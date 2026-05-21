@@ -56,6 +56,7 @@ import Icon from '@components/Icon.astro';
       err.style.display = 'block';
       return;
     }
-    window.location.href = '/compte/';
+    const next = new URLSearchParams(window.location.search).get('next');
+    window.location.href = next && next.startsWith('/') ? next : '/compte/';
   });
 </script>

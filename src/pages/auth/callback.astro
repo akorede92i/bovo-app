@@ -50,15 +50,15 @@
         setTimeout(() => { window.location.href = '/compte/connexion/'; }, 2500);
       }, 8000);
 
-      // Lit l'éventuel next= dans le hash (ex: #access_token=...&next=/menage/)
-      const hash = new URLSearchParams(window.location.hash.slice(1));
-      const next = hash.get('next') ?? '/compte/';
+      // next= est dans les query params (?next=/compte/reservations/), pas dans le hash
+      const next = new URLSearchParams(window.location.search).get('next');
+      const redirectTo = next && next.startsWith('/') ? next : '/compte/';
 
       supa.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session) {
           clearTimeout(timeout);
           msg.textContent = 'Connecté ! Redirection…';
-          window.location.replace(next);
+          window.location.replace(redirectTo);
         }
         if (event === 'SIGNED_OUT') {
           clearTimeout(timeout);
