@@ -66,7 +66,10 @@ import Layout from '@layouts/Layout.astro';
     const { error } = await supa.auth.signUp({
       email,
       password,
-      options: { data: { full_name: name, phone } },
+      options: {
+        data: { full_name: name, phone },
+        emailRedirectTo: 'https://app.bovo.bj/compte/',
+      },
     });
     if (error) {
       err.textContent = error.message;
