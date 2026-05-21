@@ -1,0 +1,177 @@
+---
+// Page de reset mot de passe.
+// Supabase redirige ici avec #access_token=...&type=recovery dans le hash.
+// On attend PASSWORD_RECOVERY, puis on affiche le formulaire de nouveau mot de passe.
+---
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+  <title>Nouveau mot de passe — Bovo</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f8f9fc; min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 0; }
+    .app { width: 100%; max-width: 480px; min-height: 100vh; background: #fff; display: flex; flex-direction: column; }
+    .topbar { display: flex; align-items: center; padding: 16px 20px; border-bottom: 1px solid #f0f0f4; }
+    .logo { font-weight: 800; font-size: 1.3rem; letter-spacing: -0.5px; color: #1a2540; text-decoration: none; }
+    .logo .o { color: #d93025; }
+    .page { padding: 28px 20px 80px; flex: 1; }
+    h1 { font-weight: 800; font-size: 1.6rem; letter-spacing: -0.5px; color: #1a2540; margin-bottom: 8px; }
+    .lead { color: #6b7280; font-size: 0.95rem; line-height: 1.5; margin-bottom: 28px; }
+    .field { margin-bottom: 16px; }
+    .field-label { display: block; font-weight: 600; font-size: 0.88rem; color: #374151; margin-bottom: 6px; }
+    .field-hint { display: block; font-size: 0.78rem; color: #9ca3af; margin-top: 4px; }
+    .input { width: 100%; height: 52px; border: 1.5px solid #e5e7eb; border-radius: 14px; padding: 0 16px; font-size: 1rem; color: #1a2540; background: #fff; outline: none; transition: border-color 0.15s; }
+    .input:focus { border-color: #4470b3; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; height: 52px; border-radius: 100px; font-weight: 700; font-size: 1rem; cursor: pointer; border: none; transition: opacity 0.15s, transform 0.1s; width: 100%; margin-top: 8px; }
+    .btn:active { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #4470b3; color: #fff; }
+    .error { color: #d93025; font-size: 0.88rem; margin: 8px 0; display: none; }
+    .success { background: #f0fdf4; border: 1.5px solid #22c55e; border-radius: 14px; padding: 16px; margin: 16px 0; display: none; }
+    .success-title { font-weight: 700; color: #16a34a; margin-bottom: 4px; }
+    .success-body { color: #4b5563; font-size: 0.88rem; }
+    .spinner-wrap { text-align: center; padding: 48px 24px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: #4470b3; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .msg { color: #6b7280; font-size: 0.95rem; }
+    .msg.error-msg { color: #d93025; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <a href="/" class="logo">B<span class="o">O</span>VO</a>
+    </header>
+
+    <main class="page">
+      <!-- État : attente du token Supabase -->
+      <div id="state-loading" class="spinner-wrap">
+        <div class="spinner"></div>
+        <p class="msg">Vérification du lien…</p>
+      </div>
+
+      <!-- État : formulaire nouveau mot de passe -->
+      <div id="state-form" hidden>
+        <h1>Nouveau mot de passe</h1>
+        <p class="lead">Choisissez un mot de passe sécurisé d'au moins 6 caractères.</p>
+        <form id="reset-form" novalidate>
+          <div class="field">
+            <label class="field-label" for="password">Nouveau mot de passe</label>
+            <input id="password" class="input" type="password" autocomplete="new-password" minlength="6" required />
+            <span class="field-hint">6 caractères minimum.</span>
+          </div>
+          <div class="field">
+            <label class="field-label" for="password2">Confirmer le mot de passe</label>
+            <input id="password2" class="input" type="password" autocomplete="new-password" minlength="6" required />
+          </div>
+          <div id="reset-error" class="error"></div>
+          <button type="submit" id="reset-btn" class="btn btn-primary">Enregistrer le mot de passe</button>
+        </form>
+      </div>
+
+      <!-- État : succès -->
+      <div id="state-success" hidden>
+        <div class="success" style="display:block;">
+          <div class="success-title">Mot de passe mis à jour ✓</div>
+          <div class="success-body">Vous allez être redirigé vers votre compte…</div>
+        </div>
+      </div>
+
+      <!-- État : lien invalide/expiré -->
+      <div id="state-error" hidden>
+        <div style="text-align:center; padding: 48px 0;">
+          <div style="font-size:2.5rem; margin-bottom:16px;">🔗</div>
+          <div style="font-weight:700; color:#1a2540; margin-bottom:8px;">Lien invalide ou expiré</div>
+          <div class="lead" style="margin-bottom:24px;">Ce lien ne fonctionne plus. Faites une nouvelle demande.</div>
+          <a href="/compte/mot-de-passe-oublie/" class="btn btn-primary" style="display:inline-flex; width:auto; padding: 0 28px;">Nouvelle demande</a>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    import { getSupabase } from '@lib/supabase';
+
+    const stateLoading = document.getElementById('state-loading')!;
+    const stateForm = document.getElementById('state-form')!;
+    const stateSuccess = document.getElementById('state-success')!;
+    const stateError = document.getElementById('state-error')!;
+
+    function show(el: HTMLElement) {
+      [stateLoading, stateForm, stateSuccess, stateError].forEach(e => e.hidden = true);
+      el.hidden = false;
+    }
+
+    const supa = getSupabase();
+
+    if (!supa) {
+      show(stateError);
+    } else {
+      // Timeout de sécurité
+      const timeout = setTimeout(() => show(stateError), 8000);
+
+      supa.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'PASSWORD_RECOVERY') {
+          clearTimeout(timeout);
+          show(stateForm);
+        } else if (event === 'SIGNED_IN' && session) {
+          // Peut arriver si le lien est un magic link et non recovery
+          clearTimeout(timeout);
+          show(stateForm);
+        }
+      });
+
+      // Force le traitement du hash
+      supa.auth.getSession();
+
+      // Formulaire
+      const form = document.getElementById('reset-form') as HTMLFormElement;
+      const errEl = document.getElementById('reset-error') as HTMLDivElement;
+      const btn = document.getElementById('reset-btn') as HTMLButtonElement;
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        errEl.style.display = 'none';
+
+        const pw = (document.getElementById('password') as HTMLInputElement).value;
+        const pw2 = (document.getElementById('password2') as HTMLInputElement).value;
+
+        if (pw.length < 6) {
+          errEl.textContent = 'Le mot de passe doit contenir au moins 6 caractères.';
+          errEl.style.display = 'block';
+          return;
+        }
+        if (pw !== pw2) {
+          errEl.textContent = 'Les deux mots de passe ne correspondent pas.';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = 'Enregistrement…';
+
+        const { error } = await supa.auth.updateUser({ password: pw });
+
+        if (error) {
+          btn.disabled = false;
+          btn.textContent = 'Enregistrer le mot de passe';
+          errEl.textContent = error.message === 'New password should be different from the old password.'
+            ? 'Le nouveau mot de passe doit être différent de l\'ancien.'
+            : 'Erreur lors de la mise à jour. Réessayez.';
+          errEl.style.display = 'block';
+          return;
+        }
+
+        show(stateSuccess);
+        setTimeout(() => { window.location.replace('/compte/'); }, 2000);
+      });
+    }
+  </script>
+</body>
+</html>

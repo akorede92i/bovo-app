@@ -117,7 +117,7 @@ import Icon from '@components/Icon.astro';
     document.getElementById('reset-password')!.addEventListener('click', async (e) => {
       e.preventDefault();
       const { error } = await supa.auth.resetPasswordForEmail(user.email, {
-        redirectTo: `${window.location.origin}/compte/connexion/`,
+        redirectTo: 'https://app.bovo.bj/auth/reset/',
       });
       if (error) {
         errEl.textContent = error.message;

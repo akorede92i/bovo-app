@@ -1,0 +1,77 @@
+---
+import Layout from '@layouts/Layout.astro';
+---
+<Layout title="Mot de passe oublié — Bovo" topbar="back" backHref="/compte/connexion/" pageTitle="Mot de passe oublié" noindex>
+  <h1 class="h-display" style="margin-bottom:8px;">Mot de passe oublié ?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Entrez votre email et on vous envoie un lien pour créer un nouveau mot de passe.</p>
+
+  <form id="forgot-form" novalidate>
+    <div class="field">
+      <label class="field-label" for="email">Email</label>
+      <input id="email" class="input" type="email" autocomplete="email" required placeholder="votre@email.com" />
+    </div>
+    <div id="forgot-error" style="color: var(--bovo-danger); display:none; margin: 8px 0; font-size:0.9rem;"></div>
+    <div id="forgot-success" hidden style="margin: 16px 0;">
+      <div class="card card-elevated" style="background: var(--bovo-success-light, #f0fdf4); border-color: var(--bovo-success); padding:16px;">
+        <div style="font-weight:600; color: var(--bovo-success); margin-bottom:4px;">Email envoyé ✓</div>
+        <div class="text-muted" style="font-size:0.88rem;">Vérifiez votre boîte de réception (et les spams). Le lien est valable 1 heure.</div>
+      </div>
+    </div>
+    <button type="submit" id="submit-btn" class="btn btn-primary btn-lg btn-block" style="margin-top:8px;">
+      Envoyer le lien
+    </button>
+  </form>
+
+  <p class="text-muted" style="text-align:center; margin-top:20px;">
+    Vous vous souvenez ? <a href="/compte/connexion/" style="color: var(--bovo-bleu); font-weight:600;">Se connecter</a>
+  </p>
+</Layout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+
+  const form = document.getElementById('forgot-form') as HTMLFormElement;
+  const err = document.getElementById('forgot-error') as HTMLDivElement;
+  const ok = document.getElementById('forgot-success') as HTMLDivElement;
+  const btn = document.getElementById('submit-btn') as HTMLButtonElement;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.style.display = 'none';
+    ok.hidden = true;
+
+    const email = (document.getElementById('email') as HTMLInputElement).value.trim();
+    if (!email) {
+      err.textContent = 'Veuillez entrer votre email.';
+      err.style.display = 'block';
+      return;
+    }
+
+    const supa = getSupabase();
+    if (!supa) {
+      err.textContent = "Service d'authentification non configuré.";
+      err.style.display = 'block';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Envoi…';
+
+    const { error } = await supa.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://app.bovo.bj/auth/reset/',
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'Envoyer le lien';
+
+    if (error) {
+      err.textContent = 'Une erreur est survenue. Réessayez.';
+      err.style.display = 'block';
+      return;
+    }
+
+    // On affiche le succès même si l'email n'existe pas (sécurité : pas d'énumération)
+    ok.hidden = false;
+    form.querySelector('button')!.disabled = true;
+  });
+</script>
