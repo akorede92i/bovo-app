@@ -110,10 +110,10 @@ const chefPriceFrom = CHEF_FREQUENCES[0].baseXof;
         <div style="flex-shrink:0; width:44px; height:44px; border-radius: var(--r-md); background: var(--bovo-bleu); color:#fff; display:flex; align-items:center; justify-content:center;">
           <Icon name="user" size={22} />
         </div>
-        <div style="flex:1;">
+        <div style="flex:1; min-width:0;">
           <div style="font-family:'Jost'; font-weight:700; font-size:1.05rem; margin-bottom:4px;">Créez votre compte Bovo</div>
           <div class="text-muted" style="margin-bottom:12px;">Sauvegardez votre adresse, suivez vos réservations, réservez en 1 clic la prochaine fois.</div>
-          <div class="flex gap-sm">
+          <div class="flex gap-sm" style="flex-wrap:wrap;">
             <a href="/compte/inscription/" class="btn btn-primary btn-sm">Créer un compte</a>
             <a href="/compte/connexion/" class="btn btn-ghost btn-sm">Se connecter</a>
           </div>
