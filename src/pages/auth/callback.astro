@@ -1,0 +1,74 @@
+---
+// Page de callback auth Supabase.
+// Supabase redirige ici après confirmation email / magic link avec #access_token=... dans le hash.
+// On attend l'événement SIGNED_IN avant de rediriger vers /compte/.
+---
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Connexion — Bovo</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <style>
+    body { margin: 0; font-family: system-ui, sans-serif; background: #f8f9fc; display: flex; align-items: center; justify-content: center; min-height: 100vh; }
+    .box { text-align: center; padding: 32px 24px; }
+    .logo { font-family: 'Jost', system-ui, sans-serif; font-weight: 800; font-size: 1.6rem; letter-spacing: -1px; color: #1a2540; margin-bottom: 24px; }
+    .logo .o { color: #d93025; }
+    .msg { color: #6b7280; font-size: 0.95rem; margin-top: 12px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: #4470b3; border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error { color: #d93025; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">B<span class="o">O</span>VO</div>
+    <div class="spinner" id="spinner"></div>
+    <p class="msg" id="msg">Connexion en cours…</p>
+  </div>
+
+  <script>
+    import { getSupabase } from '@lib/supabase';
+
+    const msg = document.getElementById('msg')!;
+    const spinner = document.getElementById('spinner')!;
+
+    const supa = getSupabase();
+
+    if (!supa) {
+      spinner.style.display = 'none';
+      msg.textContent = 'Service indisponible. Retour à l\'accueil…';
+      msg.className = 'msg error';
+      setTimeout(() => { window.location.href = '/'; }, 2000);
+    } else {
+      // Timeout de sécurité : 8 secondes
+      const timeout = setTimeout(() => {
+        spinner.style.display = 'none';
+        msg.textContent = 'Lien expiré ou déjà utilisé. Reconnectez-vous.';
+        msg.className = 'msg error';
+        setTimeout(() => { window.location.href = '/compte/connexion/'; }, 2500);
+      }, 8000);
+
+      // Lit l'éventuel next= dans le hash (ex: #access_token=...&next=/menage/)
+      const hash = new URLSearchParams(window.location.hash.slice(1));
+      const next = hash.get('next') ?? '/compte/';
+
+      supa.auth.onAuthStateChange((event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          clearTimeout(timeout);
+          msg.textContent = 'Connecté ! Redirection…';
+          window.location.replace(next);
+        }
+        if (event === 'SIGNED_OUT') {
+          clearTimeout(timeout);
+          window.location.replace('/compte/connexion/');
+        }
+      });
+
+      // getSession() force le traitement du hash #access_token
+      supa.auth.getSession();
+    }
+  </script>
+</body>
+</html>

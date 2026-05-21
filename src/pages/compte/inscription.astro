@@ -68,7 +68,7 @@ import Layout from '@layouts/Layout.astro';
       password,
       options: {
         data: { full_name: name, phone },
-        emailRedirectTo: 'https://app.bovo.bj/compte/',
+        emailRedirectTo: 'https://app.bovo.bj/auth/callback/',
       },
     });
     if (error) {
