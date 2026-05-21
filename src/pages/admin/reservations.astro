@@ -1,0 +1,261 @@
+---
+import AdminLayout from '@layouts/AdminLayout.astro';
+---
+<AdminLayout title="Réservations — Bovo Admin" pageTitle="Réservations" active="reservations">
+  <p class="admin-sub">Toutes les réservations clients, du plus récent au plus ancien.</p>
+
+  <!-- Filtres -->
+  <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:18px;">
+    <select id="filter-service" class="select" style="max-width:180px;">
+      <option value="all">Tous les services</option>
+      <option value="menage">Ménage</option>
+      <option value="airbnb">Airbnb</option>
+      <option value="demenagement">Déménagement</option>
+      <option value="chef">Chef</option>
+    </select>
+    <select id="filter-status" class="select" style="max-width:180px;">
+      <option value="all">Tous les statuts</option>
+      <option value="pending">En attente</option>
+      <option value="confirmed">Confirmée</option>
+      <option value="assigned">Assignée</option>
+      <option value="in_progress">En cours</option>
+      <option value="done">Terminée</option>
+      <option value="cancelled">Annulée</option>
+    </select>
+  </div>
+
+  <!-- Liste -->
+  <div id="list-loading" style="color: var(--bovo-muted); padding: 24px; text-align:center;">Chargement…</div>
+
+  <table id="list-table" class="admin-table admin-table-mobile" hidden>
+    <thead>
+      <tr>
+        <th></th>
+        <th>Client</th>
+        <th>Service</th>
+        <th>Prévu</th>
+        <th>Total</th>
+        <th>Statut</th>
+        <th>Worker</th>
+      </tr>
+    </thead>
+    <tbody id="list-body"></tbody>
+  </table>
+
+  <div id="list-mobile" class="mobile-cards" hidden></div>
+
+  <div id="list-empty" hidden class="empty-state">
+    <div class="empty-state-emoji">📭</div>
+    <div class="empty-state-title">Aucune réservation</div>
+    <div class="empty-state-desc">Aucune réservation ne correspond à ces filtres.</div>
+  </div>
+
+  <!-- MODAL DÉTAIL -->
+  <div id="modal" hidden role="dialog" aria-modal="true" style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; width:100%; max-width:680px; max-height:90vh; overflow-y:auto; border-radius: var(--r-xl); padding:24px;">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h2 id="modal-title" style="font-family:'Jost'; font-weight:700; font-size:1.2rem;">Réservation</h2>
+        <button id="modal-close" class="topbar-back" aria-label="Fermer">✕</button>
+      </div>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS } from '@lib/admin';
+  import { fcfa } from '@lib/catalog';
+
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('list-loading')!.textContent = 'Supabase non configuré.';
+  } else {
+    const filterService = document.getElementById('filter-service') as HTMLSelectElement;
+    const filterStatus = document.getElementById('filter-status') as HTMLSelectElement;
+    const tableBody = document.getElementById('list-body')!;
+    const tableEl = document.getElementById('list-table')!;
+    const mobileEl = document.getElementById('list-mobile')!;
+    const emptyEl = document.getElementById('list-empty')!;
+    const loadingEl = document.getElementById('list-loading')!;
+    const modal = document.getElementById('modal')!;
+    const modalBody = document.getElementById('modal-body')!;
+    const modalTitle = document.getElementById('modal-title')!;
+
+    // Cache des workers pour le selector d'assignation
+    const { data: workersData } = await supa.from('profiles').select('id, full_name, role').in('role', ['worker', 'admin']);
+    const workers = workersData ?? [];
+
+    async function load() {
+      loadingEl.hidden = false;
+      tableEl.hidden = true;
+      mobileEl.hidden = true;
+      emptyEl.hidden = true;
+
+      let q = supa.from('reservations').select('*').order('scheduled_at', { ascending: false, nullsFirst: false });
+      if (filterService.value !== 'all') q = q.eq('service_type', filterService.value);
+      if (filterStatus.value !== 'all') q = q.eq('status', filterStatus.value);
+
+      const { data, error } = await q.limit(200);
+      loadingEl.hidden = true;
+      if (error) {
+        loadingEl.textContent = `Erreur : ${error.message}`;
+        loadingEl.hidden = false;
+        return;
+      }
+      const list = data ?? [];
+      if (list.length === 0) {
+        emptyEl.hidden = false;
+        return;
+      }
+
+      // Desktop table
+      tableBody.innerHTML = list.map((r: any) => {
+        const dateStr = r.scheduled_at ? new Date(r.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+        const worker = workers.find((w: any) => w.id === r.assigned_worker_id);
+        return `
+          <tr data-id="${r.id}">
+            <td style="font-size:1.4rem;">${SERVICE_ICONS[r.service_type] ?? '✦'}</td>
+            <td>
+              <div style="font-weight:600;">${r.guest_name ?? 'Anonyme'}</div>
+              <div style="font-size:0.8rem; color:var(--bovo-muted);">${r.guest_phone ?? '—'}</div>
+            </td>
+            <td>${SERVICE_LABELS[r.service_type] ?? r.service_type}</td>
+            <td style="white-space:nowrap;">${dateStr}</td>
+            <td style="font-family:'Jost'; font-weight:700;">${r.estimated_total_xof ? fcfa(r.estimated_total_xof) : '—'}</td>
+            <td><span class="status-badge" style="background:${STATUS_COLORS[r.status] ?? '#6B7280'};">${STATUS_LABELS[r.status] ?? r.status}</span></td>
+            <td style="font-size:0.86rem;">${worker?.full_name ?? '<span style="color:var(--bovo-muted);">non assigné</span>'}</td>
+          </tr>
+        `;
+      }).join('');
+      tableEl.hidden = false;
+
+      // Mobile cards
+      mobileEl.innerHTML = list.map((r: any) => {
+        const dateStr = r.scheduled_at ? new Date(r.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+        return `
+          <div data-id="${r.id}" style="background:#fff; border:1px solid var(--bovo-line-soft); border-radius: var(--r-lg); padding:14px; margin-bottom:10px;">
+            <div style="display:flex; gap:12px; align-items:flex-start;">
+              <div style="font-size:1.6rem;">${SERVICE_ICONS[r.service_type] ?? '✦'}</div>
+              <div style="flex:1; min-width:0;">
+                <div style="font-weight:600;">${r.guest_name ?? 'Anonyme'} — ${SERVICE_LABELS[r.service_type] ?? r.service_type}</div>
+                <div style="font-size:0.84rem; color:var(--bovo-muted); margin-top:2px;">${dateStr} · ${r.guest_phone ?? '—'}</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
+                  <span class="status-badge" style="background:${STATUS_COLORS[r.status] ?? '#6B7280'};">${STATUS_LABELS[r.status] ?? r.status}</span>
+                  <span style="font-family:'Jost'; font-weight:700;">${r.estimated_total_xof ? fcfa(r.estimated_total_xof) : '—'}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      mobileEl.hidden = false;
+
+      // Click → modal
+      tableBody.querySelectorAll('tr[data-id]').forEach((tr) => tr.addEventListener('click', () => openModal(tr.getAttribute('data-id')!)));
+      mobileEl.querySelectorAll('[data-id]').forEach((c) => c.addEventListener('click', () => openModal(c.getAttribute('data-id')!)));
+    }
+
+    function row(label: string, value: string) {
+      return `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--bovo-line-soft);"><span style="color:var(--bovo-muted); font-size:0.86rem;">${label}</span><span style="font-weight:600; text-align:right;">${value}</span></div>`;
+    }
+
+    async function openModal(id: string) {
+      modalBody.innerHTML = '<div style="text-align:center; padding:40px; color: var(--bovo-muted);">Chargement…</div>';
+      modal.hidden = false;
+
+      const { data: r, error } = await supa.from('reservations').select('*').eq('id', id).maybeSingle();
+      if (error || !r) {
+        modalBody.innerHTML = `<div style="color:var(--bovo-danger);">Erreur : ${error?.message ?? 'introuvable'}</div>`;
+        return;
+      }
+
+      modalTitle.textContent = `${SERVICE_ICONS[r.service_type]} ${SERVICE_LABELS[r.service_type]} — ${r.guest_name ?? 'Anonyme'}`;
+
+      const dateStr = r.scheduled_at ? new Date(r.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' }) : '—';
+      const payload = r.payload ?? {};
+      const addr = payload.address ?? payload.from ?? {};
+      const addressLine = addr.street ? `${addr.street}${addr.quartier ? ', ' + addr.quartier : ''}, ${addr.zone ?? ''}` : '—';
+
+      const workerOptions = workers.map((w: any) => `<option value="${w.id}" ${w.id === r.assigned_worker_id ? 'selected' : ''}>${w.full_name || 'Worker sans nom'}</option>`).join('');
+
+      modalBody.innerHTML = `
+        <div style="margin-bottom:20px;">
+          <div style="display:flex; gap:8px; align-items:center; margin-bottom:12px;">
+            <span class="status-badge" style="background:${STATUS_COLORS[r.status]};">${STATUS_LABELS[r.status]}</span>
+            ${r.deposit_status === 'paid' ? '<span class="status-badge" style="background:var(--bovo-success);">Acompte payé</span>' : ''}
+            ${r.deposit_status === 'pending' ? '<span class="status-badge" style="background:var(--bovo-warning);">Acompte demandé</span>' : ''}
+          </div>
+        </div>
+
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Client</h3>
+        ${row('Nom', r.guest_name ?? '—')}
+        ${row('Téléphone', r.guest_phone ? `<a href="https://wa.me/${r.guest_phone.replace(/\D/g, '')}" style="color:var(--bovo-bleu);">${r.guest_phone}</a>` : '—')}
+        ${row('Email', r.guest_email ?? '—')}
+
+        <h3 style="font-family:'Jost'; font-weight:700; margin: 20px 0 10px;">Prestation</h3>
+        ${row('Date prévue', dateStr)}
+        ${row('Total estimé', r.estimated_total_xof ? fcfa(r.estimated_total_xof) : '—')}
+        ${row('Adresse', addressLine)}
+
+        <h3 style="font-family:'Jost'; font-weight:700; margin: 20px 0 10px;">Détail tunnel</h3>
+        <pre style="background:var(--bovo-bg-soft); padding:14px; border-radius: var(--r-md); font-size:0.78rem; overflow-x:auto; white-space:pre-wrap;">${JSON.stringify(payload, null, 2)}</pre>
+
+        <h3 style="font-family:'Jost'; font-weight:700; margin: 20px 0 10px;">Actions admin</h3>
+        <div class="field" style="margin-bottom:14px;">
+          <label class="field-label">Assigner un worker</label>
+          <select id="worker-select" class="select">
+            <option value="">— Non assigné —</option>
+            ${workerOptions}
+          </select>
+        </div>
+        <div class="field">
+          <label class="field-label">Statut</label>
+          <select id="status-select" class="select">
+            ${Object.entries(STATUS_LABELS).map(([k, v]) => `<option value="${k}" ${k === r.status ? 'selected' : ''}>${v}</option>`).join('')}
+          </select>
+        </div>
+        <div id="action-error" style="color:var(--bovo-danger); display:none; margin:8px 0;"></div>
+        <div id="action-success" style="color:var(--bovo-success); display:none; margin:8px 0;"></div>
+        <button id="save-action" class="btn btn-primary btn-block" style="margin-top:14px;">Enregistrer les modifications</button>
+      `;
+
+      document.getElementById('save-action')!.addEventListener('click', async () => {
+        const newStatus = (document.getElementById('status-select') as HTMLSelectElement).value;
+        const newWorker = (document.getElementById('worker-select') as HTMLSelectElement).value || null;
+        const errEl = document.getElementById('action-error')!;
+        const okEl = document.getElementById('action-success')!;
+        errEl.style.display = 'none';
+        okEl.style.display = 'none';
+
+        const { error } = await supa.from('reservations').update({
+          status: newStatus,
+          assigned_worker_id: newWorker,
+          updated_at: new Date().toISOString(),
+        }).eq('id', id);
+
+        if (error) {
+          errEl.textContent = error.message;
+          errEl.style.display = 'block';
+          return;
+        }
+        okEl.textContent = '✓ Modifications enregistrées';
+        okEl.style.display = 'block';
+        setTimeout(() => { modal.hidden = true; load(); }, 800);
+      });
+    }
+
+    document.getElementById('modal-close')!.addEventListener('click', () => modal.hidden = true);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
+
+    filterService.addEventListener('change', load);
+    filterStatus.addEventListener('change', load);
+
+    // Si ?id= dans l'URL → ouvrir directement le modal
+    const urlParams = new URLSearchParams(window.location.search);
+    const directId = urlParams.get('id');
+
+    await load();
+    if (directId) openModal(directId);
+  }
+</script>

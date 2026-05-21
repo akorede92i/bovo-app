@@ -1,0 +1,93 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+
+const SLOTS = [
+  { id: '08-10', label: '08:00 — 10:00', meta: 'Matinée' },
+  { id: '10-12', label: '10:00 — 12:00', meta: 'Fin de matinée' },
+  { id: '13-15', label: '13:00 — 15:00', meta: 'Début d\'après-midi' },
+  { id: '15-17', label: '15:00 — 17:00', meta: 'Après-midi' },
+  { id: '17-19', label: '17:00 — 19:00', meta: 'Fin d\'après-midi' },
+];
+
+// date minimum = demain
+const tomorrow = new Date();
+tomorrow.setDate(tomorrow.getDate() + 1);
+const minDate = tomorrow.toISOString().slice(0, 10);
+---
+<Layout
+  title="Ménage — Étape 5 : Date et créneau | Bovo"
+  topbar="back"
+  backHref="/menage/adresse/"
+  pageTitle="Ménage à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={5} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Quand souhaitez-vous notre passage&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Choisissez une date et un créneau de 2h.</p>
+
+  <div class="field">
+    <label class="field-label" for="date">Date</label>
+    <input id="date" class="input" type="date" min={minDate} required />
+  </div>
+
+  <div class="field" style="margin-top:24px;">
+    <span class="field-label">Créneau</span>
+    <div class="stack-sm" id="slot-list">
+      {SLOTS.map((s) => (
+        <button class="opt" data-value={s.id}>
+          <span class="opt-radio"></span>
+          <span class="opt-body">
+            <span class="opt-title">{s.label}</span>
+            <span class="opt-meta">{s.meta}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type MenageState } from '@lib/state';
+
+  const dateInput = document.getElementById('date') as HTMLInputElement;
+  const slotList = document.getElementById('slot-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<MenageState>('menage');
+  let date = s.date ?? '';
+  let slot = s.slot ?? '';
+  if (date) dateInput.value = date;
+
+  function render() {
+    slotList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      el.classList.toggle('is-active', el.dataset.value === slot);
+    });
+    cta.disabled = !(date && slot);
+  }
+
+  dateInput.addEventListener('change', () => {
+    date = dateInput.value;
+    saveState<MenageState>('menage', { date });
+    render();
+  });
+
+  slotList.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    slot = btn.dataset.value!;
+    saveState<MenageState>('menage', { slot });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (!date || !slot) return;
+    window.location.href = '/menage/contact/';
+  });
+
+  render();
+</script>

@@ -1,0 +1,73 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Chef — Étape 4 : Préférences | Bovo"
+  topbar="back"
+  backHref="/chef/cuisine/"
+  pageTitle="Chef à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={4} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Vos préférences alimentaires</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Pour que votre chef cuisine au plus près de vos goûts.</p>
+
+  <div class="field">
+    <label class="field-label" for="people">Nombre de personnes au foyer</label>
+    <div class="flex" style="justify-content:space-between; align-items:center; background: var(--bovo-bg-soft); border-radius: var(--r-md); padding:14px 16px;">
+      <div>
+        <div style="font-family:'Jost'; font-weight:700; font-size:1.4rem;" id="people-label">2</div>
+        <div class="text-muted">personnes</div>
+      </div>
+      <div class="qty">
+        <button class="qty-btn" id="people-minus" aria-label="Moins de personnes"><Icon name="minus" size={18} /></button>
+        <span class="qty-val" id="people-val">2</span>
+        <button class="qty-btn" id="people-plus" aria-label="Plus de personnes"><Icon name="plus" size={18} /></button>
+      </div>
+    </div>
+  </div>
+
+  <div class="field" style="margin-top:24px;">
+    <label class="field-label" for="diet">Allergies, régimes ou ingrédients à éviter</label>
+    <textarea id="diet" class="textarea" placeholder="ex. Sans arachide. Pas de porc. Mon fils est intolérant au lactose. Préférence poisson plutôt que viande rouge."></textarea>
+    <span class="field-hint">Plus c'est précis, mieux le chef adaptera ses menus.</span>
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" />
+</Layout>
+
+<script>
+  import { loadState, saveState, type ChefState } from '@lib/state';
+
+  const peopleVal = document.getElementById('people-val')!;
+  const peopleLabel = document.getElementById('people-label')!;
+  const minus = document.getElementById('people-minus') as HTMLButtonElement;
+  const plus = document.getElementById('people-plus') as HTMLButtonElement;
+  const diet = document.getElementById('diet') as HTMLTextAreaElement;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<ChefState>('chef');
+  let people = s.people ?? 2;
+  if (s.diet) diet.value = s.diet;
+
+  function render() {
+    peopleVal.textContent = String(people);
+    peopleLabel.textContent = String(people);
+    minus.disabled = people <= 1;
+    plus.disabled = people >= 20;
+  }
+
+  minus.addEventListener('click', () => { if (people > 1) { people--; render(); } });
+  plus.addEventListener('click', () => { if (people < 20) { people++; render(); } });
+
+  cta.addEventListener('click', () => {
+    saveState<ChefState>('chef', { people, diet: diet.value.trim() || undefined });
+    window.location.href = '/chef/planning/';
+  });
+
+  render();
+</script>

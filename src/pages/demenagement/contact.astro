@@ -1,0 +1,107 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Déménagement — Étape 6 : Coordonnées | Bovo"
+  topbar="back"
+  backHref="/demenagement/date/"
+  pageTitle="Déménagement"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={6} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Vos coordonnées</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Bovo vous rappelle dans la journée pour valider le devis.</p>
+
+  <div class="field">
+    <label class="field-label" for="name">Nom complet</label>
+    <input id="name" class="input" type="text" autocomplete="name" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="phone">Téléphone (WhatsApp)</label>
+    <input id="phone" class="input" type="tel" autocomplete="tel" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="email">Email</label>
+    <input id="email" class="input" type="email" autocomplete="email" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="notes">Précisions (optionnel)</label>
+    <textarea id="notes" class="textarea" placeholder="Meubles fragiles, objets de valeur, animaux à transporter…"></textarea>
+  </div>
+
+  <!-- Acompte Kkiapay -->
+  <div class="card card-elevated" style="margin-top:24px; background: linear-gradient(135deg, var(--bovo-bleu-light), #fff); border-color: transparent;">
+    <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer;">
+      <input type="checkbox" id="want-deposit" style="margin-top:3px; transform: scale(1.2); accent-color: var(--bovo-bleu);" />
+      <span>
+        <span style="font-weight:600; display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <Icon name="shield" size={16} class="" />
+          Verrouiller ma date avec un acompte de 20%
+        </span>
+        <span class="text-muted">Vous payez 20% maintenant par Mobile Money (Kkiapay), le solde le jour J. Date 100% bloquée et prioritaire.</span>
+      </span>
+    </label>
+  </div>
+
+  <!-- Compte client -->
+  <div class="card card-elevated" style="margin-top:14px; background: var(--bovo-bg-soft); border-color: transparent;">
+    <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer;">
+      <input type="checkbox" id="create-account" style="margin-top:3px; transform: scale(1.2); accent-color: var(--bovo-bleu);" />
+      <span>
+        <span style="font-weight:600; display:block; margin-bottom:4px;">Créer mon compte Bovo</span>
+        <span class="text-muted">Sauvegardez vos infos, suivez votre déménagement, contact direct avec votre chef d'équipe.</span>
+      </span>
+    </label>
+  </div>
+
+  <CtaFooter buttonLabel="Voir le récapitulatif" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type DemenagementState } from '@lib/state';
+
+  const name = document.getElementById('name') as HTMLInputElement;
+  const phone = document.getElementById('phone') as HTMLInputElement;
+  const email = document.getElementById('email') as HTMLInputElement;
+  const notes = document.getElementById('notes') as HTMLTextAreaElement;
+  const deposit = document.getElementById('want-deposit') as HTMLInputElement;
+  const createAccount = document.getElementById('create-account') as HTMLInputElement;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<DemenagementState>('demenagement');
+  if (s.customer) {
+    name.value = s.customer.fullName ?? '';
+    phone.value = s.customer.phone ?? '';
+    email.value = s.customer.email ?? '';
+    notes.value = s.customer.notes ?? '';
+  }
+  if (s.wantsDeposit) deposit.checked = true;
+
+  function validate() {
+    cta.disabled = !(name.value.trim() && phone.value.trim() && email.value.trim().includes('@'));
+  }
+  [name, phone, email, notes].forEach((el) => el.addEventListener('input', validate));
+
+  cta.addEventListener('click', () => {
+    saveState<DemenagementState>('demenagement', {
+      customer: {
+        fullName: name.value.trim(),
+        phone: phone.value.trim(),
+        email: email.value.trim(),
+        notes: notes.value.trim() || undefined,
+      },
+      wantsDeposit: deposit.checked,
+    });
+    sessionStorage.setItem('bovo:create-account', createAccount.checked ? '1' : '0');
+    window.location.href = '/demenagement/recap/';
+  });
+
+  validate();
+</script>

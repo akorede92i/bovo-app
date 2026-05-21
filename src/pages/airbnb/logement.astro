@@ -1,0 +1,78 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import { AIRBNB_TURNOVERS, fcfa } from '@lib/catalog';
+---
+<Layout
+  title="Airbnb — Étape 2 : Votre logement | Bovo"
+  topbar="back"
+  backHref="/airbnb/"
+  pageTitle="Service Airbnb"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={2} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Quelle est la taille du logement&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Le tarif est un forfait par turnover, tout compris (sauf options).</p>
+
+  <div class="stack-sm" id="size-list">
+    {AIRBNB_TURNOVERS.map((t) => (
+      <button class="opt" data-value={t.id} data-price={t.priceXof} data-duration={t.durationMin}>
+        <span class="opt-radio"></span>
+        <span class="opt-body">
+          <span class="opt-title">{t.label}</span>
+          <span class="opt-meta">{t.meta} · ~{t.durationMin} min</span>
+        </span>
+        <span class="opt-price">{fcfa(t.priceXof)}</span>
+      </button>
+    ))}
+  </div>
+
+  <CtaFooter
+    buttonLabel="Continuer"
+    buttonType="button"
+    buttonId="cta-next"
+    disabled={true}
+    priceLabel="Forfait turnover"
+    priceValue="—"
+  />
+</Layout>
+
+<script>
+  import { loadState, saveState, type AirbnbState } from '@lib/state';
+  import { AIRBNB_TURNOVERS, fcfa } from '@lib/catalog';
+
+  const list = document.getElementById('size-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  const priceEl = document.querySelector('.cta-footer .price-line strong')!;
+
+  let current = loadState<AirbnbState>('airbnb').size ?? '';
+
+  function render() {
+    let price = 0;
+    list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      const active = el.dataset.value === current;
+      el.classList.toggle('is-active', active);
+      if (active) price = Number(el.dataset.price);
+    });
+    cta.disabled = !current;
+    priceEl.textContent = current ? fcfa(price) : '—';
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    current = btn.dataset.value!;
+    const t = AIRBNB_TURNOVERS.find((x) => x.id === current)!;
+    saveState<AirbnbState>('airbnb', { size: current, estimatedPerTurnover: t.priceXof });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (!current) return;
+    window.location.href = '/airbnb/mode/';
+  });
+
+  render();
+</script>

@@ -1,0 +1,71 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import { DEM_VOLUMES, fcfa } from '@lib/catalog';
+---
+<Layout
+  title="Déménagement — Étape 1 : Volume | Bovo"
+  topbar="back"
+  backHref="/"
+  pageTitle="Déménagement"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={1} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Quel volume à déménager&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Le forfait inclut équipe + camion. Les options arrivent à l'étape 4.</p>
+
+  <div class="stack-sm" id="vol-list">
+    {DEM_VOLUMES.map((v) => (
+      <button class="opt" data-value={v.id} data-price={v.priceXof}>
+        <span class="opt-radio"></span>
+        <span class="opt-body">
+          <span class="opt-title">{v.label}</span>
+          <span class="opt-meta">{v.meta}</span>
+        </span>
+        <span class="opt-price">{fcfa(v.priceXof)}</span>
+      </button>
+    ))}
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} priceLabel="Forfait de base" priceValue="—" />
+</Layout>
+
+<script>
+  import { loadState, saveState, type DemenagementState } from '@lib/state';
+  import { DEM_VOLUMES, fcfa } from '@lib/catalog';
+
+  const list = document.getElementById('vol-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  const priceEl = document.querySelector('.cta-footer .price-line strong')!;
+
+  let current = loadState<DemenagementState>('demenagement').volume ?? '';
+
+  function render() {
+    let price = 0;
+    list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      const active = el.dataset.value === current;
+      el.classList.toggle('is-active', active);
+      if (active) price = Number(el.dataset.price);
+    });
+    cta.disabled = !current;
+    priceEl.textContent = current ? fcfa(price) : '—';
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    current = btn.dataset.value!;
+    const v = DEM_VOLUMES.find((x) => x.id === current)!;
+    saveState<DemenagementState>('demenagement', { volume: current, estimatedTotal: v.priceXof });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (!current) return;
+    window.location.href = '/demenagement/depart/';
+  });
+
+  render();
+</script>

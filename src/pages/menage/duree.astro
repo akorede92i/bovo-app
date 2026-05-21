@@ -1,0 +1,121 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+import { MENAGE_FREQUENCES, MENAGE_MIN_HOURS, MENAGE_MAX_HOURS } from '@lib/catalog';
+---
+<Layout
+  title="Ménage — Étape 2 : Durée et fréquence | Bovo"
+  topbar="back"
+  backHref="/menage/"
+  pageTitle="Ménage à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={2} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Combien de temps et à quelle fréquence&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:28px;">Minimum 2h. Plus c'est régulier, plus c'est avantageux.</p>
+
+  <div class="field">
+    <span class="field-label">Durée par passage</span>
+    <div class="flex" style="justify-content:space-between; align-items:center; background: var(--bovo-bg-soft); border-radius: var(--r-md); padding:14px 16px;">
+      <div>
+        <div style="font-family:'Jost'; font-weight:700; font-size:1.4rem;" id="hours-label">2h</div>
+        <div class="text-muted">par intervention</div>
+      </div>
+      <div class="qty">
+        <button class="qty-btn" id="hours-minus" aria-label="Diminuer la durée">
+          <Icon name="minus" size={18} />
+        </button>
+        <span class="qty-val" id="hours-val">2</span>
+        <button class="qty-btn" id="hours-plus" aria-label="Augmenter la durée">
+          <Icon name="plus" size={18} />
+        </button>
+      </div>
+    </div>
+    <span class="field-hint">De {MENAGE_MIN_HOURS}h à {MENAGE_MAX_HOURS}h</span>
+  </div>
+
+  <div class="field" style="margin-top:28px;">
+    <span class="field-label">Fréquence</span>
+    <div class="stack-sm" id="freq-list">
+      {MENAGE_FREQUENCES.map((f) => (
+        <button class="opt" data-value={f.id} data-discount={f.discount}>
+          <span class="opt-radio"></span>
+          <span class="opt-body">
+            <span class="opt-title">{f.label}</span>
+            <span class="opt-meta">{f.meta}</span>
+          </span>
+          {f.discount > 0 && <span class="opt-price">-{Math.round(f.discount * 100)}%</span>}
+        </button>
+      ))}
+    </div>
+  </div>
+
+  <CtaFooter
+    buttonLabel="Continuer"
+    buttonType="button"
+    buttonId="cta-next"
+    disabled={true}
+    priceLabel="Estimation pour ce passage"
+    priceValue="—"
+  />
+</Layout>
+
+<script>
+  import { loadState, saveState, type MenageState } from '@lib/state';
+  import { MENAGE_HOURLY_XOF, MENAGE_MIN_HOURS, MENAGE_MAX_HOURS, fcfa } from '@lib/catalog';
+
+  const hoursVal = document.getElementById('hours-val')!;
+  const hoursLabel = document.getElementById('hours-label')!;
+  const minus = document.getElementById('hours-minus') as HTMLButtonElement;
+  const plus = document.getElementById('hours-plus') as HTMLButtonElement;
+  const freqList = document.getElementById('freq-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  const priceEl = document.querySelector('.cta-footer .price-line strong')!;
+
+  const state = loadState<MenageState>('menage');
+  let hours = state.hours ?? MENAGE_MIN_HOURS;
+  let freq = state.frequence ?? '';
+
+  function render() {
+    hoursVal.textContent = String(hours);
+    hoursLabel.textContent = `${hours}h`;
+    minus.disabled = hours <= MENAGE_MIN_HOURS;
+    plus.disabled = hours >= MENAGE_MAX_HOURS;
+
+    freqList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      el.classList.toggle('is-active', el.dataset.value === freq);
+    });
+
+    // estimation
+    const discount = Number(freqList.querySelector<HTMLButtonElement>(`.opt[data-value="${freq}"]`)?.dataset.discount ?? 0);
+    const total = Math.round(hours * MENAGE_HOURLY_XOF * (1 - discount));
+    priceEl.textContent = freq ? fcfa(total) : '—';
+
+    cta.disabled = !freq;
+  }
+
+  minus.addEventListener('click', () => {
+    if (hours > MENAGE_MIN_HOURS) { hours--; saveState<MenageState>('menage', { hours }); render(); }
+  });
+  plus.addEventListener('click', () => {
+    if (hours < MENAGE_MAX_HOURS) { hours++; saveState<MenageState>('menage', { hours }); render(); }
+  });
+
+  freqList.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    freq = btn.dataset.value!;
+    saveState<MenageState>('menage', { frequence: freq });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (!freq) return;
+    window.location.href = '/menage/options/';
+  });
+
+  render();
+</script>

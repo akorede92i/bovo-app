@@ -1,0 +1,119 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Service Airbnb hosts — Bovo Cotonou"
+  topbar="back"
+  backHref="/"
+  pageTitle="Service Airbnb"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={1} /></Fragment>
+
+  <span class="text-tag" style="margin-bottom:12px; display:block;">Spécial hosts</span>
+  <h1 class="h-display" style="margin-bottom:8px;">Bovo gère vos turnovers Airbnb.</h1>
+  <p class="text-lead" style="margin-bottom:24px;">
+    Ménage, linge, restock, photos qualité, remise des clés.
+    Connectez votre calendrier iCal et on s'occupe de tout entre chaque voyageur.
+  </p>
+
+  <!-- Bénéfices -->
+  <div class="card card-elevated" style="margin-bottom:24px;">
+    <div class="stack-md">
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <div style="flex-shrink:0; color: var(--bovo-bleu);"><Icon name="calendar" size={22} /></div>
+        <div>
+          <div style="font-weight:600;">Planning automatique</div>
+          <div class="text-muted">Importez votre iCal Airbnb, on cale les turnovers entre check-out et check-in.</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <div style="flex-shrink:0; color: var(--bovo-bleu);"><Icon name="sparkles" size={22} /></div>
+        <div>
+          <div style="font-weight:600;">Tout inclus selon vos options</div>
+          <div class="text-muted">Linge propre, savon-papier-café restockés, photos envoyées après chaque passage.</div>
+        </div>
+      </div>
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <div style="flex-shrink:0; color: var(--bovo-bleu);"><Icon name="shield" size={22} /></div>
+        <div>
+          <div style="font-weight:600;">Équipe dédiée Airbnb</div>
+          <div class="text-muted">Workers formés au standard hôtel, photo après chaque turnover.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Combien de logements -->
+  <h2 class="h-section" style="margin-bottom:14px;">Combien de logements gérez-vous&nbsp;?</h2>
+  <div class="stack-sm" id="count-list">
+    <button class="opt" data-value="1">
+      <span class="opt-radio"></span>
+      <span class="opt-body">
+        <span class="opt-title">1 logement</span>
+        <span class="opt-meta">Je veux configurer mon logement</span>
+      </span>
+    </button>
+    <button class="opt" data-value="2-3">
+      <span class="opt-radio"></span>
+      <span class="opt-body">
+        <span class="opt-title">2 à 3 logements</span>
+        <span class="opt-meta">On configure le premier, puis on ajoute les autres après</span>
+      </span>
+    </button>
+    <button class="opt" data-value="4+">
+      <span class="opt-radio"></span>
+      <span class="opt-body">
+        <span class="opt-title">4 logements ou plus</span>
+        <span class="opt-meta">On vous propose un onboarding sur-mesure par WhatsApp</span>
+      </span>
+    </button>
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type AirbnbState } from '@lib/state';
+
+  const list = document.getElementById('count-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  let selected = loadState<AirbnbState>('airbnb').propertyCount?.toString() ?? '';
+
+  function render() {
+    list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      el.classList.toggle('is-active', el.dataset.value === selected);
+    });
+    cta.disabled = !selected;
+    // Si "4+" sélectionné → on change le CTA pour aller vers WhatsApp
+    if (selected === '4+') {
+      cta.textContent = 'Démarrer sur WhatsApp';
+    } else {
+      cta.textContent = 'Continuer';
+    }
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    selected = btn.dataset.value!;
+    const num = selected === '4+' ? 4 : selected === '2-3' ? 2 : 1;
+    saveState<AirbnbState>('airbnb', { propertyCount: num });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (!selected) return;
+    if (selected === '4+') {
+      const msg = encodeURIComponent("Bonjour Bovo, je suis host Airbnb avec 4 logements ou plus. J'aimerais discuter d'un onboarding sur-mesure pour la gestion des turnovers.");
+      window.location.href = `https://wa.me/2290196677743?text=${msg}`;
+      return;
+    }
+    window.location.href = '/airbnb/logement/';
+  });
+
+  render();
+</script>

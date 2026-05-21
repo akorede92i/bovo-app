@@ -1,0 +1,148 @@
+---
+import Layout from '@layouts/Layout.astro';
+import ServiceCard from '@components/ServiceCard.astro';
+import Icon from '@components/Icon.astro';
+import { fcfa, MENAGE_HOURLY_XOF, MENAGE_MIN_HOURS, AIRBNB_TURNOVERS, DEM_VOLUMES, CHEF_FREQUENCES } from '@lib/catalog';
+
+const menagePriceFrom = MENAGE_HOURLY_XOF * MENAGE_MIN_HOURS;
+const airbnbPriceFrom = AIRBNB_TURNOVERS[0].priceXof;
+const demPriceFrom = DEM_VOLUMES[0].priceXof;
+const chefPriceFrom = CHEF_FREQUENCES[0].baseXof;
+---
+<Layout
+  title="Bovo — Réservez votre prestation à Cotonou en 2 minutes"
+  description="Ménage, déménagement, chef à domicile et service Airbnb à Cotonou, Calavi, Porto-Novo. Réservez en ligne, prestataires vérifiés, paiement Mobile Money."
+  topbar="logo"
+>
+  <!-- HERO -->
+  <section class="hero-mobile">
+    <span class="hero-mobile-tag">Cotonou • Calavi • Porto-Novo</span>
+    <h1>Votre prestation, <span class="accent">réservée en 2 min.</span></h1>
+    <p class="hero-mobile-sub">Votre maison propre, votre repas prêt.</p>
+    <p class="hero-mobile-desc">
+      Ménage, déménagement, chef à domicile et turnover Airbnb. Prestataires Bovo vérifiés,
+      tarifs clairs, intervention 7j/7.
+    </p>
+  </section>
+
+  <!-- TRUST PILLS -->
+  <div class="section">
+    <div class="trust-row">
+      <span class="trust-pill"><Icon name="shield" size={16} /> Équipes vérifiées</span>
+      <span class="trust-pill"><Icon name="star" size={16} /> 4,8/5 satisfaction</span>
+      <span class="trust-pill"><Icon name="clock" size={16} /> Intervention sous 24h</span>
+      <span class="trust-pill"><Icon name="phone" size={16} /> Support WhatsApp 7j/7</span>
+    </div>
+  </div>
+
+  <!-- 4 SERVICES -->
+  <div class="section">
+    <div class="section-h">
+      <h2>Que peut-on faire pour vous ?</h2>
+    </div>
+    <div class="stack-md">
+      <ServiceCard
+        href="/menage/"
+        icon="broom"
+        iconColor="bleu"
+        title="Ménage à domicile"
+        meta={`Dès <strong>${fcfa(menagePriceFrom)}</strong> · à partir de 2h`}
+      />
+      <ServiceCard
+        href="/airbnb/"
+        icon="airbnb"
+        iconColor="rouge"
+        title="Service Airbnb (hosts)"
+        meta={`Dès <strong>${fcfa(airbnbPriceFrom)}</strong>/turnover · auto avec votre iCal`}
+        badge="Pro"
+      />
+      <ServiceCard
+        href="/demenagement/"
+        icon="truck"
+        iconColor="bleu"
+        title="Déménagement"
+        meta={`Dès <strong>${fcfa(demPriceFrom)}</strong> · cartons inclus`}
+      />
+      <ServiceCard
+        href="/chef/"
+        icon="chef"
+        iconColor="rouge"
+        title="Chef à domicile"
+        meta={`Dès <strong>${fcfa(chefPriceFrom)}</strong>/mois · engagement 1 mois min`}
+      />
+    </div>
+  </div>
+
+  <!-- COMMENT ÇA MARCHE -->
+  <div class="section">
+    <div class="section-h">
+      <h2>Comment ça marche</h2>
+    </div>
+    <div class="stack-md">
+      <div class="card card-elevated" style="display: flex; gap: 14px; align-items: flex-start;">
+        <div style="flex-shrink:0; width:36px; height:36px; border-radius:50%; background: var(--bovo-bleu-light); color: var(--bovo-bleu); display:flex; align-items:center; justify-content:center; font-family:'Jost'; font-weight:800;">1</div>
+        <div>
+          <div style="font-weight:600; margin-bottom:2px;">Choisissez votre service</div>
+          <div class="text-muted">Ménage, Airbnb, déménagement ou chef. Tarif affiché en direct.</div>
+        </div>
+      </div>
+      <div class="card card-elevated" style="display: flex; gap: 14px; align-items: flex-start;">
+        <div style="flex-shrink:0; width:36px; height:36px; border-radius:50%; background: var(--bovo-bleu-light); color: var(--bovo-bleu); display:flex; align-items:center; justify-content:center; font-family:'Jost'; font-weight:800;">2</div>
+        <div>
+          <div style="font-weight:600; margin-bottom:2px;">Adresse, date, options</div>
+          <div class="text-muted">2 minutes max. Pas besoin de compte pour réserver.</div>
+        </div>
+      </div>
+      <div class="card card-elevated" style="display: flex; gap: 14px; align-items: flex-start;">
+        <div style="flex-shrink:0; width:36px; height:36px; border-radius:50%; background: var(--bovo-bleu-light); color: var(--bovo-bleu); display:flex; align-items:center; justify-content:center; font-family:'Jost'; font-weight:800;">3</div>
+        <div>
+          <div style="font-weight:600; margin-bottom:2px;">Confirmation WhatsApp</div>
+          <div class="text-muted">Nous vous confirmons en moins d'1h, paiement sur place ou Mobile Money.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COMPTE CLIENT -->
+  <div class="section">
+    <div class="card card-elevated" style="background: linear-gradient(135deg, var(--bovo-bleu-light), #fff); border-color: transparent;">
+      <div style="display:flex; align-items:flex-start; gap:14px;">
+        <div style="flex-shrink:0; width:44px; height:44px; border-radius: var(--r-md); background: var(--bovo-bleu); color:#fff; display:flex; align-items:center; justify-content:center;">
+          <Icon name="user" size={22} />
+        </div>
+        <div style="flex:1;">
+          <div style="font-family:'Jost'; font-weight:700; font-size:1.05rem; margin-bottom:4px;">Créez votre compte Bovo</div>
+          <div class="text-muted" style="margin-bottom:12px;">Sauvegardez votre adresse, suivez vos réservations, réservez en 1 clic la prochaine fois.</div>
+          <div class="flex gap-sm">
+            <a href="/compte/inscription/" class="btn btn-primary btn-sm">Créer un compte</a>
+            <a href="/compte/connexion/" class="btn btn-ghost btn-sm">Se connecter</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SUPPORT -->
+  <div class="section">
+    <a href="https://wa.me/2290196677743" class="card card-elevated card-tap" style="display:flex; align-items:center; gap:14px; text-decoration:none;">
+      <div style="flex-shrink:0; width:44px; height:44px; border-radius: var(--r-md); background: rgba(37,211,102,0.12); color: var(--bovo-whatsapp); display:flex; align-items:center; justify-content:center;">
+        <Icon name="whatsapp" size={22} />
+      </div>
+      <div style="flex:1;">
+        <div style="font-weight:600;">Une question ?</div>
+        <div class="text-muted">Notre équipe répond sur WhatsApp en moins de 30 min</div>
+      </div>
+      <Icon name="chevron-right" size={20} />
+    </a>
+  </div>
+
+  <!-- FOOTER LÉGAL -->
+  <div class="section" style="margin-top:32px;">
+    <div class="text-muted" style="text-align:center; font-size:0.78rem; line-height:1.5;">
+      Vobodou Groupe SARL · RCCM RB/COT/24B/37037 · IFU 3202451098452<br />
+      Haie Vive, Cotonou · <a href="https://bovo.bj" style="color: var(--bovo-bleu);">bovo.bj</a><br />
+      <a href="https://bovo.bj/mentions-legales.html" style="color: var(--bovo-muted); text-decoration:underline;">Mentions légales</a> ·
+      <a href="https://bovo.bj/confidentialite.html" style="color: var(--bovo-muted); text-decoration:underline;">Confidentialité</a>
+    </div>
+  </div>
+</Layout>

@@ -1,0 +1,87 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+
+const minDate = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 3);
+  return d.toISOString().slice(0, 10);
+})();
+
+const SLOTS = [
+  { id: '07-12', label: 'Matin (7h-12h)',      meta: 'Démarrage tôt, recommandé' },
+  { id: '08-13', label: 'Matinée (8h-13h)',     meta: 'Démarrage standard' },
+  { id: '14-19', label: 'Après-midi (14h-19h)', meta: 'Si vous récupérez les clés l\'après-midi' },
+];
+---
+<Layout
+  title="Déménagement — Étape 5 : Date | Bovo"
+  topbar="back"
+  backHref="/demenagement/options/"
+  pageTitle="Déménagement"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={5} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Quand déménagez-vous&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Délai minimum 3 jours pour caler l'équipe et le camion.</p>
+
+  <div class="field">
+    <label class="field-label" for="date">Date du déménagement</label>
+    <input id="date" class="input" type="date" min={minDate} required />
+  </div>
+
+  <div class="field" style="margin-top:24px;">
+    <span class="field-label">Créneau de démarrage</span>
+    <div class="stack-sm" id="slot-list">
+      {SLOTS.map((s) => (
+        <button class="opt" data-value={s.id}>
+          <span class="opt-radio"></span>
+          <span class="opt-body">
+            <span class="opt-title">{s.label}</span>
+            <span class="opt-meta">{s.meta}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type DemenagementState } from '@lib/state';
+
+  const dateInput = document.getElementById('date') as HTMLInputElement;
+  const slotList = document.getElementById('slot-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<DemenagementState>('demenagement');
+  let date = s.date ?? '';
+  let slot = s.slot ?? '';
+  if (date) dateInput.value = date;
+
+  function render() {
+    slotList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      el.classList.toggle('is-active', el.dataset.value === slot);
+    });
+    cta.disabled = !(date && slot);
+  }
+
+  dateInput.addEventListener('change', () => { date = dateInput.value; saveState<DemenagementState>('demenagement', { date }); render(); });
+  slotList.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    slot = btn.dataset.value!;
+    saveState<DemenagementState>('demenagement', { slot });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (!date || !slot) return;
+    window.location.href = '/demenagement/contact/';
+  });
+
+  render();
+</script>

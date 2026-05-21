@@ -1,0 +1,88 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+import { MENAGE_OPTIONS, fcfa } from '@lib/catalog';
+---
+<Layout
+  title="Ménage — Étape 3 : Options | Bovo"
+  topbar="back"
+  backHref="/menage/duree/"
+  pageTitle="Ménage à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={3} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Des options en plus&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Tout est facultatif — sélectionnez ce dont vous avez besoin.</p>
+
+  <div class="stack-sm" id="opt-list">
+    {MENAGE_OPTIONS.map((o) => (
+      <button class="opt" data-value={o.id} data-price={o.priceXof}>
+        <span class="opt-check"><Icon name="check" size={14} /></span>
+        <span class="opt-body">
+          <span class="opt-title">{o.label}</span>
+          <span class="opt-meta">{o.meta}</span>
+        </span>
+        <span class="opt-price">+{fcfa(o.priceXof)}</span>
+      </button>
+    ))}
+  </div>
+
+  <CtaFooter
+    buttonLabel="Continuer"
+    buttonType="button"
+    buttonId="cta-next"
+    priceLabel="Estimation totale"
+    priceValue="—"
+  />
+</Layout>
+
+<script>
+  import { loadState, saveState, type MenageState } from '@lib/state';
+  import { MENAGE_HOURLY_XOF, MENAGE_OPTIONS, MENAGE_FREQUENCES, fcfa } from '@lib/catalog';
+
+  const list = document.getElementById('opt-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  const priceEl = document.querySelector('.cta-footer .price-line strong')!;
+
+  const state = loadState<MenageState>('menage');
+  let options = new Set<string>(state.options ?? []);
+
+  function compute(): number {
+    const hours = state.hours ?? 2;
+    const freq = state.frequence ?? 'ponctuel';
+    const f = MENAGE_FREQUENCES.find((x) => x.id === freq);
+    const discount = f?.discount ?? 0;
+    const base = hours * MENAGE_HOURLY_XOF * (1 - discount);
+    const opts = [...options].reduce((sum, id) => {
+      const o = MENAGE_OPTIONS.find((x) => x.id === id);
+      return sum + (o?.priceXof ?? 0);
+    }, 0);
+    return Math.round(base + opts);
+  }
+
+  function render() {
+    list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      el.classList.toggle('is-active', options.has(el.dataset.value!));
+    });
+    priceEl.textContent = fcfa(compute());
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    const v = btn.dataset.value!;
+    if (options.has(v)) options.delete(v); else options.add(v);
+    saveState<MenageState>('menage', { options: [...options], estimatedTotal: compute() });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    saveState<MenageState>('menage', { options: [...options], estimatedTotal: compute() });
+    window.location.href = '/menage/adresse/';
+  });
+
+  render();
+</script>

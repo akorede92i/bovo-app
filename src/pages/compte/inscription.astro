@@ -1,0 +1,80 @@
+---
+import Layout from '@layouts/Layout.astro';
+---
+<Layout title="Créer un compte — Bovo" topbar="back" backHref="/" pageTitle="Inscription" noindex>
+  <h1 class="h-display" style="margin-bottom:8px;">Créer mon compte</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Sauvegardez vos adresses, suivez vos réservations, réservez en 1 clic la prochaine fois.</p>
+
+  <form id="signup-form" novalidate>
+    <div class="field">
+      <label class="field-label" for="name">Nom complet</label>
+      <input id="name" class="input" type="text" autocomplete="name" required />
+    </div>
+    <div class="field">
+      <label class="field-label" for="phone">Téléphone (WhatsApp)</label>
+      <input id="phone" class="input" type="tel" autocomplete="tel" required />
+    </div>
+    <div class="field">
+      <label class="field-label" for="email">Email</label>
+      <input id="email" class="input" type="email" autocomplete="email" required />
+    </div>
+    <div class="field">
+      <label class="field-label" for="password">Mot de passe</label>
+      <input id="password" class="input" type="password" autocomplete="new-password" minlength="6" required />
+      <span class="field-hint">6 caractères minimum.</span>
+    </div>
+    <div id="signup-error" class="text-muted" style="color: var(--bovo-danger); display:none; margin: 8px 0;"></div>
+    <div id="signup-success" class="text-muted" style="color: var(--bovo-success); display:none; margin: 8px 0;"></div>
+    <button type="submit" class="btn btn-primary btn-lg btn-block" style="margin-top: 8px;">
+      Créer mon compte
+    </button>
+  </form>
+
+  <p class="text-muted" style="text-align:center; margin-top: 20px;">
+    Déjà un compte ? <a href="/compte/connexion/" style="color: var(--bovo-bleu); font-weight:600;">Se connecter</a>
+  </p>
+
+  <p class="text-muted" style="font-size:0.78rem; text-align:center; margin-top: 20px;">
+    En créant un compte, vous acceptez nos <a href="https://bovo.bj/mentions-legales.html" style="color: var(--bovo-bleu);">conditions</a> et notre <a href="https://bovo.bj/confidentialite.html" style="color: var(--bovo-bleu);">politique de confidentialité</a>.
+  </p>
+</Layout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+
+  const form = document.getElementById('signup-form') as HTMLFormElement;
+  const err = document.getElementById('signup-error') as HTMLDivElement;
+  const ok = document.getElementById('signup-success') as HTMLDivElement;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.style.display = 'none';
+    ok.style.display = 'none';
+
+    const name = (document.getElementById('name') as HTMLInputElement).value.trim();
+    const phone = (document.getElementById('phone') as HTMLInputElement).value.trim();
+    const email = (document.getElementById('email') as HTMLInputElement).value.trim();
+    const password = (document.getElementById('password') as HTMLInputElement).value;
+
+    const supa = getSupabase();
+    if (!supa) {
+      err.textContent = "Service d'authentification non configuré.";
+      err.style.display = 'block';
+      return;
+    }
+
+    const { error } = await supa.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: name, phone } },
+    });
+    if (error) {
+      err.textContent = error.message;
+      err.style.display = 'block';
+      return;
+    }
+    ok.textContent = "Un email de validation vient de vous être envoyé. Cliquez sur le lien pour finaliser votre inscription.";
+    ok.style.display = 'block';
+    form.reset();
+  });
+</script>

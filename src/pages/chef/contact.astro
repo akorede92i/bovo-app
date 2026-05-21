@@ -1,0 +1,106 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Chef — Étape 6 : Coordonnées | Bovo"
+  topbar="back"
+  backHref="/chef/planning/"
+  pageTitle="Chef à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={6} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Vos coordonnées</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Notre équipe vous propose un chef qui correspond à vos goûts dans les 48h.</p>
+
+  <div class="field">
+    <label class="field-label" for="name">Nom complet</label>
+    <input id="name" class="input" type="text" autocomplete="name" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="phone">Téléphone (WhatsApp)</label>
+    <input id="phone" class="input" type="tel" autocomplete="tel" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="email">Email</label>
+    <input id="email" class="input" type="email" autocomplete="email" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="notes">Autres précisions (optionnel)</label>
+    <textarea id="notes" class="textarea" placeholder="Horaires souhaités, jours préférés, événements particuliers…"></textarea>
+  </div>
+
+  <!-- Acompte Kkiapay -->
+  <div class="card card-elevated" style="margin-top:24px; background: linear-gradient(135deg, var(--bovo-bleu-light), #fff); border-color: transparent;">
+    <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer;">
+      <input type="checkbox" id="want-deposit" style="margin-top:3px; transform: scale(1.2); accent-color: var(--bovo-bleu);" />
+      <span>
+        <span style="font-weight:600; display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+          <Icon name="shield" size={16} class="" />
+          Verrouiller le premier mois (acompte 20%)
+        </span>
+        <span class="text-muted">Acompte payé par Mobile Money pour confirmer la mission. Solde du premier mois prélevé au démarrage.</span>
+      </span>
+    </label>
+  </div>
+
+  <div class="card card-elevated" style="margin-top:14px; background: var(--bovo-bg-soft); border-color: transparent;">
+    <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer;">
+      <input type="checkbox" id="create-account" style="margin-top:3px; transform: scale(1.2); accent-color: var(--bovo-bleu);" />
+      <span>
+        <span style="font-weight:600; display:block; margin-bottom:4px;">Créer mon compte Bovo</span>
+        <span class="text-muted">Recevez les menus de la semaine, suivez vos prestations, contact direct avec votre chef.</span>
+      </span>
+    </label>
+  </div>
+
+  <CtaFooter buttonLabel="Voir le récapitulatif" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type ChefState } from '@lib/state';
+
+  const name = document.getElementById('name') as HTMLInputElement;
+  const phone = document.getElementById('phone') as HTMLInputElement;
+  const email = document.getElementById('email') as HTMLInputElement;
+  const notes = document.getElementById('notes') as HTMLTextAreaElement;
+  const deposit = document.getElementById('want-deposit') as HTMLInputElement;
+  const createAccount = document.getElementById('create-account') as HTMLInputElement;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<ChefState>('chef');
+  if (s.customer) {
+    name.value = s.customer.fullName ?? '';
+    phone.value = s.customer.phone ?? '';
+    email.value = s.customer.email ?? '';
+    notes.value = s.customer.notes ?? '';
+  }
+  if (s.wantsDeposit) deposit.checked = true;
+
+  function validate() {
+    cta.disabled = !(name.value.trim() && phone.value.trim() && email.value.trim().includes('@'));
+  }
+  [name, phone, email, notes].forEach((el) => el.addEventListener('input', validate));
+
+  cta.addEventListener('click', () => {
+    saveState<ChefState>('chef', {
+      customer: {
+        fullName: name.value.trim(),
+        phone: phone.value.trim(),
+        email: email.value.trim(),
+        notes: notes.value.trim() || undefined,
+      },
+      wantsDeposit: deposit.checked,
+    });
+    sessionStorage.setItem('bovo:create-account', createAccount.checked ? '1' : '0');
+    window.location.href = '/chef/recap/';
+  });
+
+  validate();
+</script>

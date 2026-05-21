@@ -1,0 +1,168 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Mon compte — Bovo"
+  topbar="back"
+  backHref="/"
+  pageTitle="Mon compte"
+  noindex
+>
+  <!-- Loading state -->
+  <div id="loading" style="text-align:center; padding:48px 20px;">
+    <div class="text-muted">Chargement…</div>
+  </div>
+
+  <!-- Content -->
+  <div id="content" hidden>
+    <!-- Greeting -->
+    <div class="card card-elevated" style="background: linear-gradient(135deg, var(--bovo-bleu-light), #fff); border-color:transparent; margin-bottom:20px;">
+      <div style="display:flex; gap:14px; align-items:center;">
+        <div style="flex-shrink:0; width:54px; height:54px; border-radius:50%; background: var(--bovo-bleu); color:#fff; display:flex; align-items:center; justify-content:center; font-family:'Jost'; font-weight:800; font-size:1.4rem;" id="avatar">B</div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-family:'Jost'; font-weight:700; font-size:1.15rem;" id="hello">Bonjour 👋</div>
+          <div class="text-muted" id="user-email">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats rapides -->
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:24px;">
+      <div class="card card-elevated" style="text-align:center; padding:18px 12px;">
+        <div style="font-family:'Jost'; font-weight:800; font-size:1.6rem; color: var(--bovo-bleu);" id="stat-reservations">0</div>
+        <div class="text-muted" style="font-size:0.78rem;">Réservations</div>
+      </div>
+      <div class="card card-elevated" style="text-align:center; padding:18px 12px;">
+        <div style="font-family:'Jost'; font-weight:800; font-size:1.6rem; color: var(--bovo-rouge);" id="stat-addresses">0</div>
+        <div class="text-muted" style="font-size:0.78rem;">Adresses sauvées</div>
+      </div>
+    </div>
+
+    <!-- Prochaine résa -->
+    <div id="next-reservation" hidden style="margin-bottom:24px;">
+      <h2 class="h-section" style="margin-bottom:12px;">Votre prochaine prestation</h2>
+      <div class="card card-elevated" id="next-card"></div>
+    </div>
+
+    <!-- Actions rapides -->
+    <h2 class="h-section" style="margin-bottom:12px;">Accès rapide</h2>
+    <div class="stack-md" style="margin-bottom:24px;">
+      <a href="/" class="svc-card">
+        <div class="svc-card-icon"><Icon name="sparkles" size={24} /></div>
+        <div class="svc-card-body">
+          <div class="svc-card-title">Nouvelle réservation</div>
+          <div class="svc-card-meta">Ménage, Airbnb, déménagement, chef</div>
+        </div>
+        <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
+      </a>
+      <a href="/compte/reservations/" class="svc-card">
+        <div class="svc-card-icon"><Icon name="calendar" size={24} /></div>
+        <div class="svc-card-body">
+          <div class="svc-card-title">Mes réservations</div>
+          <div class="svc-card-meta">Historique et prestations à venir</div>
+        </div>
+        <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
+      </a>
+      <a href="/compte/adresses/" class="svc-card">
+        <div class="svc-card-icon rouge"><Icon name="pin" size={24} /></div>
+        <div class="svc-card-body">
+          <div class="svc-card-title">Mes adresses</div>
+          <div class="svc-card-meta">Pour réserver en 1 clic</div>
+        </div>
+        <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
+      </a>
+      <a href="/compte/host/" class="svc-card">
+        <div class="svc-card-icon rouge"><Icon name="airbnb" size={24} /></div>
+        <div class="svc-card-body">
+          <div class="svc-card-title">Mes logements Airbnb</div>
+          <div class="svc-card-meta">Calendriers iCal et turnovers</div>
+        </div>
+        <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
+      </a>
+      <a href="/compte/parametres/" class="svc-card">
+        <div class="svc-card-icon"><Icon name="user" size={24} /></div>
+        <div class="svc-card-body">
+          <div class="svc-card-title">Paramètres</div>
+          <div class="svc-card-meta">Profil, notifications, déconnexion</div>
+        </div>
+        <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
+      </a>
+    </div>
+
+    <button id="signout-btn" class="btn btn-ghost btn-block" style="margin-top:24px;">
+      Se déconnecter
+    </button>
+  </div>
+</Layout>
+
+<script>
+  import { requireAuth, signOut } from '@lib/auth';
+  import { getSupabase } from '@lib/supabase';
+  import { fcfa } from '@lib/catalog';
+
+  const user = await requireAuth();
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('loading')!.textContent = 'Service indisponible.';
+  } else {
+    // Hello
+    const name = user.profile?.full_name ?? user.email.split('@')[0];
+    document.getElementById('hello')!.textContent = `Bonjour ${name.split(' ')[0]} 👋`;
+    document.getElementById('user-email')!.textContent = user.email;
+    document.getElementById('avatar')!.textContent = name.slice(0, 1).toUpperCase();
+
+    // Stats + prochaine résa
+    const [resCountRes, addrCountRes, nextRes] = await Promise.all([
+      supa.from('reservations').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+      supa.from('addresses').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+      supa.from('reservations')
+        .select('id, service_type, status, scheduled_at, estimated_total_xof, payload')
+        .eq('user_id', user.id)
+        .gte('scheduled_at', new Date().toISOString())
+        .in('status', ['pending', 'confirmed', 'assigned'])
+        .order('scheduled_at', { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    document.getElementById('stat-reservations')!.textContent = String(resCountRes.count ?? 0);
+    document.getElementById('stat-addresses')!.textContent = String(addrCountRes.count ?? 0);
+
+    if (nextRes.data) {
+      const r = nextRes.data as any;
+      const block = document.getElementById('next-reservation')!;
+      block.hidden = false;
+      const labels: Record<string, string> = {
+        menage: 'Ménage à domicile',
+        airbnb: 'Service Airbnb',
+        demenagement: 'Déménagement',
+        chef: 'Chef à domicile',
+      };
+      const statusLabels: Record<string, string> = {
+        pending: 'En attente',
+        confirmed: 'Confirmée',
+        assigned: 'Équipe assignée',
+      };
+      const statusColors: Record<string, string> = {
+        pending: 'var(--bovo-warning)',
+        confirmed: 'var(--bovo-success)',
+        assigned: 'var(--bovo-success)',
+      };
+      const dateStr = r.scheduled_at ? new Date(r.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' }) : '—';
+      document.getElementById('next-card')!.innerHTML = `
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:10px;">
+          <div style="font-family:'Jost'; font-weight:700;">${labels[r.service_type] ?? r.service_type}</div>
+          <span style="font-size:0.72rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:${statusColors[r.status] ?? 'var(--bovo-muted)'};">${statusLabels[r.status] ?? r.status}</span>
+        </div>
+        <div class="text-muted" style="margin-bottom:6px;">${dateStr}</div>
+        <div style="font-family:'Jost'; font-weight:700; color: var(--bovo-bleu);">${fcfa(r.estimated_total_xof ?? 0)}</div>
+      `;
+    }
+
+    document.getElementById('loading')!.hidden = true;
+    document.getElementById('content')!.hidden = false;
+  }
+
+  document.getElementById('signout-btn')?.addEventListener('click', () => signOut());
+</script>

@@ -1,0 +1,72 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import { MENAGE_LOGEMENTS } from '@lib/catalog';
+---
+<Layout
+  title="Ménage à domicile — Étape 1 : Votre logement | Bovo"
+  topbar="back"
+  backHref="/"
+  pageTitle="Ménage à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra">
+    <Stepper total={7} current={1} />
+  </Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Quelle est la taille de votre logement&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Ça nous aide à estimer la durée idéale pour un ménage soigné.</p>
+
+  <div class="stack-sm" id="logement-list">
+    {MENAGE_LOGEMENTS.map((l) => (
+      <button class="opt" data-value={l.id} data-base-hours={l.baseHours}>
+        <span class="opt-radio"></span>
+        <span class="opt-body">
+          <span class="opt-title">{l.label}</span>
+          <span class="opt-meta">{l.meta}</span>
+        </span>
+        <span class="opt-meta" style="font-size:0.78rem;">~{l.baseHours}h</span>
+      </button>
+    ))}
+  </div>
+
+  <CtaFooter
+    buttonLabel="Continuer"
+    buttonType="button"
+    buttonId="cta-next"
+    disabled={true}
+  />
+</Layout>
+
+<script>
+  import { loadState, saveState, type MenageState } from '@lib/state';
+
+  const list = document.getElementById('logement-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  let current = loadState<MenageState>('menage').logement ?? '';
+
+  function render() {
+    list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      const isActive = el.dataset.value === current;
+      el.classList.toggle('is-active', isActive);
+    });
+    cta.disabled = !current;
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    current = btn.dataset.value!;
+    const baseHours = Number(btn.dataset.baseHours);
+    saveState<MenageState>('menage', { logement: current, hours: baseHours });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (!current) return;
+    window.location.href = '/menage/duree/';
+  });
+
+  render();
+</script>

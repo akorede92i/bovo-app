@@ -1,0 +1,14 @@
+---
+interface Props {
+  total: number;
+  current: number; // 1-indexed
+}
+const { total, current } = Astro.props;
+---
+<div class="stepper" role="progressbar" aria-valuemin={1} aria-valuemax={total} aria-valuenow={current} aria-label={`Étape ${current} sur ${total}`}>
+  {Array.from({ length: total }).map((_, i) => {
+    const n = i + 1;
+    const cls = n < current ? 'done' : n === current ? 'active' : '';
+    return <div class={`stepper-dot ${cls}`}></div>;
+  })}
+</div>

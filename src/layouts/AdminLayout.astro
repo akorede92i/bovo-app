@@ -1,0 +1,252 @@
+---
+import '@styles/global.css';
+
+interface Props {
+  title?: string;
+  pageTitle?: string;
+  active?: 'dashboard' | 'reservations' | 'workers' | 'airbnb';
+}
+
+const { title = 'Bovo Admin', pageTitle, active = 'dashboard' } = Astro.props;
+
+const tabs = [
+  { id: 'dashboard',    href: '/admin/',              label: 'Dashboard',  emoji: '📊' },
+  { id: 'reservations', href: '/admin/reservations/', label: 'Réservations', emoji: '📋' },
+  { id: 'workers',      href: '/admin/workers/',      label: 'Workers',    emoji: '👥' },
+  { id: 'airbnb',       href: '/admin/airbnb/',       label: 'Airbnb',     emoji: '🏠' },
+];
+---
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{title}</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="theme-color" content="#1F2937" />
+
+  <style>
+    /* Layout admin override — plus large que l'app mobile */
+    body {
+      background: var(--bovo-bg-soft) !important;
+    }
+    .admin-shell {
+      max-width: 1100px;
+      margin: 0 auto;
+      min-height: 100vh;
+      background: var(--bovo-bg);
+      box-shadow: 0 0 60px rgba(0,0,0,0.04);
+    }
+    .admin-header {
+      position: sticky;
+      top: 0;
+      z-index: var(--z-sticky);
+      background: var(--bovo-ink);
+      color: #fff;
+      padding: 14px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .admin-header .admin-logo {
+      font-family: 'Jost', sans-serif;
+      font-weight: 800;
+      font-size: 1.2rem;
+      letter-spacing: 1.5px;
+      color: #fff;
+    }
+    .admin-header .admin-logo .o-rouge { color: #fff; opacity: 0.7; }
+    .admin-header .admin-pill {
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      background: var(--bovo-rouge);
+      color: #fff;
+      padding: 3px 10px;
+      border-radius: var(--r-full);
+      text-transform: uppercase;
+      margin-left: 8px;
+    }
+    .admin-header .admin-user {
+      font-size: 0.84rem;
+      color: rgba(255,255,255,0.7);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .admin-header a {
+      color: #fff;
+      font-size: 0.84rem;
+      opacity: 0.8;
+    }
+    .admin-header a:hover { opacity: 1; }
+
+    .admin-tabs {
+      display: flex;
+      gap: 4px;
+      padding: 8px 24px;
+      background: #fff;
+      border-bottom: 1px solid var(--bovo-line-soft);
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .admin-tabs::-webkit-scrollbar { display: none; }
+    .admin-tabs a {
+      flex-shrink: 0;
+      padding: 12px 16px;
+      font-size: 0.92rem;
+      font-weight: 500;
+      color: var(--bovo-muted);
+      border-radius: var(--r-md);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all var(--t-fast) var(--ease);
+    }
+    .admin-tabs a:hover { color: var(--bovo-ink); background: var(--bovo-bg-soft); }
+    .admin-tabs a.is-active {
+      color: var(--bovo-bleu);
+      background: var(--bovo-bleu-light);
+      font-weight: 600;
+    }
+
+    .admin-page {
+      padding: 24px;
+    }
+    @media (min-width: 768px) {
+      .admin-page { padding: 32px 40px; }
+    }
+
+    .admin-h1 {
+      font-family: 'Jost', sans-serif;
+      font-weight: 800;
+      font-size: 1.8rem;
+      margin-bottom: 6px;
+    }
+    .admin-sub {
+      color: var(--bovo-muted);
+      margin-bottom: 24px;
+    }
+
+    /* KPI cards */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 14px;
+      margin-bottom: 28px;
+    }
+    .kpi {
+      background: #fff;
+      border: 1px solid var(--bovo-line-soft);
+      border-radius: var(--r-lg);
+      padding: 18px;
+    }
+    .kpi-label { font-size: 0.78rem; font-weight: 600; color: var(--bovo-muted); text-transform: uppercase; letter-spacing: 1.2px; margin-bottom: 8px; }
+    .kpi-value { font-family: 'Jost', sans-serif; font-weight: 800; font-size: 2rem; line-height: 1; color: var(--bovo-ink); }
+    .kpi-trend { font-size: 0.78rem; color: var(--bovo-muted); margin-top: 6px; }
+
+    /* Tables */
+    .admin-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #fff;
+      border-radius: var(--r-lg);
+      overflow: hidden;
+      box-shadow: var(--sh-sm);
+    }
+    .admin-table th {
+      text-align: left;
+      padding: 12px 16px;
+      font-size: 0.76rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--bovo-muted);
+      background: var(--bovo-bg-soft);
+      border-bottom: 1px solid var(--bovo-line-soft);
+    }
+    .admin-table td {
+      padding: 14px 16px;
+      font-size: 0.92rem;
+      border-bottom: 1px solid var(--bovo-line-soft);
+      vertical-align: middle;
+    }
+    .admin-table tr:last-child td { border-bottom: none; }
+    .admin-table tr:hover { background: var(--bovo-bg-soft); cursor: pointer; }
+
+    /* Mobile : table → cards */
+    @media (max-width: 640px) {
+      .admin-table-mobile { display: none; }
+    }
+    .mobile-cards { display: none; }
+    @media (max-width: 640px) {
+      .mobile-cards { display: block; }
+    }
+
+    /* Status badge */
+    .status-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 4px 10px;
+      border-radius: var(--r-full);
+      color: #fff;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 60px 24px;
+      background: #fff;
+      border-radius: var(--r-lg);
+      border: 1px dashed var(--bovo-line);
+    }
+    .empty-state-emoji { font-size: 2.4rem; margin-bottom: 12px; }
+    .empty-state-title { font-family: 'Jost', sans-serif; font-weight: 700; font-size: 1.1rem; margin-bottom: 6px; }
+    .empty-state-desc { color: var(--bovo-muted); }
+  </style>
+</head>
+<body>
+  <div class="admin-shell">
+    <header class="admin-header">
+      <div style="display:flex; align-items:center;">
+        <a href="/admin/" class="admin-logo">B<span class="o-rouge">O</span>VO</a>
+        <span class="admin-pill">Admin</span>
+      </div>
+      <div class="admin-user">
+        <span id="admin-email">…</span>
+        <a href="/" id="admin-back">← App</a>
+        <a href="#" id="admin-signout">Déconnexion</a>
+      </div>
+    </header>
+
+    <nav class="admin-tabs" aria-label="Sections admin">
+      {tabs.map((t) => (
+        <a href={t.href} class={active === t.id ? 'is-active' : ''}>
+          <span>{t.emoji}</span> {t.label}
+        </a>
+      ))}
+    </nav>
+
+    <main class="admin-page">
+      {pageTitle && <h1 class="admin-h1">{pageTitle}</h1>}
+      <slot />
+    </main>
+  </div>
+
+  <script>
+    import { requireAdmin } from '@lib/admin';
+    import { signOut } from '@lib/auth';
+
+    const user = await requireAdmin();
+    document.getElementById('admin-email')!.textContent = user.email;
+    document.getElementById('admin-signout')!.addEventListener('click', (e) => {
+      e.preventDefault();
+      signOut();
+    });
+  </script>
+</body>
+</html>

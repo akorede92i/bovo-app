@@ -1,0 +1,176 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Chef — Récapitulatif | Bovo"
+  topbar="back"
+  backHref="/chef/contact/"
+  pageTitle="Chef à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={7} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Récapitulatif</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Votre proposition de chef sous 48h.</p>
+
+  <div class="stack-md" id="recap-cards"></div>
+
+  <div id="deposit-block" hidden class="card card-elevated" style="margin-top:18px; padding:18px; background: var(--bovo-bleu-light); border-color: transparent;">
+    <div style="display:flex; gap:12px; align-items:flex-start;">
+      <div style="flex-shrink:0; color: var(--bovo-bleu);"><Icon name="shield" size={20} /></div>
+      <div style="flex:1;">
+        <div style="font-weight:600; margin-bottom:4px;">Acompte de 20% pour verrouiller la mission</div>
+        <div class="text-muted">Vous paierez <strong id="deposit-amount" style="color: var(--bovo-ink);">—</strong> par Mobile Money (MTN/Moov) ou carte.</div>
+      </div>
+    </div>
+  </div>
+
+  <CtaFooter buttonLabel="Envoyer ma demande" buttonType="button" buttonId="cta-submit" priceLabel="Forfait mensuel" priceValue="—" variant="rouge" />
+</Layout>
+
+<script src="https://cdn.kkiapay.me/k.js"></script>
+
+<script>
+  import { loadState, clearState, type ChefState } from '@lib/state';
+  import { getSupabase } from '@lib/supabase';
+  import { CHEF_FREQUENCES, CHEF_DUREES, CHEF_CUISINES, fcfa } from '@lib/catalog';
+
+  const s = loadState<ChefState>('chef');
+  const freq = CHEF_FREQUENCES.find((f) => f.id === s.frequence);
+  const duree = CHEF_DUREES.find((d) => d.id === s.duree);
+  const cuisinesLabels = (s.cuisines ?? []).map((id) => CHEF_CUISINES.find((c) => c.id === id)?.label).filter(Boolean);
+  const monthly = Math.round((freq?.baseXof ?? 0) * (duree?.multiplier ?? 1));
+  const deposit = Math.round(monthly * 0.2);
+
+  function row(label: string, value: string) {
+    return `
+      <div class="flex-between" style="padding:10px 0; border-bottom:1px solid var(--bovo-line-soft);">
+        <span class="text-muted" style="font-size:0.84rem;">${label}</span>
+        <span style="font-weight:600; text-align:right;">${value}</span>
+      </div>
+    `;
+  }
+
+  document.getElementById('recap-cards')!.innerHTML = `
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Votre formule</div>
+      ${row('Fréquence', freq?.label ?? '—')}
+      ${row('Durée d\'engagement', duree?.label ?? '—')}
+      ${row('Style de cuisine', cuisinesLabels.join(', ') || '—')}
+      ${row('Personnes au foyer', String(s.people ?? '—'))}
+      ${s.diet ? row('Allergies/régime', s.diet) : ''}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Démarrage et adresse</div>
+      ${row('Démarrage', s.startDate ?? '—')}
+      ${row('Zone', s.address?.zone ?? '—')}
+      ${s.address?.quartier ? row('Quartier', s.address.quartier) : ''}
+      ${row('Adresse', s.address?.street ?? '—')}
+      ${s.address?.building ? row('Précisions', s.address.building) : ''}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Vos coordonnées</div>
+      ${row('Nom', s.customer?.fullName ?? '—')}
+      ${row('Téléphone', s.customer?.phone ?? '—')}
+      ${row('Email', s.customer?.email ?? '—')}
+      ${s.customer?.notes ? row('Notes', s.customer.notes) : ''}
+    </div>
+  `;
+
+  document.querySelector('.cta-footer .price-line strong')!.textContent = `${fcfa(monthly)}/mois`;
+
+  if (s.wantsDeposit) {
+    document.getElementById('deposit-block')!.hidden = false;
+    document.getElementById('deposit-amount')!.textContent = fcfa(deposit);
+  }
+
+  const cta = document.getElementById('cta-submit') as HTMLButtonElement;
+
+  function buildWhatsappMessage(): string {
+    const lines = [
+      '*Nouvelle demande Bovo — Chef à domicile*',
+      '',
+      `Fréquence : ${freq?.label}`,
+      `Engagement : ${duree?.label}`,
+      `Style de cuisine : ${cuisinesLabels.join(', ')}`,
+      `Personnes : ${s.people}`,
+      s.diet ? `Régime/allergies : ${s.diet}` : '',
+      '',
+      `Démarrage : ${s.startDate}`,
+      `Adresse : ${s.address?.street}${s.address?.quartier ? `, ${s.address.quartier}` : ''}, ${s.address?.zone}`,
+      s.address?.building ? `Précisions : ${s.address.building}` : '',
+      '',
+      `Client : ${s.customer?.fullName}`,
+      `Tél : ${s.customer?.phone}`,
+      `Email : ${s.customer?.email}`,
+      s.customer?.notes ? `Notes : ${s.customer.notes}` : '',
+      '',
+      `*Forfait mensuel : ${fcfa(monthly)}*`,
+      s.wantsDeposit ? `Acompte 20% souhaité : ${fcfa(deposit)}` : '',
+    ];
+    return lines.filter(Boolean).join('\n');
+  }
+
+  async function submitToSupabase(depositStatus: 'none' | 'paid' = 'none', kkiapayTx?: string) {
+    const payload = {
+      service_type: 'chef' as const,
+      payload: {
+        frequence: s.frequence, duree: s.duree, cuisines: s.cuisines ?? [],
+        people: s.people, diet: s.diet, startDate: s.startDate, address: s.address,
+      },
+      estimated_total_xof: monthly,
+      guest_name: s.customer?.fullName,
+      guest_phone: s.customer?.phone,
+      guest_email: s.customer?.email,
+      scheduled_at: s.startDate ? new Date(`${s.startDate}T09:00:00`).toISOString() : null,
+      status: 'pending' as const,
+      deposit_status: depositStatus,
+      deposit_kkiapay_tx: kkiapayTx ?? null,
+    };
+    const supa = getSupabase();
+    if (supa) {
+      const { error } = await supa.from('reservations').insert(payload);
+      if (error) console.warn('[Bovo] Supabase insert failed:', error.message);
+    }
+  }
+
+  function goToWhatsapp() {
+    const msg = encodeURIComponent(buildWhatsappMessage());
+    const url = `https://wa.me/2290196677743?text=${msg}`;
+    clearState('chef');
+    setTimeout(() => { window.location.href = url; }, 400);
+  }
+
+  cta.addEventListener('click', async () => {
+    cta.disabled = true;
+    cta.textContent = 'Envoi en cours…';
+
+    if (s.wantsDeposit && typeof (window as any).openKkiapayWidget === 'function') {
+      (window as any).openKkiapayWidget({
+        amount: deposit,
+        api_key: import.meta.env.PUBLIC_KKIAPAY_PUBLIC_KEY ?? 'DEMO',
+        position: 'center',
+        sandbox: true,
+        data: 'chef',
+        theme: '#4470B3',
+        name: s.customer?.fullName ?? '',
+        email: s.customer?.email ?? '',
+        phone: s.customer?.phone ?? '',
+      });
+      (window as any).addKkiapayListener?.('success', async (resp: any) => {
+        await submitToSupabase('paid', resp?.transactionId);
+        goToWhatsapp();
+      });
+      (window as any).addKkiapayListener?.('failed', async () => {
+        await submitToSupabase('none');
+        goToWhatsapp();
+      });
+    } else {
+      await submitToSupabase(s.wantsDeposit ? 'pending' : 'none');
+      goToWhatsapp();
+    }
+  });
+</script>

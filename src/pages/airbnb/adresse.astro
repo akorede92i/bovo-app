@@ -1,0 +1,124 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import { ZONES } from '@lib/catalog';
+
+const ACCESS_MODES = [
+  { id: 'cles-boite', label: 'Boîte à clés sécurisée', meta: 'Nous donnez le code, on prend les clés sur place' },
+  { id: 'code',       label: 'Serrure à code',         meta: 'Nous transmettez le code d\'accès' },
+  { id: 'gardien',    label: 'Gardien / réception',    meta: 'Un référent remet les clés à notre équipe' },
+  { id: 'rdv',        label: 'Remise en main propre',  meta: 'Vous nous remettez les clés au premier passage' },
+];
+---
+<Layout
+  title="Airbnb — Étape 5 : Adresse et accès | Bovo"
+  topbar="back"
+  backHref="/airbnb/options/"
+  pageTitle="Service Airbnb"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={5} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Adresse et accès au logement</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Important : comment notre équipe entrera-t-elle entre chaque voyageur ?</p>
+
+  <div class="field">
+    <label class="field-label" for="zone">Zone</label>
+    <select id="zone" class="select" required>
+      <option value="">Choisir une zone…</option>
+      {ZONES.map((z) => <option value={z}>{z}</option>)}
+    </select>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="quartier">Quartier</label>
+    <input id="quartier" class="input" type="text" placeholder="ex. Cadjèhoun, Haie Vive…" />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="street">Adresse exacte</label>
+    <input id="street" class="input" type="text" placeholder="Rue, numéro, repères, résidence" required />
+  </div>
+
+  <h2 class="h-section" style="margin: 24px 0 12px;">Mode d'accès</h2>
+  <div class="stack-sm" id="access-list">
+    {ACCESS_MODES.map((m) => (
+      <button class="opt" data-value={m.id}>
+        <span class="opt-radio"></span>
+        <span class="opt-body">
+          <span class="opt-title">{m.label}</span>
+          <span class="opt-meta">{m.meta}</span>
+        </span>
+      </button>
+    ))}
+  </div>
+
+  <div class="field" style="margin-top: 18px;">
+    <label class="field-label" for="access-details">Détails d'accès (code, instructions précises)</label>
+    <textarea id="access-details" class="textarea" placeholder="ex. Code boîte à clés : 1234. Porte d'entrée à gauche après le portail. Compteur électrique dans le couloir."></textarea>
+    <span class="field-hint">Vos infos sont transmises uniquement à notre équipe assignée.</span>
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type AirbnbState } from '@lib/state';
+
+  const zone = document.getElementById('zone') as HTMLSelectElement;
+  const quartier = document.getElementById('quartier') as HTMLInputElement;
+  const street = document.getElementById('street') as HTMLInputElement;
+  const accessList = document.getElementById('access-list')!;
+  const accessDetails = document.getElementById('access-details') as HTMLTextAreaElement;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<AirbnbState>('airbnb');
+  let accessMode = s.access?.mode ?? '';
+
+  if (s.address) {
+    zone.value = s.address.zone ?? '';
+    quartier.value = s.address.quartier ?? '';
+    street.value = s.address.street ?? '';
+  }
+  if (s.access?.details) accessDetails.value = s.access.details;
+
+  function renderAccess() {
+    accessList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      el.classList.toggle('is-active', el.dataset.value === accessMode);
+    });
+  }
+
+  function validate() {
+    cta.disabled = !(zone.value && street.value.trim() && accessMode);
+  }
+
+  accessList.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    accessMode = btn.dataset.value!;
+    renderAccess();
+    validate();
+  });
+
+  [zone, quartier, street, accessDetails].forEach((el) => el.addEventListener('input', validate));
+  zone.addEventListener('change', validate);
+
+  cta.addEventListener('click', () => {
+    saveState<AirbnbState>('airbnb', {
+      address: {
+        zone: zone.value,
+        quartier: quartier.value.trim() || undefined,
+        street: street.value.trim(),
+      },
+      access: {
+        mode: accessMode as any,
+        details: accessDetails.value.trim() || undefined,
+      },
+    });
+    window.location.href = '/airbnb/planning/';
+  });
+
+  renderAccess();
+  validate();
+</script>

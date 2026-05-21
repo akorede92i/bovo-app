@@ -1,0 +1,193 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+
+const tomorrow = new Date();
+tomorrow.setDate(tomorrow.getDate() + 1);
+const minDate = tomorrow.toISOString().slice(0, 10);
+
+const SLOTS = [
+  { id: '11-13', label: '11:00 — 13:00', meta: 'Standard check-out → check-in' },
+  { id: '13-15', label: '13:00 — 15:00', meta: 'Créneau court' },
+  { id: '10-14', label: '10:00 — 14:00', meta: 'Créneau confortable' },
+];
+
+const DURATIONS = [
+  { id: 3,  label: '3 mois',  meta: 'Engagement minimum' },
+  { id: 6,  label: '6 mois',  meta: 'Tarif préférentiel' },
+  { id: 12, label: '12 mois', meta: 'Meilleur tarif' },
+];
+---
+<Layout
+  title="Airbnb — Étape 6 : Planning | Bovo"
+  topbar="back"
+  backHref="/airbnb/adresse/"
+  pageTitle="Service Airbnb"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={6} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;" id="title">Quand démarre-t-on&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;" id="subtitle">Choisissez la date selon votre planning.</p>
+
+  <!-- Mode ponctuel -->
+  <div id="block-ponctuel" hidden>
+    <div class="field">
+      <label class="field-label" for="ponctuel-date">Date du turnover</label>
+      <input id="ponctuel-date" class="input" type="date" min={minDate} />
+    </div>
+    <div class="field" style="margin-top:18px;">
+      <span class="field-label">Créneau souhaité</span>
+      <div class="stack-sm" id="slot-list">
+        {SLOTS.map((s) => (
+          <button class="opt" data-value={s.id}>
+            <span class="opt-radio"></span>
+            <span class="opt-body">
+              <span class="opt-title">{s.label}</span>
+              <span class="opt-meta">{s.meta}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+
+  <!-- Mode récurrent (iCal) -->
+  <div id="block-recurrent" hidden>
+    <div class="card card-elevated" style="background: var(--bovo-bleu-light); border-color: transparent; margin-bottom:18px;">
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <div style="flex-shrink:0; color: var(--bovo-bleu);"><Icon name="info" size={20} /></div>
+        <div style="font-size:0.86rem; color: var(--bovo-ink-soft); line-height:1.5;">
+          <strong style="color: var(--bovo-ink);">Comment trouver votre URL iCal Airbnb&nbsp;?</strong><br />
+          Dans votre annonce Airbnb, allez dans <em>Calendrier &gt; Disponibilités &gt; Exporter le calendrier</em>, copiez l'URL et collez-la ci-dessous.
+        </div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="ical-url">URL iCal de votre annonce Airbnb</label>
+      <input id="ical-url" class="input" type="url" placeholder="https://www.airbnb.com/calendar/ical/xxx.ics" />
+      <span class="field-hint">Lecture seule : on synchronise toutes les heures et on planifie les turnovers.</span>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="start-date">Date de démarrage</label>
+      <input id="start-date" class="input" type="date" min={minDate} />
+    </div>
+
+    <div class="field" style="margin-top:18px;">
+      <span class="field-label">Durée d'engagement</span>
+      <div class="stack-sm" id="duration-list">
+        {DURATIONS.map((d) => (
+          <button class="opt" data-value={d.id}>
+            <span class="opt-radio"></span>
+            <span class="opt-body">
+              <span class="opt-title">{d.label}</span>
+              <span class="opt-meta">{d.meta}</span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type AirbnbState } from '@lib/state';
+
+  const s = loadState<AirbnbState>('airbnb');
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const blockPonctuel = document.getElementById('block-ponctuel')!;
+  const blockRecurrent = document.getElementById('block-recurrent')!;
+  const title = document.getElementById('title')!;
+  const subtitle = document.getElementById('subtitle')!;
+
+  if (s.mode === 'recurrent') {
+    blockRecurrent.hidden = false;
+    title.textContent = 'Connectons votre calendrier';
+    subtitle.textContent = 'Importez votre iCal et choisissez la durée d\'engagement.';
+  } else {
+    blockPonctuel.hidden = false;
+  }
+
+  // PONCTUEL
+  const ponctuelDate = document.getElementById('ponctuel-date') as HTMLInputElement;
+  const slotList = document.getElementById('slot-list');
+  let slot = s.ponctuelSlot ?? '';
+  if (s.ponctuelDate && ponctuelDate) ponctuelDate.value = s.ponctuelDate;
+
+  function renderSlot() {
+    if (!slotList) return;
+    slotList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      el.classList.toggle('is-active', el.dataset.value === slot);
+    });
+  }
+
+  // RÉCURRENT
+  const icalUrl = document.getElementById('ical-url') as HTMLInputElement | null;
+  const startDate = document.getElementById('start-date') as HTMLInputElement | null;
+  const durationList = document.getElementById('duration-list');
+  let duration = s.durationMonths ?? 0;
+  if (icalUrl && s.icalUrl) icalUrl.value = s.icalUrl;
+  if (startDate && s.startDate) startDate.value = s.startDate;
+
+  function renderDuration() {
+    if (!durationList) return;
+    durationList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      el.classList.toggle('is-active', Number(el.dataset.value) === duration);
+    });
+  }
+
+  function validate() {
+    if (s.mode === 'recurrent') {
+      const url = icalUrl?.value.trim();
+      const isUrl = url && /^https?:\/\//.test(url);
+      cta.disabled = !(isUrl && startDate?.value && duration);
+    } else {
+      cta.disabled = !(ponctuelDate?.value && slot);
+    }
+  }
+
+  slotList?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    slot = btn.dataset.value!;
+    renderSlot();
+    validate();
+  });
+
+  durationList?.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    duration = Number(btn.dataset.value);
+    renderDuration();
+    validate();
+  });
+
+  [ponctuelDate, icalUrl, startDate].forEach((el) => el?.addEventListener('input', validate));
+
+  cta.addEventListener('click', () => {
+    if (s.mode === 'recurrent') {
+      saveState<AirbnbState>('airbnb', {
+        icalUrl: icalUrl?.value.trim(),
+        startDate: startDate?.value,
+        durationMonths: duration,
+      });
+    } else {
+      saveState<AirbnbState>('airbnb', {
+        ponctuelDate: ponctuelDate.value,
+        ponctuelSlot: slot,
+      });
+    }
+    window.location.href = '/airbnb/contact/';
+  });
+
+  renderSlot();
+  renderDuration();
+  validate();
+</script>

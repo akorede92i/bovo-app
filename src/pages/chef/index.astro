@@ -1,0 +1,71 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import { CHEF_FREQUENCES, fcfa } from '@lib/catalog';
+---
+<Layout
+  title="Chef à domicile — Étape 1 : Fréquence | Bovo"
+  topbar="back"
+  backHref="/"
+  pageTitle="Chef à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={1} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Combien de repas par semaine&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Votre chef vient à domicile, cuisine sur place et laisse la cuisine propre.</p>
+
+  <div class="stack-sm" id="freq-list">
+    {CHEF_FREQUENCES.map((f) => (
+      <button class="opt" data-value={f.id} data-price={f.baseXof}>
+        <span class="opt-radio"></span>
+        <span class="opt-body">
+          <span class="opt-title">{f.label}</span>
+          <span class="opt-meta">{f.meta}</span>
+        </span>
+        <span class="opt-price">{fcfa(f.baseXof)}/mois</span>
+      </button>
+    ))}
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} priceLabel="Forfait mensuel" priceValue="—" />
+</Layout>
+
+<script>
+  import { loadState, saveState, type ChefState } from '@lib/state';
+  import { CHEF_FREQUENCES, fcfa } from '@lib/catalog';
+
+  const list = document.getElementById('freq-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  const priceEl = document.querySelector('.cta-footer .price-line strong')!;
+
+  let current = loadState<ChefState>('chef').frequence ?? '';
+
+  function render() {
+    let price = 0;
+    list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      const active = el.dataset.value === current;
+      el.classList.toggle('is-active', active);
+      if (active) price = Number(el.dataset.price);
+    });
+    cta.disabled = !current;
+    priceEl.textContent = current ? `${fcfa(price)}/mois` : '—';
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    current = btn.dataset.value!;
+    const f = CHEF_FREQUENCES.find((x) => x.id === current)!;
+    saveState<ChefState>('chef', { frequence: current, estimatedTotalMonthly: f.baseXof });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (!current) return;
+    window.location.href = '/chef/duree/';
+  });
+
+  render();
+</script>

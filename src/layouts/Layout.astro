@@ -1,0 +1,104 @@
+---
+import '@styles/global.css';
+
+interface Props {
+  title?: string;
+  description?: string;
+  topbar?: 'logo' | 'back' | 'none';
+  backHref?: string;
+  pageTitle?: string;
+  noindex?: boolean;
+}
+
+const {
+  title = 'Bovo — Réservez votre prestation à Cotonou',
+  description = 'Réservez en ligne ménage, déménagement, chef à domicile et service Airbnb à Cotonou, Calavi, Porto-Novo. Tarifs clairs, prestataires vérifiés, WhatsApp à portée de main.',
+  topbar = 'logo',
+  backHref,
+  pageTitle,
+  noindex = false,
+} = Astro.props;
+
+const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj').toString();
+---
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {noindex && <meta name="robots" content="noindex,nofollow" />}
+    <link rel="canonical" href={canonical} />
+
+    <!-- Theme color (bleu Bovo) -->
+    <meta name="theme-color" content="#4470B3" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#345a8f" media="(prefers-color-scheme: dark)" />
+
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Bovo" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:site_name" content="Bovo" />
+    <meta property="og:locale" content="fr_BJ" />
+    <meta property="og:image" content="https://bovo.bj/og-image.png" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <!-- Preconnects -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+    <slot name="head" />
+  </head>
+  <body>
+    <div class="app">
+      {topbar !== 'none' && (
+        <header class="topbar">
+          <div class="topbar-inner">
+            {topbar === 'back' ? (
+              <a href={backHref ?? '/'} class="topbar-back" aria-label="Retour">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <path d="M19 12H5" /><path d="M12 19l-7-7 7-7" />
+                </svg>
+              </a>
+            ) : (
+              <a href="/" class="bovo-logo" aria-label="Bovo — Accueil">B<span class="o-rouge">O</span>VO</a>
+            )}
+            {pageTitle && <span class="topbar-title">{pageTitle}</span>}
+            <div class="topbar-spacer"></div>
+          </div>
+          <slot name="topbar-extra" />
+        </header>
+      )}
+
+      <main class="page">
+        <slot />
+      </main>
+
+      <slot name="cta-footer" />
+    </div>
+
+    <!-- Register PWA service worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
+  </body>
+</html>

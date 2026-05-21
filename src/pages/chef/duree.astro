@@ -1,0 +1,80 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import { CHEF_DUREES, CHEF_FREQUENCES, fcfa } from '@lib/catalog';
+---
+<Layout
+  title="Chef — Étape 2 : Durée d'engagement | Bovo"
+  topbar="back"
+  backHref="/chef/"
+  pageTitle="Chef à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={2} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Durée d'engagement</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Engagement minimum 1 mois. Plus c'est long, plus le tarif baisse.</p>
+
+  <div class="stack-sm" id="duree-list">
+    {CHEF_DUREES.map((d) => {
+      const discountPct = Math.round((1 - d.multiplier) * 100);
+      return (
+        <button class="opt" data-value={d.id} data-mult={d.multiplier}>
+          <span class="opt-radio"></span>
+          <span class="opt-body">
+            <span class="opt-title">{d.label}</span>
+            <span class="opt-meta">{d.meta}</span>
+          </span>
+          {discountPct > 0 && <span class="opt-price">-{discountPct}%</span>}
+        </button>
+      );
+    })}
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} priceLabel="Forfait mensuel" priceValue="—" />
+</Layout>
+
+<script>
+  import { loadState, saveState, type ChefState } from '@lib/state';
+  import { CHEF_FREQUENCES, CHEF_DUREES, fcfa } from '@lib/catalog';
+
+  const list = document.getElementById('duree-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  const priceEl = document.querySelector('.cta-footer .price-line strong')!;
+
+  const s = loadState<ChefState>('chef');
+  let current = s.duree ?? '';
+  const freq = CHEF_FREQUENCES.find((f) => f.id === s.frequence);
+
+  function compute(mult: number) {
+    return Math.round((freq?.baseXof ?? 0) * mult);
+  }
+
+  function render() {
+    let mult = 1;
+    list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      const active = el.dataset.value === current;
+      el.classList.toggle('is-active', active);
+      if (active) mult = Number(el.dataset.mult);
+    });
+    cta.disabled = !current;
+    priceEl.textContent = current ? `${fcfa(compute(mult))}/mois` : '—';
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    current = btn.dataset.value!;
+    const mult = Number(btn.dataset.mult);
+    saveState<ChefState>('chef', { duree: current, estimatedTotalMonthly: compute(mult) });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (!current) return;
+    window.location.href = '/chef/cuisine/';
+  });
+
+  render();
+</script>

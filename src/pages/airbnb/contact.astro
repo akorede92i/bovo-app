@@ -1,0 +1,90 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+---
+<Layout
+  title="Airbnb — Étape 7 : Vos coordonnées | Bovo"
+  topbar="back"
+  backHref="/airbnb/planning/"
+  pageTitle="Service Airbnb"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={7} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Vos coordonnées host</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Notre équipe vous appelle dans la journée pour valider votre setup.</p>
+
+  <div class="field">
+    <label class="field-label" for="name">Nom complet</label>
+    <input id="name" class="input" type="text" autocomplete="name" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="phone">Téléphone (WhatsApp)</label>
+    <input id="phone" class="input" type="tel" autocomplete="tel" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="email">Email</label>
+    <input id="email" class="input" type="email" autocomplete="email" required />
+    <span class="field-hint">Pour recevoir les rapports après chaque turnover (photos, restock).</span>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="notes">Notes spécifiques au logement (optionnel)</label>
+    <textarea id="notes" class="textarea" placeholder="Particularités : meubles fragiles, animaux du propriétaire, voisins sensibles…"></textarea>
+  </div>
+
+  <!-- Offre compte client -->
+  <div class="card card-elevated" style="margin-top:24px; background: linear-gradient(135deg, var(--bovo-bleu-light), #fff); border-color: transparent;">
+    <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer;">
+      <input type="checkbox" id="create-account" checked style="margin-top:3px; transform: scale(1.2); accent-color: var(--bovo-bleu);" />
+      <span>
+        <span style="font-weight:600; display:block; margin-bottom:4px;">Créer mon espace host Bovo</span>
+        <span class="text-muted">Ajoutez d'autres logements, consultez les rapports après chaque turnover, suivez votre planning iCal en temps réel.</span>
+      </span>
+    </label>
+  </div>
+
+  <CtaFooter buttonLabel="Voir le récapitulatif" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type AirbnbState } from '@lib/state';
+
+  const name = document.getElementById('name') as HTMLInputElement;
+  const phone = document.getElementById('phone') as HTMLInputElement;
+  const email = document.getElementById('email') as HTMLInputElement;
+  const notes = document.getElementById('notes') as HTMLTextAreaElement;
+  const createAccount = document.getElementById('create-account') as HTMLInputElement;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<AirbnbState>('airbnb');
+  if (s.customer) {
+    name.value = s.customer.fullName ?? '';
+    phone.value = s.customer.phone ?? '';
+    email.value = s.customer.email ?? '';
+    notes.value = s.customer.notes ?? '';
+  }
+
+  function validate() {
+    cta.disabled = !(name.value.trim() && phone.value.trim() && email.value.trim().includes('@'));
+  }
+  [name, phone, email, notes].forEach((el) => el.addEventListener('input', validate));
+
+  cta.addEventListener('click', () => {
+    saveState<AirbnbState>('airbnb', {
+      customer: {
+        fullName: name.value.trim(),
+        phone: phone.value.trim(),
+        email: email.value.trim(),
+        notes: notes.value.trim() || undefined,
+      },
+    });
+    sessionStorage.setItem('bovo:create-account', createAccount.checked ? '1' : '0');
+    window.location.href = '/airbnb/recap/';
+  });
+
+  validate();
+</script>

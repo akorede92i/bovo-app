@@ -1,0 +1,176 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Airbnb — Récapitulatif | Bovo"
+  topbar="back"
+  backHref="/airbnb/contact/"
+  pageTitle="Service Airbnb"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={7} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Récapitulatif</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Vérifiez avant d'envoyer. Bovo vous rappelle pour confirmer.</p>
+
+  <div class="stack-md" id="recap-cards"></div>
+
+  <div class="card card-elevated" style="margin-top:18px; padding:18px; background: var(--bovo-bg-soft);">
+    <div class="text-muted" style="font-size:0.82rem; line-height:1.5;">
+      <Icon name="info" size={14} class="" />
+      Tarif au turnover. Pour le mode récurrent, l'engagement démarre après validation de votre iCal. Annulation libre avec préavis de 14 jours.
+    </div>
+  </div>
+
+  <CtaFooter buttonLabel="Envoyer ma demande" buttonType="button" buttonId="cta-submit" priceLabel="Forfait par turnover" priceValue="—" variant="rouge" />
+</Layout>
+
+<script>
+  import { loadState, clearState, type AirbnbState } from '@lib/state';
+  import { getSupabase } from '@lib/supabase';
+  import { AIRBNB_TURNOVERS, AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
+
+  const s = loadState<AirbnbState>('airbnb');
+  const size = AIRBNB_TURNOVERS.find((t) => t.id === s.size);
+  const opts = (s.options ?? []).map((id) => AIRBNB_OPTIONS.find((o) => o.id === id)!).filter(Boolean);
+  const optsTotal = opts.reduce((sum, o) => sum + o.priceXof, 0);
+  const total = (size?.priceXof ?? 0) + optsTotal;
+
+  function row(label: string, value: string) {
+    return `
+      <div class="flex-between" style="padding:10px 0; border-bottom:1px solid var(--bovo-line-soft);">
+        <span class="text-muted" style="font-size:0.84rem;">${label}</span>
+        <span style="font-weight:600; text-align:right;">${value}</span>
+      </div>
+    `;
+  }
+
+  const planningBlock = s.mode === 'recurrent'
+    ? `
+      <div class="card card-elevated">
+        <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Planning récurrent</div>
+        ${row('Mode', 'Récurrent (iCal auto)')}
+        ${row('Calendrier iCal', s.icalUrl ? '✓ Fourni' : '—')}
+        ${row('Démarrage', s.startDate ?? '—')}
+        ${row('Engagement', s.durationMonths ? `${s.durationMonths} mois` : '—')}
+      </div>
+    `
+    : `
+      <div class="card card-elevated">
+        <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Turnover ponctuel</div>
+        ${row('Date', s.ponctuelDate ?? '—')}
+        ${row('Créneau', s.ponctuelSlot ?? '—')}
+      </div>
+    `;
+
+  const accessLabels: Record<string, string> = {
+    'cles-boite': 'Boîte à clés',
+    'code': 'Serrure à code',
+    'gardien': 'Gardien / réception',
+    'rdv': 'Remise en main propre',
+  };
+
+  document.getElementById('recap-cards')!.innerHTML = `
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Votre logement</div>
+      ${row('Taille', size?.label ?? '—')}
+      ${row('Capacité', size?.meta ?? '—')}
+      ${row('Durée turnover', `~${size?.durationMin ?? 0} min`)}
+      ${opts.length ? row('Options', opts.map((o) => o.label).join(', ')) : ''}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Adresse</div>
+      ${row('Zone', s.address?.zone ?? '—')}
+      ${s.address?.quartier ? row('Quartier', s.address.quartier) : ''}
+      ${row('Adresse', s.address?.street ?? '—')}
+      ${row('Accès', accessLabels[s.access?.mode ?? ''] ?? '—')}
+      ${s.access?.details ? row('Détails accès', s.access.details) : ''}
+    </div>
+    ${planningBlock}
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Vos coordonnées</div>
+      ${row('Nom', s.customer?.fullName ?? '—')}
+      ${row('Téléphone', s.customer?.phone ?? '—')}
+      ${row('Email', s.customer?.email ?? '—')}
+      ${s.customer?.notes ? row('Notes', s.customer.notes) : ''}
+    </div>
+  `;
+
+  document.querySelector('.cta-footer .price-line strong')!.textContent = fcfa(total);
+
+  // ============= SOUMISSION =============
+  const cta = document.getElementById('cta-submit') as HTMLButtonElement;
+
+  function buildWhatsappMessage(): string {
+    const lines = [
+      '*Nouvelle demande Bovo — Service Airbnb*',
+      '',
+      `Logement : ${size?.label} (${size?.meta})`,
+      opts.length ? `Options : ${opts.map((o) => o.label).join(', ')}` : '',
+      '',
+      `Adresse : ${s.address?.street}${s.address?.quartier ? `, ${s.address.quartier}` : ''}, ${s.address?.zone}`,
+      `Mode d'accès : ${accessLabels[s.access?.mode ?? ''] ?? '—'}`,
+      s.access?.details ? `Détails : ${s.access.details}` : '',
+      '',
+    ];
+
+    if (s.mode === 'recurrent') {
+      lines.push('*Mode : RÉCURRENT (iCal auto)*');
+      lines.push(`iCal : ${s.icalUrl}`);
+      lines.push(`Démarrage : ${s.startDate}`);
+      lines.push(`Engagement : ${s.durationMonths} mois`);
+    } else {
+      lines.push('*Mode : PONCTUEL*');
+      lines.push(`Date : ${s.ponctuelDate}`);
+      lines.push(`Créneau : ${s.ponctuelSlot}`);
+    }
+
+    lines.push('', `Host : ${s.customer?.fullName}`, `Tél : ${s.customer?.phone}`, `Email : ${s.customer?.email}`);
+    if (s.customer?.notes) lines.push(`Notes : ${s.customer.notes}`);
+
+    lines.push('', `*Forfait par turnover : ${fcfa(total)}*`);
+    return lines.filter(Boolean).join('\n');
+  }
+
+  cta.addEventListener('click', async () => {
+    cta.disabled = true;
+    cta.textContent = 'Envoi en cours…';
+
+    const payload = {
+      service_type: 'airbnb' as const,
+      payload: {
+        size: s.size, options: s.options ?? [], mode: s.mode,
+        propertyCount: s.propertyCount,
+        address: s.address, access: s.access,
+        ponctuelDate: s.ponctuelDate, ponctuelSlot: s.ponctuelSlot,
+        icalUrl: s.icalUrl, startDate: s.startDate, durationMonths: s.durationMonths,
+      },
+      estimated_total_xof: total,
+      duration_min: size?.durationMin ?? null,
+      guest_name: s.customer?.fullName,
+      guest_phone: s.customer?.phone,
+      guest_email: s.customer?.email,
+      scheduled_at: s.mode === 'ponctuel' && s.ponctuelDate
+        ? new Date(`${s.ponctuelDate}T${(s.ponctuelSlot ?? '11-13').split('-')[0]}:00:00`).toISOString()
+        : s.startDate
+          ? new Date(`${s.startDate}T09:00:00`).toISOString()
+          : null,
+      status: 'pending' as const,
+    };
+
+    const supa = getSupabase();
+    if (supa) {
+      await supa.from('reservations').insert(payload).then(({ error }) => {
+        if (error) console.warn('[Bovo] Supabase insert failed:', error.message);
+      });
+    }
+
+    const msg = encodeURIComponent(buildWhatsappMessage());
+    const url = `https://wa.me/2290196677743?text=${msg}`;
+    clearState('airbnb');
+    setTimeout(() => { window.location.href = url; }, 400);
+  });
+</script>

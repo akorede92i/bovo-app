@@ -1,0 +1,161 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Ménage — Récapitulatif | Bovo"
+  topbar="back"
+  backHref="/menage/contact/"
+  pageTitle="Ménage à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={7} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Récapitulatif</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Vérifiez les détails avant d'envoyer votre demande.</p>
+
+  <div class="stack-md" id="recap-cards">
+    <!-- Rempli en JS -->
+  </div>
+
+  <div class="card card-elevated" style="margin-top:18px; padding:18px; background: var(--bovo-bg-soft);">
+    <div class="text-muted" style="font-size:0.82rem; line-height:1.5;">
+      <Icon name="info" size={14} class="" />
+      Le tarif final sera confirmé par notre équipe en moins d'1h sur WhatsApp.
+      Vous pouvez régler en espèces, en Mobile Money ou par virement à la prestation.
+    </div>
+  </div>
+
+  <CtaFooter buttonLabel="Envoyer ma demande" buttonType="button" buttonId="cta-submit" priceLabel="Estimation totale" priceValue="—" variant="rouge" />
+</Layout>
+
+<script>
+  import { loadState, clearState, type MenageState } from '@lib/state';
+  import { getSupabase } from '@lib/supabase';
+  import {
+    MENAGE_LOGEMENTS, MENAGE_FREQUENCES, MENAGE_OPTIONS, MENAGE_HOURLY_XOF, fcfa,
+  } from '@lib/catalog';
+
+  const s = loadState<MenageState>('menage');
+
+  // calcul final
+  const hours = s.hours ?? 2;
+  const freq = MENAGE_FREQUENCES.find((f) => f.id === s.frequence);
+  const discount = freq?.discount ?? 0;
+  const base = hours * MENAGE_HOURLY_XOF * (1 - discount);
+  const opts = (s.options ?? []).map((id) => MENAGE_OPTIONS.find((o) => o.id === id)!).filter(Boolean);
+  const optsTotal = opts.reduce((sum, o) => sum + o.priceXof, 0);
+  const total = Math.round(base + optsTotal);
+
+  const logement = MENAGE_LOGEMENTS.find((l) => l.id === s.logement);
+  const addr = s.address;
+  const cust = s.customer;
+
+  function row(label: string, value: string) {
+    return `
+      <div class="flex-between" style="padding:10px 0; border-bottom:1px solid var(--bovo-line-soft);">
+        <span class="text-muted" style="font-size:0.84rem;">${label}</span>
+        <span style="font-weight:600; text-align:right;">${value}</span>
+      </div>
+    `;
+  }
+
+  const recapEl = document.getElementById('recap-cards')!;
+  recapEl.innerHTML = `
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Votre prestation</div>
+      ${row('Logement', logement?.label ?? '—')}
+      ${row('Durée', `${hours}h par passage`)}
+      ${row('Fréquence', freq?.label ?? '—')}
+      ${opts.length ? row('Options', opts.map((o) => o.label).join(', ')) : ''}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Adresse</div>
+      ${row('Zone', addr?.zone ?? '—')}
+      ${addr?.quartier ? row('Quartier', addr.quartier) : ''}
+      ${row('Adresse', addr?.street ?? '—')}
+      ${addr?.building ? row('Précisions', addr.building) : ''}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Quand</div>
+      ${row('Date', s.date ?? '—')}
+      ${row('Créneau', s.slot ?? '—')}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Vos coordonnées</div>
+      ${row('Nom', cust?.fullName ?? '—')}
+      ${row('Téléphone', cust?.phone ?? '—')}
+      ${cust?.email ? row('Email', cust.email) : ''}
+      ${cust?.notes ? row('Notes', cust.notes) : ''}
+    </div>
+  `;
+
+  document.querySelector('.cta-footer .price-line strong')!.textContent = fcfa(total);
+
+  // ============= SOUMISSION =============
+  const cta = document.getElementById('cta-submit') as HTMLButtonElement;
+
+  function buildWhatsappMessage(): string {
+    const lines = [
+      '*Nouvelle demande Bovo — Ménage*',
+      '',
+      `Logement : ${logement?.label}`,
+      `Durée : ${hours}h`,
+      `Fréquence : ${freq?.label}`,
+      opts.length ? `Options : ${opts.map((o) => o.label).join(', ')}` : '',
+      '',
+      `Adresse : ${addr?.street}${addr?.quartier ? `, ${addr.quartier}` : ''}, ${addr?.zone}`,
+      addr?.building ? `Précisions : ${addr.building}` : '',
+      '',
+      `Date : ${s.date}`,
+      `Créneau : ${s.slot}`,
+      '',
+      `Client : ${cust?.fullName}`,
+      `Tél : ${cust?.phone}`,
+      cust?.email ? `Email : ${cust.email}` : '',
+      cust?.notes ? `Notes : ${cust.notes}` : '',
+      '',
+      `*Estimation : ${fcfa(total)}*`,
+    ].filter(Boolean);
+    return lines.join('\n');
+  }
+
+  cta.addEventListener('click', async () => {
+    cta.disabled = true;
+    cta.textContent = 'Envoi en cours…';
+
+    const payload = {
+      service_type: 'menage' as const,
+      payload: {
+        logement: s.logement, hours, frequence: s.frequence, options: s.options ?? [],
+        date: s.date, slot: s.slot, address: s.address,
+      },
+      estimated_total_xof: total,
+      duration_min: hours * 60,
+      guest_name: cust?.fullName,
+      guest_phone: cust?.phone,
+      guest_email: cust?.email,
+      scheduled_at: s.date ? new Date(`${s.date}T${(s.slot ?? '08-10').split('-')[0]}:00:00`).toISOString() : null,
+      status: 'pending' as const,
+    };
+
+    let saved = false;
+    const supa = getSupabase();
+    if (supa) {
+      const { error } = await supa.from('reservations').insert(payload);
+      if (!error) saved = true;
+      else console.warn('[Bovo] Supabase insert failed, fallback to WhatsApp:', error.message);
+    }
+
+    // Toujours déclencher WhatsApp (notif admin + UX client)
+    const msg = encodeURIComponent(buildWhatsappMessage());
+    const adminWa = '2290196677743'; // numéro Bovo (cf. memory)
+    const url = `https://wa.me/${adminWa}?text=${msg}`;
+
+    clearState('menage');
+    // Petit délai pour que l'utilisateur voit l'état "envoi en cours"
+    setTimeout(() => { window.location.href = url; }, 400);
+  });
+</script>

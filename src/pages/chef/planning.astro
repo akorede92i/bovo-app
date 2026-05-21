@@ -1,0 +1,95 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import { ZONES } from '@lib/catalog';
+
+const minDate = (() => {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toISOString().slice(0, 10);
+})();
+---
+<Layout
+  title="Chef — Étape 5 : Démarrage et adresse | Bovo"
+  topbar="back"
+  backHref="/chef/preferences/"
+  pageTitle="Chef à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={5} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Démarrage et adresse</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Délai minimum 7 jours pour caler votre chef.</p>
+
+  <div class="field">
+    <label class="field-label" for="start-date">Date de démarrage</label>
+    <input id="start-date" class="input" type="date" min={minDate} required />
+  </div>
+
+  <div class="field" style="margin-top:18px;">
+    <label class="field-label" for="zone">Zone</label>
+    <select id="zone" class="select" required>
+      <option value="">Choisir une zone…</option>
+      {ZONES.map((z) => <option value={z}>{z}</option>)}
+    </select>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="quartier">Quartier</label>
+    <input id="quartier" class="input" type="text" placeholder="ex. Haie Vive, Cadjèhoun…" />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="street">Adresse</label>
+    <input id="street" class="input" type="text" placeholder="Rue, numéro, repères" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="building">Précisions (étage, code, instructions)</label>
+    <textarea id="building" class="textarea" placeholder="ex. Résidence Soleil, 3e étage, portail vert"></textarea>
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type ChefState } from '@lib/state';
+
+  const startDate = document.getElementById('start-date') as HTMLInputElement;
+  const zone = document.getElementById('zone') as HTMLSelectElement;
+  const quartier = document.getElementById('quartier') as HTMLInputElement;
+  const street = document.getElementById('street') as HTMLInputElement;
+  const building = document.getElementById('building') as HTMLTextAreaElement;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<ChefState>('chef');
+  if (s.startDate) startDate.value = s.startDate;
+  if (s.address) {
+    zone.value = s.address.zone ?? '';
+    quartier.value = s.address.quartier ?? '';
+    street.value = s.address.street ?? '';
+    building.value = s.address.building ?? '';
+  }
+
+  function validate() {
+    cta.disabled = !(startDate.value && zone.value && street.value.trim());
+  }
+  [startDate, zone, quartier, street, building].forEach((el) => el.addEventListener('input', validate));
+  zone.addEventListener('change', validate);
+
+  cta.addEventListener('click', () => {
+    saveState<ChefState>('chef', {
+      startDate: startDate.value,
+      address: {
+        zone: zone.value,
+        quartier: quartier.value.trim() || undefined,
+        street: street.value.trim(),
+        building: building.value.trim() || undefined,
+      },
+    });
+    window.location.href = '/chef/contact/';
+  });
+
+  validate();
+</script>

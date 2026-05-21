@@ -1,0 +1,58 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout title="Connexion — Bovo" topbar="back" backHref="/" pageTitle="Connexion" noindex>
+  <h1 class="h-display" style="margin-bottom:8px;">Bon retour 👋</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Connectez-vous pour retrouver vos adresses et votre historique.</p>
+
+  <form id="login-form" novalidate>
+    <div class="field">
+      <label class="field-label" for="email">Email</label>
+      <input id="email" class="input" type="email" autocomplete="email" required />
+    </div>
+    <div class="field">
+      <label class="field-label" for="password">Mot de passe</label>
+      <input id="password" class="input" type="password" autocomplete="current-password" required />
+    </div>
+    <div id="login-error" class="text-muted" style="color: var(--bovo-danger); display:none; margin: 8px 0;"></div>
+    <button type="submit" class="btn btn-primary btn-lg btn-block" style="margin-top: 8px;">
+      Se connecter
+    </button>
+  </form>
+
+  <p class="text-muted" style="text-align:center; margin-top: 20px;">
+    Pas encore de compte ? <a href="/compte/inscription/" style="color: var(--bovo-bleu); font-weight:600;">Créer mon compte</a>
+  </p>
+</Layout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+
+  const form = document.getElementById('login-form') as HTMLFormElement;
+  const err = document.getElementById('login-error') as HTMLDivElement;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.style.display = 'none';
+    const email = (document.getElementById('email') as HTMLInputElement).value.trim();
+    const password = (document.getElementById('password') as HTMLInputElement).value;
+
+    const supa = getSupabase();
+    if (!supa) {
+      err.textContent = "Service d'authentification non configuré.";
+      err.style.display = 'block';
+      return;
+    }
+
+    const { error } = await supa.auth.signInWithPassword({ email, password });
+    if (error) {
+      err.textContent = error.message === 'Invalid login credentials'
+        ? 'Identifiants incorrects.'
+        : 'Connexion impossible. Réessayez.';
+      err.style.display = 'block';
+      return;
+    }
+    window.location.href = '/compte/';
+  });
+</script>

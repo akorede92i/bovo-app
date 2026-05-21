@@ -1,0 +1,136 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Paramètres — Bovo"
+  topbar="back"
+  backHref="/compte/"
+  pageTitle="Paramètres"
+  noindex
+>
+  <div id="loading" style="text-align:center; padding:48px 20px;">
+    <div class="text-muted">Chargement…</div>
+  </div>
+
+  <div id="content" hidden>
+    <h2 class="h-section" style="margin-bottom:12px;">Mon profil</h2>
+
+    <form id="profile-form" novalidate>
+      <div class="field">
+        <label class="field-label" for="full-name">Nom complet</label>
+        <input id="full-name" class="input" type="text" autocomplete="name" required />
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="phone">Téléphone (WhatsApp)</label>
+        <input id="phone" class="input" type="tel" autocomplete="tel" required />
+      </div>
+
+      <div class="field">
+        <label class="field-label" for="email">Email</label>
+        <input id="email" class="input" type="email" readonly style="background: var(--bovo-bg-soft); color: var(--bovo-muted);" />
+        <span class="field-hint">Pour changer d'email, contactez le support.</span>
+      </div>
+
+      <div id="profile-error" class="text-muted" style="color: var(--bovo-danger); display:none; margin:8px 0;"></div>
+      <div id="profile-success" class="text-muted" style="color: var(--bovo-success); display:none; margin:8px 0;"></div>
+
+      <button type="submit" class="btn btn-primary btn-block">Enregistrer</button>
+    </form>
+
+    <hr style="border:none; border-top:1px solid var(--bovo-line-soft); margin: 32px 0;">
+
+    <h2 class="h-section" style="margin-bottom:12px;">Sécurité</h2>
+    <a href="#" id="reset-password" class="svc-card">
+      <div class="svc-card-icon"><Icon name="lock" size={22} /></div>
+      <div class="svc-card-body">
+        <div class="svc-card-title">Changer mon mot de passe</div>
+        <div class="svc-card-meta">On vous envoie un email avec un lien</div>
+      </div>
+      <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
+    </a>
+
+    <hr style="border:none; border-top:1px solid var(--bovo-line-soft); margin: 32px 0;">
+
+    <h2 class="h-section" style="margin-bottom:12px;">Support</h2>
+    <a href="https://wa.me/2290196677743" class="svc-card">
+      <div class="svc-card-icon"><Icon name="whatsapp" size={22} /></div>
+      <div class="svc-card-body">
+        <div class="svc-card-title">Nous contacter sur WhatsApp</div>
+        <div class="svc-card-meta">Réponse sous 30 minutes</div>
+      </div>
+      <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
+    </a>
+
+    <hr style="border:none; border-top:1px solid var(--bovo-line-soft); margin: 32px 0;">
+
+    <button id="signout-btn" class="btn btn-ghost btn-block">
+      Se déconnecter
+    </button>
+
+    <p class="text-muted" style="text-align:center; margin-top:24px; font-size:0.78rem;">
+      Vobodou Groupe SARL · Cotonou, Bénin<br>
+      <a href="https://bovo.bj/mentions-legales.html" style="color: var(--bovo-muted); text-decoration:underline;">Mentions légales</a> ·
+      <a href="https://bovo.bj/confidentialite.html" style="color: var(--bovo-muted); text-decoration:underline;">Confidentialité</a>
+    </p>
+  </div>
+</Layout>
+
+<script>
+  import { requireAuth, signOut } from '@lib/auth';
+  import { getSupabase } from '@lib/supabase';
+
+  const user = await requireAuth();
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('loading')!.textContent = 'Service indisponible.';
+  } else {
+    const name = document.getElementById('full-name') as HTMLInputElement;
+    const phone = document.getElementById('phone') as HTMLInputElement;
+    const email = document.getElementById('email') as HTMLInputElement;
+    const errEl = document.getElementById('profile-error') as HTMLDivElement;
+    const okEl = document.getElementById('profile-success') as HTMLDivElement;
+
+    name.value = user.profile?.full_name ?? '';
+    phone.value = user.profile?.phone ?? '';
+    email.value = user.email;
+
+    document.getElementById('profile-form')!.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errEl.style.display = 'none';
+      okEl.style.display = 'none';
+      const { error } = await supa.from('profiles').update({
+        full_name: name.value.trim(),
+        phone: phone.value.trim(),
+        updated_at: new Date().toISOString(),
+      }).eq('id', user.id);
+      if (error) {
+        errEl.textContent = error.message;
+        errEl.style.display = 'block';
+        return;
+      }
+      okEl.textContent = 'Profil mis à jour.';
+      okEl.style.display = 'block';
+    });
+
+    document.getElementById('reset-password')!.addEventListener('click', async (e) => {
+      e.preventDefault();
+      const { error } = await supa.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${window.location.origin}/compte/connexion/`,
+      });
+      if (error) {
+        errEl.textContent = error.message;
+        errEl.style.display = 'block';
+        return;
+      }
+      okEl.textContent = 'Email envoyé. Vérifiez votre boîte de réception.';
+      okEl.style.display = 'block';
+    });
+
+    document.getElementById('signout-btn')!.addEventListener('click', () => signOut());
+
+    document.getElementById('loading')!.hidden = true;
+    document.getElementById('content')!.hidden = false;
+  }
+</script>

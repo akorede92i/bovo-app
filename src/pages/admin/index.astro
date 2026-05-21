@@ -1,0 +1,143 @@
+---
+import AdminLayout from '@layouts/AdminLayout.astro';
+---
+<AdminLayout title="Dashboard — Bovo Admin" pageTitle="Tableau de bord" active="dashboard">
+  <p class="admin-sub" id="hello-line">Bienvenue 👋</p>
+
+  <!-- KPIs -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Aujourd'hui</div>
+      <div class="kpi-value" id="kpi-today">—</div>
+      <div class="kpi-trend">prestations prévues</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">À assigner</div>
+      <div class="kpi-value" id="kpi-pending" style="color: var(--bovo-warning);">—</div>
+      <div class="kpi-trend">en attente d'équipe</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Cette semaine</div>
+      <div class="kpi-value" id="kpi-week">—</div>
+      <div class="kpi-trend">7 prochains jours</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">CA estimé (mois)</div>
+      <div class="kpi-value" id="kpi-revenue" style="color: var(--bovo-bleu);">—</div>
+      <div class="kpi-trend">FCFA confirmés</div>
+    </div>
+  </div>
+
+  <!-- À traiter en priorité -->
+  <h2 style="font-family: 'Jost', sans-serif; font-weight: 700; font-size: 1.1rem; margin-bottom: 14px;">🔥 À traiter en priorité</h2>
+  <div id="urgent-loading" style="color: var(--bovo-muted); padding: 20px;">Chargement…</div>
+  <div id="urgent-list" hidden></div>
+  <div id="urgent-empty" hidden class="empty-state">
+    <div class="empty-state-emoji">✨</div>
+    <div class="empty-state-title">Tout est à jour</div>
+    <div class="empty-state-desc">Aucune réservation n'attend votre attention.</div>
+  </div>
+
+  <!-- Prochaines prestations -->
+  <h2 style="font-family: 'Jost', sans-serif; font-weight: 700; font-size: 1.1rem; margin: 32px 0 14px;">📅 Prochaines prestations</h2>
+  <div id="upcoming-loading" style="color: var(--bovo-muted); padding: 20px;">Chargement…</div>
+  <div id="upcoming-list" hidden></div>
+  <div id="upcoming-empty" hidden class="empty-state">
+    <div class="empty-state-emoji">📭</div>
+    <div class="empty-state-title">Aucune prestation à venir</div>
+  </div>
+</AdminLayout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS } from '@lib/admin';
+  import { fcfa } from '@lib/catalog';
+
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('hello-line')!.textContent = 'Supabase non configuré.';
+  } else {
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+    const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7).toISOString();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+
+    // Hello line
+    const hour = now.getHours();
+    const salut = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
+    document.getElementById('hello-line')!.textContent = `${salut} 👋 Voici l'activité Bovo du moment.`;
+
+    // KPIs en parallèle
+    const [todayRes, pendingRes, weekRes, revenueRes] = await Promise.all([
+      supa.from('reservations').select('id', { count: 'exact', head: true })
+        .gte('scheduled_at', todayStart).lt('scheduled_at', todayEnd).neq('status', 'cancelled'),
+      supa.from('reservations').select('id', { count: 'exact', head: true })
+        .in('status', ['pending', 'confirmed']),
+      supa.from('reservations').select('id', { count: 'exact', head: true })
+        .gte('scheduled_at', todayStart).lt('scheduled_at', weekEnd).neq('status', 'cancelled'),
+      supa.from('reservations').select('estimated_total_xof')
+        .gte('scheduled_at', monthStart).lt('scheduled_at', monthEnd)
+        .in('status', ['confirmed', 'assigned', 'in_progress', 'done']),
+    ]);
+
+    document.getElementById('kpi-today')!.textContent = String(todayRes.count ?? 0);
+    document.getElementById('kpi-pending')!.textContent = String(pendingRes.count ?? 0);
+    document.getElementById('kpi-week')!.textContent = String(weekRes.count ?? 0);
+    const revenue = (revenueRes.data ?? []).reduce((sum: number, r: any) => sum + (r.estimated_total_xof ?? 0), 0);
+    document.getElementById('kpi-revenue')!.textContent = fcfa(revenue);
+
+    function renderResaCard(r: any) {
+      const dateStr = r.scheduled_at
+        ? new Date(r.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
+        : '—';
+      const statusColor = STATUS_COLORS[r.status] ?? '#6B7280';
+      return `
+        <a href="/admin/reservations/?id=${r.id}" style="display:flex; gap:14px; padding:14px 16px; background:#fff; border:1px solid var(--bovo-line-soft); border-radius: var(--r-lg); margin-bottom:10px; align-items:center; text-decoration:none;">
+          <div style="font-size:1.6rem; flex-shrink:0;">${SERVICE_ICONS[r.service_type] ?? '✦'}</div>
+          <div style="flex:1; min-width:0;">
+            <div style="font-weight:600; color: var(--bovo-ink);">${SERVICE_LABELS[r.service_type] ?? r.service_type} — ${r.guest_name ?? 'Anonyme'}</div>
+            <div style="font-size:0.84rem; color: var(--bovo-muted); margin-top:2px;">${dateStr} · ${r.guest_phone ?? '—'}</div>
+          </div>
+          <span class="status-badge" style="background:${statusColor};">${STATUS_LABELS[r.status] ?? r.status}</span>
+        </a>
+      `;
+    }
+
+    // À traiter en priorité (pending / confirmed à venir, max 5)
+    const { data: urgent } = await supa.from('reservations')
+      .select('id, service_type, guest_name, guest_phone, scheduled_at, status')
+      .in('status', ['pending', 'confirmed'])
+      .order('scheduled_at', { ascending: true })
+      .limit(5);
+
+    document.getElementById('urgent-loading')!.hidden = true;
+    if (!urgent || urgent.length === 0) {
+      document.getElementById('urgent-empty')!.hidden = false;
+    } else {
+      const list = document.getElementById('urgent-list')!;
+      list.innerHTML = urgent.map(renderResaCard).join('');
+      list.hidden = false;
+    }
+
+    // Prochaines (assigned/in_progress, 7 jours, max 10)
+    const { data: upcoming } = await supa.from('reservations')
+      .select('id, service_type, guest_name, guest_phone, scheduled_at, status')
+      .gte('scheduled_at', todayStart)
+      .lt('scheduled_at', weekEnd)
+      .in('status', ['assigned', 'in_progress'])
+      .order('scheduled_at', { ascending: true })
+      .limit(10);
+
+    document.getElementById('upcoming-loading')!.hidden = true;
+    if (!upcoming || upcoming.length === 0) {
+      document.getElementById('upcoming-empty')!.hidden = false;
+    } else {
+      const list = document.getElementById('upcoming-list')!;
+      list.innerHTML = upcoming.map(renderResaCard).join('');
+      list.hidden = false;
+    }
+  }
+</script>
+</AdminLayout>

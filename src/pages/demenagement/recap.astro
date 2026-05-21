@@ -1,0 +1,200 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Déménagement — Récapitulatif | Bovo"
+  topbar="back"
+  backHref="/demenagement/contact/"
+  pageTitle="Déménagement"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={7} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Récapitulatif</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Vérifiez avant d'envoyer. Devis confirmé par Bovo en moins d'1h.</p>
+
+  <div class="stack-md" id="recap-cards"></div>
+
+  <div id="deposit-block" hidden class="card card-elevated" style="margin-top:18px; padding:18px; background: var(--bovo-bleu-light); border-color: transparent;">
+    <div style="display:flex; gap:12px; align-items:flex-start;">
+      <div style="flex-shrink:0; color: var(--bovo-bleu);"><Icon name="shield" size={20} /></div>
+      <div style="flex:1;">
+        <div style="font-weight:600; margin-bottom:4px;">Acompte de 20% pour verrouiller la date</div>
+        <div class="text-muted" style="margin-bottom:10px;">Vous paierez <strong id="deposit-amount" style="color: var(--bovo-ink);">—</strong> par Mobile Money (MTN/Moov) ou carte. Le solde se règle le jour J.</div>
+      </div>
+    </div>
+  </div>
+
+  <CtaFooter buttonLabel="Envoyer ma demande" buttonType="button" buttonId="cta-submit" priceLabel="Estimation totale" priceValue="—" variant="rouge" />
+</Layout>
+
+<!-- Kkiapay widget (chargé seulement si acompte coché) -->
+<script src="https://cdn.kkiapay.me/k.js"></script>
+
+<script>
+  import { loadState, clearState, type DemenagementState } from '@lib/state';
+  import { getSupabase } from '@lib/supabase';
+  import { DEM_VOLUMES, DEM_OPTIONS, DEM_ETAGE_SUPP_XOF, fcfa } from '@lib/catalog';
+
+  const s = loadState<DemenagementState>('demenagement');
+  const vol = DEM_VOLUMES.find((v) => v.id === s.volume);
+  const opts = (s.options ?? []).map((id) => DEM_OPTIONS.find((o) => o.id === id)!).filter(Boolean);
+  const optsTotal = opts.reduce((sum, o) => sum + o.priceXof, 0);
+  const fromFloors = (!s.from?.elevator && s.from?.floor) ? s.from.floor : 0;
+  const toFloors = (!s.to?.elevator && s.to?.floor) ? s.to.floor : 0;
+  const floorsCost = (fromFloors + toFloors) * DEM_ETAGE_SUPP_XOF;
+  const total = (vol?.priceXof ?? 0) + optsTotal + floorsCost;
+  const deposit = Math.round(total * 0.2);
+
+  function row(label: string, value: string) {
+    return `
+      <div class="flex-between" style="padding:10px 0; border-bottom:1px solid var(--bovo-line-soft);">
+        <span class="text-muted" style="font-size:0.84rem;">${label}</span>
+        <span style="font-weight:600; text-align:right;">${value}</span>
+      </div>
+    `;
+  }
+
+  document.getElementById('recap-cards')!.innerHTML = `
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Votre déménagement</div>
+      ${row('Volume', vol?.label ?? '—')}
+      ${row('Forfait de base', fcfa(vol?.priceXof ?? 0))}
+      ${opts.length ? row('Options', opts.map((o) => o.label).join(', ')) : ''}
+      ${floorsCost > 0 ? row('Étages sans ascenseur', `+${fcfa(floorsCost)}`) : ''}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Adresse de départ</div>
+      ${row('Zone', s.from?.zone ?? '—')}
+      ${s.from?.quartier ? row('Quartier', s.from.quartier) : ''}
+      ${row('Adresse', s.from?.street ?? '—')}
+      ${row('Étage', s.from?.floor === 0 ? 'RDC' : `${s.from?.floor}e étage`)}
+      ${row('Ascenseur', s.from?.elevator ? 'Oui' : 'Non')}
+      ${s.from?.parking ? row('Accès camion', s.from.parking) : ''}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Adresse d'arrivée</div>
+      ${row('Zone', s.to?.zone ?? '—')}
+      ${s.to?.quartier ? row('Quartier', s.to.quartier) : ''}
+      ${row('Adresse', s.to?.street ?? '—')}
+      ${row('Étage', s.to?.floor === 0 ? 'RDC' : `${s.to?.floor}e étage`)}
+      ${row('Ascenseur', s.to?.elevator ? 'Oui' : 'Non')}
+      ${s.to?.parking ? row('Accès camion', s.to.parking) : ''}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Quand</div>
+      ${row('Date', s.date ?? '—')}
+      ${row('Créneau', s.slot ?? '—')}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Vos coordonnées</div>
+      ${row('Nom', s.customer?.fullName ?? '—')}
+      ${row('Téléphone', s.customer?.phone ?? '—')}
+      ${row('Email', s.customer?.email ?? '—')}
+      ${s.customer?.notes ? row('Notes', s.customer.notes) : ''}
+    </div>
+  `;
+
+  document.querySelector('.cta-footer .price-line strong')!.textContent = fcfa(total);
+
+  if (s.wantsDeposit) {
+    const block = document.getElementById('deposit-block')!;
+    block.hidden = false;
+    document.getElementById('deposit-amount')!.textContent = fcfa(deposit);
+  }
+
+  // ============= SOUMISSION =============
+  const cta = document.getElementById('cta-submit') as HTMLButtonElement;
+
+  function buildWhatsappMessage(): string {
+    const lines = [
+      '*Nouvelle demande Bovo — Déménagement*',
+      '',
+      `Volume : ${vol?.label}`,
+      opts.length ? `Options : ${opts.map((o) => o.label).join(', ')}` : '',
+      '',
+      `Départ : ${s.from?.street}, ${s.from?.zone} — ${s.from?.floor === 0 ? 'RDC' : `${s.from?.floor}e étage`}${s.from?.elevator ? ' (ascenseur)' : ''}`,
+      s.from?.parking ? `Accès départ : ${s.from.parking}` : '',
+      '',
+      `Arrivée : ${s.to?.street}, ${s.to?.zone} — ${s.to?.floor === 0 ? 'RDC' : `${s.to?.floor}e étage`}${s.to?.elevator ? ' (ascenseur)' : ''}`,
+      s.to?.parking ? `Accès arrivée : ${s.to.parking}` : '',
+      '',
+      `Date : ${s.date}`,
+      `Créneau : ${s.slot}`,
+      '',
+      `Client : ${s.customer?.fullName}`,
+      `Tél : ${s.customer?.phone}`,
+      `Email : ${s.customer?.email}`,
+      s.customer?.notes ? `Notes : ${s.customer.notes}` : '',
+      '',
+      `*Estimation : ${fcfa(total)}*`,
+      s.wantsDeposit ? `Acompte 20% souhaité : ${fcfa(deposit)}` : '',
+    ];
+    return lines.filter(Boolean).join('\n');
+  }
+
+  async function submitToSupabase(depositStatus: 'none' | 'paid' = 'none', kkiapayTx?: string) {
+    const payload = {
+      service_type: 'demenagement' as const,
+      payload: {
+        volume: s.volume, options: s.options ?? [],
+        from: s.from, to: s.to, date: s.date, slot: s.slot,
+      },
+      estimated_total_xof: total,
+      guest_name: s.customer?.fullName,
+      guest_phone: s.customer?.phone,
+      guest_email: s.customer?.email,
+      scheduled_at: s.date ? new Date(`${s.date}T${(s.slot ?? '08-13').split('-')[0]}:00:00`).toISOString() : null,
+      status: 'pending' as const,
+      deposit_status: depositStatus,
+      deposit_kkiapay_tx: kkiapayTx ?? null,
+    };
+    const supa = getSupabase();
+    if (supa) {
+      const { error } = await supa.from('reservations').insert(payload);
+      if (error) console.warn('[Bovo] Supabase insert failed:', error.message);
+    }
+  }
+
+  function goToWhatsapp() {
+    const msg = encodeURIComponent(buildWhatsappMessage());
+    const url = `https://wa.me/2290196677743?text=${msg}`;
+    clearState('demenagement');
+    setTimeout(() => { window.location.href = url; }, 400);
+  }
+
+  cta.addEventListener('click', async () => {
+    cta.disabled = true;
+    cta.textContent = 'Envoi en cours…';
+
+    if (s.wantsDeposit && typeof (window as any).openKkiapayWidget === 'function') {
+      // Lance Kkiapay pour l'acompte
+      (window as any).openKkiapayWidget({
+        amount: deposit,
+        api_key: import.meta.env.PUBLIC_KKIAPAY_PUBLIC_KEY ?? 'DEMO',
+        callback: '',
+        position: 'center',
+        sandbox: true,
+        data: 'demenagement',
+        theme: '#4470B3',
+        name: s.customer?.fullName ?? '',
+        email: s.customer?.email ?? '',
+        phone: s.customer?.phone ?? '',
+      });
+      (window as any).addKkiapayListener?.('success', async (resp: any) => {
+        await submitToSupabase('paid', resp?.transactionId);
+        goToWhatsapp();
+      });
+      (window as any).addKkiapayListener?.('failed', async () => {
+        await submitToSupabase('none');
+        goToWhatsapp();
+      });
+    } else {
+      await submitToSupabase(s.wantsDeposit ? 'pending' : 'none');
+      goToWhatsapp();
+    }
+  });
+</script>

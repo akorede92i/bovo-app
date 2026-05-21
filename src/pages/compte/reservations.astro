@@ -1,0 +1,151 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Mes réservations — Bovo"
+  topbar="back"
+  backHref="/compte/"
+  pageTitle="Mes réservations"
+  noindex
+>
+  <div id="loading" style="text-align:center; padding:48px 20px;">
+    <div class="text-muted">Chargement…</div>
+  </div>
+
+  <div id="content" hidden>
+    <!-- Filtres -->
+    <div class="chips" style="margin-bottom:20px;">
+      <button class="chip is-active" data-filter="all">Toutes</button>
+      <button class="chip" data-filter="upcoming">À venir</button>
+      <button class="chip" data-filter="past">Passées</button>
+    </div>
+
+    <div id="reservations-list" class="stack-md"></div>
+
+    <div id="empty" hidden class="card card-elevated" style="text-align:center; padding:32px 20px;">
+      <div style="color: var(--bovo-muted); margin-bottom:12px;">
+        <Icon name="calendar" size={40} />
+      </div>
+      <div style="font-family:'Jost'; font-weight:700; margin-bottom:6px;">Aucune réservation</div>
+      <div class="text-muted" style="margin-bottom:18px;">Réservez votre première prestation en 2 minutes.</div>
+      <a href="/" class="btn btn-primary">Découvrir les services</a>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { requireAuth } from '@lib/auth';
+  import { getSupabase, type Reservation } from '@lib/supabase';
+  import { fcfa } from '@lib/catalog';
+
+  const user = await requireAuth();
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('loading')!.textContent = 'Service indisponible.';
+  } else {
+    const listEl = document.getElementById('reservations-list')!;
+    const empty = document.getElementById('empty')!;
+    let allReservations: Reservation[] = [];
+    let currentFilter: 'all' | 'upcoming' | 'past' = 'all';
+
+    const labels: Record<string, string> = {
+      menage: 'Ménage à domicile',
+      airbnb: 'Service Airbnb',
+      demenagement: 'Déménagement',
+      chef: 'Chef à domicile',
+    };
+    const icons: Record<string, string> = {
+      menage: 'broom',
+      airbnb: 'airbnb',
+      demenagement: 'truck',
+      chef: 'chef',
+    };
+    const statusConfig: Record<string, { label: string; color: string }> = {
+      pending:     { label: 'En attente', color: 'var(--bovo-warning)' },
+      confirmed:   { label: 'Confirmée', color: 'var(--bovo-success)' },
+      assigned:    { label: 'Équipe assignée', color: 'var(--bovo-success)' },
+      in_progress: { label: 'En cours', color: 'var(--bovo-bleu)' },
+      done:        { label: 'Terminée', color: 'var(--bovo-muted)' },
+      cancelled:   { label: 'Annulée', color: 'var(--bovo-danger)' },
+    };
+
+    function render() {
+      const now = new Date();
+      const filtered = allReservations.filter((r) => {
+        if (currentFilter === 'all') return true;
+        const d = r.scheduled_at ? new Date(r.scheduled_at) : null;
+        if (currentFilter === 'upcoming') return d && d >= now && !['done', 'cancelled'].includes(r.status);
+        if (currentFilter === 'past')     return !d || d < now || ['done', 'cancelled'].includes(r.status);
+        return true;
+      });
+
+      listEl.innerHTML = '';
+      if (filtered.length === 0) {
+        empty.hidden = false;
+        return;
+      }
+      empty.hidden = true;
+      for (const r of filtered) {
+        const dateStr = r.scheduled_at
+          ? new Date(r.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })
+          : 'Date à confirmer';
+        const sc = statusConfig[r.status] ?? { label: r.status, color: 'var(--bovo-muted)' };
+        const iconName = icons[r.service_type] ?? 'broom';
+        const div = document.createElement('div');
+        div.className = 'card card-elevated';
+        div.innerHTML = `
+          <div style="display:flex; gap:14px; align-items:flex-start;">
+            <div style="flex-shrink:0; width:44px; height:44px; border-radius:var(--r-md); background: var(--bovo-bleu-light); color: var(--bovo-bleu); display:flex; align-items:center; justify-content:center;" data-icon="${iconName}">
+              <!-- icon inserted below -->
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div class="flex-between" style="margin-bottom:6px;">
+                <div style="font-family:'Jost'; font-weight:700; font-size:1rem;">${labels[r.service_type] ?? r.service_type}</div>
+                <span style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:${sc.color}; flex-shrink:0; margin-left:8px;">${sc.label}</span>
+              </div>
+              <div class="text-muted" style="font-size:0.86rem; margin-bottom:6px;">${dateStr}</div>
+              ${r.estimated_total_xof ? `<div style="font-family:'Jost'; font-weight:700; color: var(--bovo-bleu);">${fcfa(r.estimated_total_xof)}</div>` : ''}
+              ${r.deposit_status === 'paid' ? '<div style="font-size:0.74rem; color: var(--bovo-success); margin-top:4px;">✓ Acompte payé</div>' : ''}
+            </div>
+          </div>
+        `;
+        listEl.appendChild(div);
+      }
+
+      // Icônes SVG inline (placeholder, on utilise des emojis simples ici car les Icon components ne sont pas client-side)
+      listEl.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => {
+        const name = el.getAttribute('data-icon');
+        const map: Record<string, string> = {
+          broom: '🧹', airbnb: '🏠', truck: '🚚', chef: '👨‍🍳',
+        };
+        el.innerHTML = `<span style="font-size:1.4rem;">${map[name!] ?? '✦'}</span>`;
+      });
+    }
+
+    document.querySelectorAll<HTMLButtonElement>('.chip').forEach((chip) => {
+      chip.addEventListener('click', () => {
+        document.querySelectorAll('.chip').forEach((c) => c.classList.remove('is-active'));
+        chip.classList.add('is-active');
+        currentFilter = chip.dataset.filter as any;
+        render();
+      });
+    });
+
+    const { data, error } = await supa
+      .from('reservations')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('scheduled_at', { ascending: false, nullsFirst: false });
+
+    if (error) {
+      listEl.innerHTML = `<div class="text-muted" style="color: var(--bovo-danger);">Erreur : ${error.message}</div>`;
+    } else {
+      allReservations = (data ?? []) as Reservation[];
+      render();
+    }
+
+    document.getElementById('loading')!.hidden = true;
+    document.getElementById('content')!.hidden = false;
+  }
+</script>

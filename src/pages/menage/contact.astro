@@ -1,0 +1,95 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Ménage — Étape 6 : Vos coordonnées | Bovo"
+  topbar="back"
+  backHref="/menage/creneau/"
+  pageTitle="Ménage à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={6} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Vos coordonnées</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Nous vous confirmons par WhatsApp en moins d'1h.</p>
+
+  <div class="field">
+    <label class="field-label" for="name">Nom complet</label>
+    <input id="name" class="input" type="text" placeholder="Prénom Nom" autocomplete="name" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="phone">Téléphone (WhatsApp de préférence)</label>
+    <input id="phone" class="input" type="tel" placeholder="+229 01 96 67 77 43" autocomplete="tel" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="email">Email (optionnel)</label>
+    <input id="email" class="input" type="email" placeholder="vous@email.com" autocomplete="email" />
+    <span class="field-hint">Pour recevoir la confirmation et votre facture.</span>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="notes">Notes pour l'équipe (optionnel)</label>
+    <textarea id="notes" class="textarea" placeholder="Allergie aux produits parfumés, présence d'animaux, etc."></textarea>
+  </div>
+
+  <!-- Offre de création de compte -->
+  <div class="card card-elevated" style="margin-top:24px; background: linear-gradient(135deg, var(--bovo-bleu-light), #fff); border-color: transparent;">
+    <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer;">
+      <input type="checkbox" id="create-account" style="margin-top:3px; transform: scale(1.2); accent-color: var(--bovo-bleu);" />
+      <span>
+        <span style="font-weight:600; display:block; margin-bottom:4px;">Créer mon compte Bovo</span>
+        <span class="text-muted">Sauvegardez vos infos pour réserver en 1 clic la prochaine fois. Vous recevrez un lien de validation par email.</span>
+      </span>
+    </label>
+  </div>
+
+  <CtaFooter buttonLabel="Voir le récapitulatif" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type MenageState } from '@lib/state';
+
+  const name = document.getElementById('name') as HTMLInputElement;
+  const phone = document.getElementById('phone') as HTMLInputElement;
+  const email = document.getElementById('email') as HTMLInputElement;
+  const notes = document.getElementById('notes') as HTMLTextAreaElement;
+  const createAccount = document.getElementById('create-account') as HTMLInputElement;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<MenageState>('menage');
+  if (s.customer) {
+    name.value = s.customer.fullName ?? '';
+    phone.value = s.customer.phone ?? '';
+    email.value = s.customer.email ?? '';
+    notes.value = s.customer.notes ?? '';
+  }
+
+  function validPhone(v: string) {
+    return v.replace(/\D/g, '').length >= 8;
+  }
+  function validate() {
+    cta.disabled = !(name.value.trim() && validPhone(phone.value));
+  }
+  [name, phone, email, notes].forEach((el) => el.addEventListener('input', validate));
+
+  cta.addEventListener('click', () => {
+    saveState<MenageState>('menage', {
+      customer: {
+        fullName: name.value.trim(),
+        phone: phone.value.trim(),
+        email: email.value.trim() || undefined,
+        notes: notes.value.trim() || undefined,
+      },
+    });
+    const wantAccount = createAccount.checked;
+    sessionStorage.setItem('bovo:create-account', wantAccount ? '1' : '0');
+    window.location.href = '/menage/recap/';
+  });
+
+  validate();
+</script>

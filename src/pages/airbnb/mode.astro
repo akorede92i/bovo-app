@@ -1,0 +1,78 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Airbnb — Étape 3 : Mode de service | Bovo"
+  topbar="back"
+  backHref="/airbnb/logement/"
+  pageTitle="Service Airbnb"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={3} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Un seul turnover ou récurrent&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Le mode récurrent connecte votre iCal Airbnb pour automatiser le planning.</p>
+
+  <div class="stack-md" id="mode-list">
+    <button class="opt" data-value="ponctuel" style="align-items:flex-start; padding:18px;">
+      <span class="opt-radio" style="margin-top:4px;"></span>
+      <span class="opt-body">
+        <span class="opt-title" style="display:flex; align-items:center; gap:8px;">
+          <Icon name="calendar" size={18} />
+          Turnover ponctuel
+        </span>
+        <span class="opt-meta" style="margin-top:4px;">
+          Une seule intervention à une date précise. Idéal pour tester notre service.
+        </span>
+      </span>
+    </button>
+
+    <button class="opt" data-value="recurrent" style="align-items:flex-start; padding:18px; position:relative;">
+      <span class="opt-radio" style="margin-top:4px;"></span>
+      <span class="opt-body">
+        <span class="opt-title" style="display:flex; align-items:center; gap:8px;">
+          <Icon name="sparkles" size={18} />
+          Récurrent automatique <span style="font-size:0.62rem; background: var(--bovo-rouge); color:#fff; padding:2px 6px; border-radius: var(--r-full); letter-spacing:1px; text-transform:uppercase;">Pro</span>
+        </span>
+        <span class="opt-meta" style="margin-top:4px;">
+          Connectez votre calendrier iCal Airbnb : on planifie automatiquement chaque turnover entre vos voyageurs. Engagement 3, 6 ou 12 mois.
+        </span>
+      </span>
+    </button>
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type AirbnbState } from '@lib/state';
+
+  const list = document.getElementById('mode-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  let mode = loadState<AirbnbState>('airbnb').mode ?? '';
+
+  function render() {
+    list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      el.classList.toggle('is-active', el.dataset.value === mode);
+    });
+    cta.disabled = !mode;
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    mode = btn.dataset.value as 'ponctuel' | 'recurrent';
+    saveState<AirbnbState>('airbnb', { mode });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (!mode) return;
+    window.location.href = '/airbnb/options/';
+  });
+
+  render();
+</script>

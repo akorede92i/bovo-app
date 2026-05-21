@@ -1,0 +1,229 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Icon from '@components/Icon.astro';
+import { ZONES } from '@lib/catalog';
+---
+<Layout
+  title="Mes adresses — Bovo"
+  topbar="back"
+  backHref="/compte/"
+  pageTitle="Mes adresses"
+  noindex
+>
+  <div id="loading" style="text-align:center; padding:48px 20px;">
+    <div class="text-muted">Chargement…</div>
+  </div>
+
+  <div id="content" hidden>
+    <p class="text-lead" style="margin-bottom:20px;">
+      Sauvegardez vos adresses pour réserver en 1 clic.
+    </p>
+
+    <div id="address-list" class="stack-md" style="margin-bottom:24px;"></div>
+
+    <div id="empty" hidden class="card card-elevated" style="text-align:center; padding:32px 20px;">
+      <div style="color: var(--bovo-muted); margin-bottom:12px;">
+        <Icon name="pin" size={40} />
+      </div>
+      <div style="font-family:'Jost'; font-weight:700; margin-bottom:6px;">Aucune adresse enregistrée</div>
+      <div class="text-muted">Ajoutez votre première adresse pour gagner du temps à chaque réservation.</div>
+    </div>
+
+    <button id="add-btn" class="btn btn-primary btn-block">
+      <Icon name="plus" size={20} /> Ajouter une adresse
+    </button>
+  </div>
+
+  <!-- MODAL : ajout / édition -->
+  <div id="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-title" style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.5); display:flex; align-items:flex-end; justify-content:center;">
+    <div style="background:#fff; width:100%; max-width: var(--app-max); border-radius: var(--r-xl) var(--r-xl) 0 0; padding: 20px 20px calc(20px + var(--safe-bottom)); max-height: 90vh; overflow-y:auto;">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h2 id="modal-title" class="h-title">Ajouter une adresse</h2>
+        <button id="modal-close" class="topbar-back" aria-label="Fermer"><Icon name="close" size={20} /></button>
+      </div>
+
+      <form id="addr-form" novalidate>
+        <input type="hidden" id="addr-id" />
+
+        <div class="field">
+          <label class="field-label" for="addr-label">Libellé</label>
+          <input id="addr-label" class="input" type="text" placeholder="ex. Domicile, Bureau, Maison parents" required />
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="addr-zone">Zone</label>
+          <select id="addr-zone" class="select" required>
+            <option value="">Choisir une zone…</option>
+            {ZONES.map((z) => <option value={z}>{z}</option>)}
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="addr-quartier">Quartier</label>
+          <input id="addr-quartier" class="input" type="text" placeholder="ex. Cadjèhoun, Haie Vive…" />
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="addr-street">Adresse</label>
+          <input id="addr-street" class="input" type="text" placeholder="Rue, numéro, repères" required />
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="addr-building">Précisions (étage, code…)</label>
+          <textarea id="addr-building" class="textarea" placeholder="ex. 2e étage, portail bleu, sonnez à Konaté"></textarea>
+        </div>
+
+        <div class="field">
+          <label style="display:flex; align-items:center; gap:10px; padding:12px 16px; background: var(--bovo-bg-soft); border-radius: var(--r-md); cursor:pointer;">
+            <input type="checkbox" id="addr-default" style="transform: scale(1.2); accent-color: var(--bovo-bleu);" />
+            <span style="font-weight:500;">Définir comme adresse par défaut</span>
+          </label>
+        </div>
+
+        <div id="addr-error" class="text-muted" style="color: var(--bovo-danger); display:none; margin:8px 0;"></div>
+
+        <div class="flex gap-md" style="margin-top: 18px;">
+          <button type="button" id="addr-delete" class="btn btn-ghost" style="flex:1; display:none;">Supprimer</button>
+          <button type="submit" class="btn btn-primary" style="flex:2;">Enregistrer</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  import { requireAuth } from '@lib/auth';
+  import { getSupabase, type Address } from '@lib/supabase';
+
+  const user = await requireAuth();
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('loading')!.textContent = 'Service indisponible.';
+  } else {
+    const listEl = document.getElementById('address-list')!;
+    const empty = document.getElementById('empty')!;
+    const modal = document.getElementById('modal')!;
+    const modalTitle = document.getElementById('modal-title')!;
+    const form = document.getElementById('addr-form') as HTMLFormElement;
+    const idEl = document.getElementById('addr-id') as HTMLInputElement;
+    const labelEl = document.getElementById('addr-label') as HTMLInputElement;
+    const zoneEl = document.getElementById('addr-zone') as HTMLSelectElement;
+    const quartierEl = document.getElementById('addr-quartier') as HTMLInputElement;
+    const streetEl = document.getElementById('addr-street') as HTMLInputElement;
+    const buildingEl = document.getElementById('addr-building') as HTMLTextAreaElement;
+    const defaultEl = document.getElementById('addr-default') as HTMLInputElement;
+    const errEl = document.getElementById('addr-error') as HTMLDivElement;
+    const deleteBtn = document.getElementById('addr-delete') as HTMLButtonElement;
+
+    function openModal(addr?: Address) {
+      errEl.style.display = 'none';
+      if (addr) {
+        modalTitle.textContent = 'Modifier l\'adresse';
+        idEl.value = addr.id;
+        labelEl.value = addr.label;
+        zoneEl.value = addr.zone;
+        quartierEl.value = addr.quartier ?? '';
+        streetEl.value = addr.street;
+        buildingEl.value = addr.building ?? '';
+        defaultEl.checked = (addr as any).is_default ?? false;
+        deleteBtn.style.display = '';
+      } else {
+        modalTitle.textContent = 'Ajouter une adresse';
+        form.reset();
+        idEl.value = '';
+        deleteBtn.style.display = 'none';
+      }
+      modal.hidden = false;
+    }
+
+    function closeModal() { modal.hidden = true; }
+
+    async function load() {
+      const { data, error } = await supa.from('addresses').select('*').eq('user_id', user.id).order('is_default', { ascending: false }).order('created_at', { ascending: false });
+      if (error) {
+        listEl.innerHTML = `<div class="text-muted" style="color: var(--bovo-danger);">Erreur : ${error.message}</div>`;
+        return;
+      }
+      const addresses = (data ?? []) as Address[];
+      listEl.innerHTML = '';
+      if (addresses.length === 0) {
+        empty.hidden = false;
+        return;
+      }
+      empty.hidden = true;
+      for (const a of addresses) {
+        const isDefault = (a as any).is_default;
+        const card = document.createElement('button');
+        card.className = 'card card-elevated card-tap';
+        card.style.cssText = 'text-align:left; width:100%; display:block;';
+        card.innerHTML = `
+          <div class="flex-between" style="margin-bottom:6px;">
+            <div style="font-family:'Jost'; font-weight:700; font-size:1rem; display:flex; align-items:center; gap:8px;">
+              ${a.label}
+              ${isDefault ? '<span style="font-size:0.62rem; background: var(--bovo-bleu); color:#fff; padding:2px 8px; border-radius: var(--r-full); letter-spacing:1px; text-transform:uppercase;">Par défaut</span>' : ''}
+            </div>
+          </div>
+          <div class="text-muted" style="font-size:0.88rem; line-height:1.5;">
+            ${a.street}${a.quartier ? `, ${a.quartier}` : ''}<br>${a.zone}
+          </div>
+        `;
+        card.addEventListener('click', () => openModal(a));
+        listEl.appendChild(card);
+      }
+    }
+
+    document.getElementById('add-btn')!.addEventListener('click', () => openModal());
+    document.getElementById('modal-close')!.addEventListener('click', closeModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errEl.style.display = 'none';
+      const id = idEl.value || undefined;
+      const payload = {
+        user_id: user.id,
+        label: labelEl.value.trim(),
+        zone: zoneEl.value,
+        quartier: quartierEl.value.trim() || null,
+        street: streetEl.value.trim(),
+        building: buildingEl.value.trim() || null,
+        is_default: defaultEl.checked,
+      };
+
+      // Si défaut coché, désactive les autres
+      if (defaultEl.checked) {
+        await supa.from('addresses').update({ is_default: false }).eq('user_id', user.id);
+      }
+
+      const op = id
+        ? supa.from('addresses').update(payload).eq('id', id)
+        : supa.from('addresses').insert(payload);
+      const { error } = await op;
+      if (error) {
+        errEl.textContent = error.message;
+        errEl.style.display = 'block';
+        return;
+      }
+      closeModal();
+      await load();
+    });
+
+    deleteBtn.addEventListener('click', async () => {
+      const id = idEl.value;
+      if (!id) return;
+      if (!confirm('Supprimer cette adresse ?')) return;
+      const { error } = await supa.from('addresses').delete().eq('id', id);
+      if (error) {
+        errEl.textContent = error.message;
+        errEl.style.display = 'block';
+        return;
+      }
+      closeModal();
+      await load();
+    });
+
+    await load();
+    document.getElementById('loading')!.hidden = true;
+    document.getElementById('content')!.hidden = false;
+  }
+</script>

@@ -1,0 +1,81 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import { ZONES } from '@lib/catalog';
+---
+<Layout
+  title="Ménage — Étape 4 : Adresse | Bovo"
+  topbar="back"
+  backHref="/menage/options/"
+  pageTitle="Ménage à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={4} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Où intervenons-nous&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Précisez votre zone et votre adresse exacte.</p>
+
+  <div class="field">
+    <label class="field-label" for="zone">Zone</label>
+    <select id="zone" class="select" required>
+      <option value="">Choisir une zone…</option>
+      {ZONES.map((z) => <option value={z}>{z}</option>)}
+    </select>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="quartier">Quartier (optionnel)</label>
+    <input id="quartier" class="input" type="text" placeholder="ex. Haie Vive, Fidjrosse, Akpakpa…" />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="street">Adresse</label>
+    <input id="street" class="input" type="text" placeholder="Rue, numéro, repère" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="building">Précisions (étage, code, instructions)</label>
+    <textarea id="building" class="textarea" placeholder="ex. 2e étage, sonnez à Konaté, portail bleu"></textarea>
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type MenageState } from '@lib/state';
+
+  const zone = document.getElementById('zone') as HTMLSelectElement;
+  const quartier = document.getElementById('quartier') as HTMLInputElement;
+  const street = document.getElementById('street') as HTMLInputElement;
+  const building = document.getElementById('building') as HTMLTextAreaElement;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<MenageState>('menage');
+  if (s.address) {
+    zone.value = s.address.zone ?? '';
+    quartier.value = s.address.quartier ?? '';
+    street.value = s.address.street ?? '';
+    building.value = s.address.building ?? '';
+  }
+
+  function validate() {
+    cta.disabled = !(zone.value && street.value.trim());
+  }
+  [zone, quartier, street, building].forEach((el) => el.addEventListener('input', validate));
+  zone.addEventListener('change', validate);
+
+  cta.addEventListener('click', () => {
+    saveState<MenageState>('menage', {
+      address: {
+        zone: zone.value,
+        quartier: quartier.value.trim() || undefined,
+        street: street.value.trim(),
+        building: building.value.trim() || undefined,
+      },
+    });
+    window.location.href = '/menage/creneau/';
+  });
+
+  validate();
+</script>

@@ -1,0 +1,66 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+import { CHEF_CUISINES } from '@lib/catalog';
+---
+<Layout
+  title="Chef — Étape 3 : Type de cuisine | Bovo"
+  topbar="back"
+  backHref="/chef/duree/"
+  pageTitle="Chef à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={3} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Quel style de cuisine&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Choisissez un ou plusieurs styles — votre chef adaptera ses menus.</p>
+
+  <div class="stack-sm" id="cuisine-list">
+    {CHEF_CUISINES.map((c) => (
+      <button class="opt" data-value={c.id}>
+        <span class="opt-check"><Icon name="check" size={14} /></span>
+        <span class="opt-body">
+          <span class="opt-title">{c.label}</span>
+          <span class="opt-meta">{c.meta}</span>
+        </span>
+      </button>
+    ))}
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type ChefState } from '@lib/state';
+
+  const list = document.getElementById('cuisine-list')!;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<ChefState>('chef');
+  let cuisines = new Set<string>(s.cuisines ?? []);
+
+  function render() {
+    list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
+      el.classList.toggle('is-active', cuisines.has(el.dataset.value!));
+    });
+    cta.disabled = cuisines.size === 0;
+  }
+
+  list.addEventListener('click', (e) => {
+    const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.opt');
+    if (!btn) return;
+    const v = btn.dataset.value!;
+    if (cuisines.has(v)) cuisines.delete(v); else cuisines.add(v);
+    saveState<ChefState>('chef', { cuisines: [...cuisines] });
+    render();
+  });
+
+  cta.addEventListener('click', () => {
+    if (cuisines.size === 0) return;
+    window.location.href = '/chef/preferences/';
+  });
+
+  render();
+</script>

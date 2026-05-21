@@ -1,0 +1,26 @@
+---
+import Icon from './Icon.astro';
+
+interface Props {
+  href: string;
+  icon: 'broom' | 'airbnb' | 'truck' | 'chef';
+  iconColor?: 'bleu' | 'rouge';
+  title: string;
+  meta: string;
+  badge?: string;
+}
+const { href, icon, iconColor = 'bleu', title, meta, badge } = Astro.props;
+---
+<a href={href} class="svc-card" data-service={icon}>
+  {badge && <span class="svc-card-badge">{badge}</span>}
+  <div class={`svc-card-icon ${iconColor === 'rouge' ? 'rouge' : ''}`}>
+    <Icon name={icon} size={28} />
+  </div>
+  <div class="svc-card-body">
+    <div class="svc-card-title">{title}</div>
+    <div class="svc-card-meta" set:html={meta}></div>
+  </div>
+  <div class="svc-card-arrow">
+    <Icon name="chevron-right" size={20} />
+  </div>
+</a>

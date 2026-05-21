@@ -1,0 +1,107 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import { ZONES, DEM_ETAGE_SUPP_XOF, fcfa } from '@lib/catalog';
+---
+<Layout
+  title="Déménagement — Étape 2 : Adresse de départ | Bovo"
+  topbar="back"
+  backHref="/demenagement/"
+  pageTitle="Déménagement"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={7} current={2} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">D'où partez-vous&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Indiquez votre adresse actuelle et les accès.</p>
+
+  <div class="field">
+    <label class="field-label" for="zone">Zone</label>
+    <select id="zone" class="select" required>
+      <option value="">Choisir une zone…</option>
+      {ZONES.map((z) => <option value={z}>{z}</option>)}
+    </select>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="quartier">Quartier</label>
+    <input id="quartier" class="input" type="text" placeholder="ex. Haie Vive, Akpakpa…" />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="street">Adresse exacte</label>
+    <input id="street" class="input" type="text" placeholder="Rue, numéro, repères" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="floor">Étage</label>
+    <select id="floor" class="select">
+      <option value="0">Rez-de-chaussée</option>
+      <option value="1">1er étage</option>
+      <option value="2">2e étage</option>
+      <option value="3">3e étage</option>
+      <option value="4">4e étage</option>
+      <option value="5">5e étage ou +</option>
+    </select>
+    <span class="field-hint">+{fcfa(DEM_ETAGE_SUPP_XOF)} par étage sans ascenseur</span>
+  </div>
+
+  <div class="field">
+    <label style="display:flex; align-items:center; gap:10px; padding:14px 16px; background: var(--bovo-bg-soft); border-radius: var(--r-md); cursor:pointer;">
+      <input type="checkbox" id="elevator" style="transform: scale(1.2); accent-color: var(--bovo-bleu);" />
+      <span style="font-weight:500;">Ascenseur disponible</span>
+    </label>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="parking">Accès camion (optionnel)</label>
+    <textarea id="parking" class="textarea" placeholder="ex. Camion 7m peut se garer devant. Rue étroite, prévoir une distance de portage de 20m."></textarea>
+  </div>
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type DemenagementState } from '@lib/state';
+
+  const zone = document.getElementById('zone') as HTMLSelectElement;
+  const quartier = document.getElementById('quartier') as HTMLInputElement;
+  const street = document.getElementById('street') as HTMLInputElement;
+  const floor = document.getElementById('floor') as HTMLSelectElement;
+  const elevator = document.getElementById('elevator') as HTMLInputElement;
+  const parking = document.getElementById('parking') as HTMLTextAreaElement;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<DemenagementState>('demenagement');
+  if (s.from) {
+    zone.value = s.from.zone ?? '';
+    quartier.value = s.from.quartier ?? '';
+    street.value = s.from.street ?? '';
+    floor.value = String(s.from.floor ?? 0);
+    elevator.checked = !!s.from.elevator;
+    parking.value = s.from.parking ?? '';
+  }
+
+  function validate() {
+    cta.disabled = !(zone.value && street.value.trim());
+  }
+  [zone, quartier, street, floor, elevator, parking].forEach((el) => el.addEventListener('input', validate));
+  zone.addEventListener('change', validate);
+
+  cta.addEventListener('click', () => {
+    saveState<DemenagementState>('demenagement', {
+      from: {
+        zone: zone.value,
+        quartier: quartier.value.trim() || undefined,
+        street: street.value.trim(),
+        floor: Number(floor.value),
+        elevator: elevator.checked,
+        parking: parking.value.trim() || undefined,
+      },
+    });
+    window.location.href = '/demenagement/arrivee/';
+  });
+
+  validate();
+</script>

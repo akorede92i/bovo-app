@@ -1,0 +1,39 @@
+---
+interface Props {
+  priceLabel?: string;
+  priceValue?: string;
+  buttonLabel: string;
+  buttonHref?: string;
+  buttonType?: 'submit' | 'button' | 'link';
+  buttonId?: string;
+  disabled?: boolean;
+  variant?: 'primary' | 'rouge' | 'whatsapp';
+}
+const {
+  priceLabel,
+  priceValue,
+  buttonLabel,
+  buttonHref,
+  buttonType = 'link',
+  buttonId,
+  disabled = false,
+  variant = 'primary',
+} = Astro.props;
+---
+<div class="cta-footer">
+  {priceLabel && priceValue && (
+    <div class="price-line">
+      <span>{priceLabel}</span>
+      <strong>{priceValue}</strong>
+    </div>
+  )}
+  {buttonType === 'link' && buttonHref ? (
+    <a href={buttonHref} class={`btn btn-${variant} btn-lg btn-block`} aria-disabled={disabled} id={buttonId}>
+      {buttonLabel}
+    </a>
+  ) : (
+    <button type={buttonType} class={`btn btn-${variant} btn-lg btn-block`} disabled={disabled} id={buttonId}>
+      {buttonLabel}
+    </button>
+  )}
+</div>
