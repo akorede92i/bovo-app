@@ -35,6 +35,19 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=5, viewport-fit=cover" />
+
+    <!-- Garde-fou recovery password : si un lien Supabase atterrit ailleurs
+         que /auth/reset/, on redirige en préservant le hash. -->
+    <script is:inline>
+      (function () {
+        var hash = window.location.hash || '';
+        var path = window.location.pathname || '';
+        if (hash.indexOf('type=recovery') !== -1 && path.indexOf('/auth/reset') === -1) {
+          window.location.replace('/auth/reset/' + hash);
+        }
+      })();
+    </script>
+
     <title>{title}</title>
     <meta name="description" content={description} />
     {noindex && <meta name="robots" content="noindex,nofollow" />}
