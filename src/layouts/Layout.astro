@@ -8,6 +8,14 @@ interface Props {
   backHref?: string;
   pageTitle?: string;
   noindex?: boolean;
+  /**
+   * Type de shell :
+   * - 'app' (défaut) : carte mobile centrée (forms, auth, tunnels)
+   * - 'landing'      : pleine largeur responsive (homepage, pages marketing)
+   * - 'tunnel'       : comme 'app' mobile + 2 colonnes desktop si slot="sidebar"
+   * - 'dashboard'    : sidebar nav + content (compte/*)
+   */
+  shell?: 'app' | 'landing' | 'tunnel' | 'dashboard';
 }
 
 const {
@@ -17,6 +25,7 @@ const {
   backHref,
   pageTitle,
   noindex = false,
+  shell = 'app',
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj').toString();
@@ -64,39 +73,122 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
 
     <slot name="head" />
   </head>
-  <body>
-    <div class="app">
-      {topbar !== 'none' && (
-        <header class="topbar">
-          <div class="topbar-inner">
-            {topbar === 'back' ? (
-              <a href={backHref ?? '/'} class="topbar-back" aria-label="Retour">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                  <path d="M19 12H5" /><path d="M12 19l-7-7 7-7" />
-                </svg>
-              </a>
-            ) : (
-              <a href="/" class="bovo-logo" aria-label="Bovo — Accueil">B<span class="o-rouge">O</span>VO</a>
-            )}
-            {pageTitle && <span class="topbar-title">{pageTitle}</span>}
-            <div class="topbar-spacer"></div>
+  <body data-shell={shell}>
+    {shell === 'landing' ? (
+      <!-- ====== LANDING SHELL : full-width responsive ====== -->
+      <div class="landing-shell">
+        <header class="landing-header">
+          <div class="landing-header-inner">
+            <a href="/" class="bovo-logo" aria-label="Bovo — Accueil">B<span class="o-rouge">O</span>VO</a>
+            <nav class="landing-nav" aria-label="Navigation principale">
+              <a href="#services">Services</a>
+              <a href="#fonctionnement">Comment ça marche</a>
+              <a href="https://wa.me/2290196677743" target="_blank" rel="noopener">Support</a>
+            </nav>
+            <div class="landing-cta">
+              <a href="/compte/connexion/" class="landing-login">Se connecter</a>
+              <a href="/compte/inscription/" class="btn btn-primary btn-sm">Créer un compte</a>
+            </div>
+            <button class="landing-burger" id="landing-burger" aria-label="Menu" type="button">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
           </div>
-          <slot name="topbar-extra" />
         </header>
-      )}
+        <main class="landing-main">
+          <slot />
+        </main>
+        <slot name="cta-footer" />
+      </div>
+    ) : shell === 'dashboard' ? (
+      <!-- ====== DASHBOARD SHELL : sidebar nav + content ====== -->
+      <div class="dash-shell">
+        <header class="dash-topbar">
+          <button class="dash-burger" id="dash-burger" aria-label="Menu" type="button">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+          </button>
+          <a href="/" class="bovo-logo" aria-label="Bovo — Accueil">B<span class="o-rouge">O</span>VO</a>
+          {pageTitle && <span class="dash-topbar-title">{pageTitle}</span>}
+          <div style="flex:1;"></div>
+          <a href="/" class="dash-topbar-back" aria-label="Retour à l'app">← App</a>
+        </header>
+        <div class="dash-body">
+          <aside class="dash-sidebar" id="dash-sidebar">
+            <slot name="sidebar" />
+          </aside>
+          <main class="dash-main">
+            <slot />
+          </main>
+        </div>
+        <slot name="cta-footer" />
+      </div>
+    ) : (
+      <!-- ====== APP / TUNNEL SHELL : mobile-card centré ====== -->
+      <div class={shell === 'tunnel' ? 'app app-tunnel' : 'app'}>
+        {topbar !== 'none' && (
+          <header class="topbar">
+            <div class="topbar-inner">
+              {topbar === 'back' ? (
+                <a href={backHref ?? '/'} class="topbar-back" aria-label="Retour">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M19 12H5" /><path d="M12 19l-7-7 7-7" />
+                  </svg>
+                </a>
+              ) : (
+                <a href="/" class="bovo-logo" aria-label="Bovo — Accueil">B<span class="o-rouge">O</span>VO</a>
+              )}
+              {pageTitle && <span class="topbar-title">{pageTitle}</span>}
+              <div class="topbar-spacer"></div>
+            </div>
+            <slot name="topbar-extra" />
+          </header>
+        )}
 
-      <main class="page">
-        <slot />
-      </main>
+        {shell === 'tunnel' ? (
+          <div class="tunnel-grid">
+            <main class="page tunnel-main">
+              <slot />
+            </main>
+            <aside class="tunnel-aside">
+              <slot name="sidebar" />
+            </aside>
+          </div>
+        ) : (
+          <main class="page">
+            <slot />
+          </main>
+        )}
 
-      <slot name="cta-footer" />
-    </div>
+        <slot name="cta-footer" />
+      </div>
+    )}
 
     <!-- Register PWA service worker -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
           navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
+
+    <!-- Mobile drawer toggle (landing + dashboard shells) -->
+    <script>
+      const landingBurger = document.getElementById('landing-burger');
+      if (landingBurger) {
+        landingBurger.addEventListener('click', () => {
+          document.body.classList.toggle('landing-drawer-open');
+        });
+        document.querySelectorAll('.landing-nav a, .landing-cta a').forEach((a) => {
+          a.addEventListener('click', () => document.body.classList.remove('landing-drawer-open'));
+        });
+      }
+      const dashBurger = document.getElementById('dash-burger');
+      if (dashBurger) {
+        dashBurger.addEventListener('click', () => {
+          document.body.classList.toggle('dash-drawer-open');
+        });
+        document.querySelectorAll('.dash-sidebar a').forEach((a) => {
+          a.addEventListener('click', () => document.body.classList.remove('dash-drawer-open'));
         });
       }
     </script>
