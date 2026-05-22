@@ -3,65 +3,188 @@ import AdminLayout from '@layouts/AdminLayout.astro';
 import { ZONES } from '@lib/catalog';
 ---
 <AdminLayout title="Dashboard — Bovo Admin" pageTitle="Tableau de bord" active="dashboard">
-  <p class="admin-sub" id="hello-line">Bienvenue 👋</p>
-
-  <!-- ACTIONS RAPIDES -->
-  <div style="display:flex; gap:10px; margin-bottom:24px; flex-wrap:wrap;">
-    <button id="open-new-resa" class="btn btn-primary btn-sm">
-      <span style="font-size:1.1rem;">📋</span> Nouvelle réservation
-    </button>
-    <button id="open-new-customer" class="btn btn-rouge btn-sm">
-      <span style="font-size:1.1rem;">👤</span> Nouveau client
-    </button>
-    <a href="/admin/workers/" class="btn btn-ghost btn-sm">
-      <span style="font-size:1.1rem;">👥</span> Gérer les workers
-    </a>
+  <div class="dash-top">
+    <p class="admin-sub" id="hello-line">Bienvenue 👋</p>
+    <div class="dash-actions">
+      <div class="search-wrap">
+        <span class="search-icon">🔎</span>
+        <input id="global-search" class="input" type="search" placeholder="Rechercher client, téléphone, zone…" autocomplete="off" />
+        <div id="search-results" class="search-results" hidden></div>
+      </div>
+      <button id="open-new-resa" class="btn btn-primary btn-sm">📋 Nouvelle réservation</button>
+      <button id="open-new-customer" class="btn btn-rouge btn-sm">👤 Nouveau client</button>
+    </div>
   </div>
 
-  <!-- KPIs -->
+  <!-- ============ ACTIVITÉ COMMERCIALE ============ -->
+  <h2 class="dash-section">💼 Activité commerciale</h2>
   <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">CA mois</div>
+      <div class="kpi-value" id="kpi-revenue" style="color: var(--bovo-bleu);">—</div>
+      <div class="kpi-trend" id="kpi-revenue-trend">FCFA confirmés</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Clients actifs</div>
+      <div class="kpi-value" id="kpi-customers">—</div>
+      <div class="kpi-trend" id="kpi-customers-trend">avec contrat en cours</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Demandes à traiter</div>
+      <div class="kpi-value" id="kpi-pending" style="color: var(--bovo-warning);">—</div>
+      <div class="kpi-trend" id="kpi-pending-trend">en attente d'équipe</div>
+    </div>
     <div class="kpi">
       <div class="kpi-label">Aujourd'hui</div>
       <div class="kpi-value" id="kpi-today">—</div>
-      <div class="kpi-trend">prestations prévues</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">À assigner</div>
-      <div class="kpi-value" id="kpi-pending" style="color: var(--bovo-warning);">—</div>
-      <div class="kpi-trend">en attente d'équipe</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Cette semaine</div>
-      <div class="kpi-value" id="kpi-week">—</div>
-      <div class="kpi-trend">7 prochains jours</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">CA estimé (mois)</div>
-      <div class="kpi-value" id="kpi-revenue" style="color: var(--bovo-bleu);">—</div>
-      <div class="kpi-trend">FCFA confirmés</div>
+      <div class="kpi-trend" id="kpi-today-trend">prestations prévues</div>
     </div>
   </div>
 
-  <!-- À traiter en priorité -->
-  <h2 style="font-family: 'Jost', sans-serif; font-weight: 700; font-size: 1.1rem; margin-bottom: 14px;">🔥 À traiter en priorité</h2>
-  <div id="urgent-loading" style="color: var(--bovo-muted); padding: 20px;">Chargement…</div>
-  <div id="urgent-list" hidden></div>
-  <div id="urgent-empty" hidden class="empty-state">
-    <div class="empty-state-emoji">✨</div>
-    <div class="empty-state-title">Tout est à jour</div>
-    <div class="empty-state-desc">Aucune réservation n'attend votre attention.</div>
+  <!-- ============ WORKFORCE ============ -->
+  <h2 class="dash-section">👥 Workforce</h2>
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Workers actifs</div>
+      <div class="kpi-value" id="kpi-workers-total">—</div>
+      <div class="kpi-trend">total équipe Bovo</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Placés aujourd'hui</div>
+      <div class="kpi-value" id="kpi-workers-busy" style="color: var(--bovo-success);">—</div>
+      <div class="kpi-trend">workers en mission</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Dispos aujourd'hui</div>
+      <div class="kpi-value" id="kpi-workers-free" style="color: var(--bovo-bleu);">—</div>
+      <div class="kpi-trend">non assignés</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Taux occupation</div>
+      <div class="kpi-value" id="kpi-occupation">—</div>
+      <div class="kpi-trend">aujourd'hui</div>
+    </div>
   </div>
 
-  <!-- Prochaines prestations -->
-  <h2 style="font-family: 'Jost', sans-serif; font-weight: 700; font-size: 1.1rem; margin: 32px 0 14px;">📅 Prochaines prestations</h2>
-  <div id="upcoming-loading" style="color: var(--bovo-muted); padding: 20px;">Chargement…</div>
-  <div id="upcoming-list" hidden></div>
-  <div id="upcoming-empty" hidden class="empty-state">
-    <div class="empty-state-emoji">📭</div>
-    <div class="empty-state-title">Aucune prestation à venir</div>
+  <!-- ============ GRID 2 COLONNES ============ -->
+  <div class="dash-grid">
+    <div class="dash-col-main">
+
+      <!-- Aujourd'hui timeline -->
+      <section class="dash-block">
+        <div class="dash-block-head">
+          <h2>📅 Aujourd'hui <span id="today-date" style="color:var(--bovo-muted); font-weight:400; font-size:0.92rem;"></span></h2>
+        </div>
+        <div id="today-loading" class="loading">Chargement…</div>
+        <div id="today-list" hidden></div>
+        <div id="today-empty" hidden class="empty-state">
+          <div class="empty-state-emoji">☀️</div>
+          <div class="empty-state-title">Aucune prestation aujourd'hui</div>
+          <div class="empty-state-desc">Journée calme — profite ou prospecte.</div>
+        </div>
+      </section>
+
+      <!-- Urgents -->
+      <section class="dash-block">
+        <div class="dash-block-head">
+          <h2>🔥 À traiter en priorité</h2>
+        </div>
+        <div id="urgent-loading" class="loading">Chargement…</div>
+        <div id="urgent-list" hidden></div>
+        <div id="urgent-empty" hidden class="empty-state">
+          <div class="empty-state-emoji">✨</div>
+          <div class="empty-state-title">Tout est à jour</div>
+          <div class="empty-state-desc">Aucune réservation n'attend votre attention.</div>
+        </div>
+      </section>
+
+      <!-- Prochaines + filtres -->
+      <section class="dash-block">
+        <div class="dash-block-head">
+          <h2>📆 Prochaines prestations</h2>
+        </div>
+        <div class="dash-filters">
+          <input id="filter-search" class="input" type="search" placeholder="Filtrer par nom, téléphone…" />
+          <div class="pills" role="tablist">
+            <button class="pill is-active" data-service="all" type="button">Tous</button>
+            <button class="pill" data-service="menage" type="button">🧹 Ménage</button>
+            <button class="pill" data-service="airbnb" type="button">🏠 Airbnb</button>
+            <button class="pill" data-service="demenagement" type="button">🚚 Démén.</button>
+            <button class="pill" data-service="chef" type="button">👨‍🍳 Chef</button>
+          </div>
+        </div>
+        <div id="upcoming-loading" class="loading">Chargement…</div>
+        <div id="upcoming-list" hidden></div>
+        <div id="upcoming-empty" hidden class="empty-state">
+          <div class="empty-state-emoji">📭</div>
+          <div class="empty-state-title">Aucune prestation à venir</div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="dash-col-side">
+
+      <!-- Activity feed -->
+      <section class="dash-block">
+        <div class="dash-block-head">
+          <h2>⚡ Activité récente</h2>
+          <span id="realtime-dot" class="realtime-dot" title="Connexion temps réel"></span>
+        </div>
+        <div id="activity-loading" class="loading">Chargement…</div>
+        <div id="activity-feed" hidden></div>
+        <div id="activity-empty" hidden class="empty-state" style="padding:30px 16px;">
+          <div class="empty-state-desc">Aucune activité récente.</div>
+        </div>
+      </section>
+
+      <!-- Top workers -->
+      <section class="dash-block">
+        <div class="dash-block-head">
+          <h2>🏆 Top workers (30j)</h2>
+        </div>
+        <div id="top-workers-loading" class="loading">Chargement…</div>
+        <div id="top-workers" hidden></div>
+        <div id="top-workers-empty" hidden class="empty-state" style="padding:30px 16px;">
+          <div class="empty-state-desc">Aucun worker n'a encore été assigné.</div>
+        </div>
+      </section>
+
+      <!-- Workers libres -->
+      <section class="dash-block">
+        <div class="dash-block-head">
+          <h2>🟢 Disponibles cette semaine</h2>
+        </div>
+        <div id="free-workers-loading" class="loading">Chargement…</div>
+        <div id="free-workers" hidden></div>
+        <div id="free-workers-empty" hidden class="empty-state" style="padding:30px 16px;">
+          <div class="empty-state-desc">Tous les workers sont engagés cette semaine.</div>
+        </div>
+      </section>
+
+    </aside>
   </div>
 
-  <!-- MODAL NOUVELLE RÉSERVATION -->
+  <!-- ============ MODAL ASSIGNER WORKER ============ -->
+  <div id="assign-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; width:100%; max-width:480px; max-height:90vh; overflow-y:auto; border-radius: var(--r-xl); padding:24px;">
+      <div class="flex-between" style="margin-bottom:8px;">
+        <h2 style="font-family:'Jost'; font-weight:700;">Assigner un worker</h2>
+        <button id="assign-close" class="topbar-back" aria-label="Fermer">✕</button>
+      </div>
+      <p class="text-muted" id="assign-resa-info" style="margin-bottom:16px; font-size:0.9rem;"></p>
+      <form id="assign-form">
+        <div class="field">
+          <label class="field-label">Worker</label>
+          <select id="assign-worker" class="select" required></select>
+          <span class="field-hint">Les workers ayant la compétence requise sont mis en tête.</span>
+        </div>
+        <div id="assign-error" style="color:var(--bovo-danger); display:none; margin:8px 0;"></div>
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:14px;">Confirmer l'assignation</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ============ MODAL NOUVELLE RÉSERVATION ============ -->
   <div id="new-resa-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:center; justify-content:center; padding:20px;">
     <div style="background:#fff; width:100%; max-width:640px; max-height:90vh; overflow-y:auto; border-radius: var(--r-xl); padding:24px;">
       <div class="flex-between" style="margin-bottom:16px;">
@@ -147,7 +270,7 @@ import { ZONES } from '@lib/catalog';
     </div>
   </div>
 
-  <!-- MODAL NOUVEAU CLIENT -->
+  <!-- ============ MODAL NOUVEAU CLIENT ============ -->
   <div id="new-customer-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:center; justify-content:center; padding:20px;">
     <div style="background:#fff; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; border-radius: var(--r-xl); padding:24px;">
       <div class="flex-between" style="margin-bottom:16px;">
@@ -191,6 +314,295 @@ import { ZONES } from '@lib/catalog';
   </div>
 </AdminLayout>
 
+<style>
+  /* ====== HEADER DASHBOARD ====== */
+  .dash-top { margin-bottom: 16px; }
+  .dash-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 240px;
+    max-width: 420px;
+  }
+  .search-icon {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--bovo-muted);
+    font-size: 0.92rem;
+    pointer-events: none;
+  }
+  .search-wrap .input { padding-left: 36px; }
+  .search-results {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid var(--bovo-line);
+    border-radius: var(--r-md);
+    box-shadow: var(--sh-md);
+    max-height: 360px;
+    overflow-y: auto;
+    z-index: var(--z-sticky);
+  }
+  .search-result {
+    display: block;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--bovo-line-soft);
+    font-size: 0.88rem;
+    color: var(--bovo-ink);
+    text-decoration: none;
+  }
+  .search-result:last-child { border-bottom: none; }
+  .search-result:hover { background: var(--bovo-bg-soft); }
+  .search-result-meta { color: var(--bovo-muted); font-size: 0.8rem; margin-top: 2px; }
+
+  /* ====== SECTION TITLES ====== */
+  .dash-section {
+    font-family: 'Jost', sans-serif;
+    font-weight: 800;
+    font-size: 0.84rem;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--bovo-muted);
+    margin: 24px 0 12px;
+  }
+  .dash-section:first-of-type { margin-top: 8px; }
+
+  /* ====== KPI TRENDS ====== */
+  .kpi-trend-up { color: var(--bovo-success); font-weight: 600; }
+  .kpi-trend-down { color: var(--bovo-danger); font-weight: 600; }
+  .kpi-trend-flat { color: var(--bovo-muted); font-weight: 500; }
+  .kpi-trend-arrow { font-size: 0.78rem; margin-right: 3px; }
+
+  /* ====== GRID DASHBOARD ====== */
+  .dash-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+    margin-top: 20px;
+  }
+  @media (min-width: 1100px) {
+    .dash-grid {
+      grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+    }
+  }
+
+  /* ====== BLOCKS ====== */
+  .dash-block { margin-bottom: 28px; }
+  .dash-block-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .dash-block-head h2 {
+    font-family: 'Jost', sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin: 0;
+  }
+
+  .loading {
+    color: var(--bovo-muted);
+    padding: 18px;
+    font-size: 0.9rem;
+  }
+
+  /* ====== FILTERS ====== */
+  .dash-filters {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .pill {
+    border: 1px solid var(--bovo-line);
+    background: #fff;
+    padding: 6px 12px;
+    font-size: 0.84rem;
+    font-weight: 500;
+    border-radius: var(--r-full);
+    cursor: pointer;
+    transition: all var(--t-fast) var(--ease);
+    color: var(--bovo-muted);
+  }
+  .pill:hover { background: var(--bovo-bg-soft); }
+  .pill.is-active {
+    background: var(--bovo-ink);
+    color: #fff;
+    border-color: var(--bovo-ink);
+  }
+
+  /* ====== RESA CARDS ====== */
+  .resa-card {
+    display: flex;
+    gap: 12px;
+    padding: 12px 14px;
+    background: #fff;
+    border: 1px solid var(--bovo-line-soft);
+    border-radius: var(--r-lg);
+    margin-bottom: 8px;
+    align-items: center;
+    text-decoration: none;
+    color: var(--bovo-ink);
+    transition: all var(--t-fast) var(--ease);
+  }
+  .resa-card:hover {
+    border-color: var(--bovo-line);
+    transform: translateY(-1px);
+    box-shadow: var(--sh-sm);
+  }
+  .resa-card.is-urgent {
+    border-color: var(--bovo-danger);
+    background: linear-gradient(to right, rgba(220,38,38,0.04), #fff);
+  }
+  .resa-card.is-warn {
+    border-color: var(--bovo-warning);
+    background: linear-gradient(to right, rgba(245,158,11,0.05), #fff);
+  }
+  .resa-card-icon { font-size: 1.5rem; flex-shrink: 0; }
+  .resa-card-body { flex: 1; min-width: 0; }
+  .resa-card-title { font-weight: 600; color: var(--bovo-ink); font-size: 0.95rem; }
+  .resa-card-meta { font-size: 0.8rem; color: var(--bovo-muted); margin-top: 2px; }
+  .resa-card-flags { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .resa-flag {
+    display: inline-block;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    padding: 2px 7px;
+    border-radius: var(--r-full);
+    text-transform: uppercase;
+  }
+  .resa-flag.is-urgent { background: var(--bovo-danger); color: #fff; }
+  .resa-flag.is-warn { background: var(--bovo-warning); color: #fff; }
+
+  /* ====== TIMELINE TODAY ====== */
+  .today-timeline { display: flex; flex-direction: column; gap: 6px; }
+  .today-row {
+    display: flex;
+    gap: 12px;
+    align-items: stretch;
+  }
+  .today-hour {
+    width: 56px;
+    flex-shrink: 0;
+    font-family: 'Jost', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--bovo-ink);
+    padding-top: 14px;
+    text-align: right;
+    border-right: 2px solid var(--bovo-line-soft);
+    padding-right: 12px;
+  }
+  .today-card-wrap { flex: 1; }
+  .today-assign-btn {
+    background: var(--bovo-danger);
+    color: #fff;
+    border: none;
+    padding: 4px 10px;
+    border-radius: var(--r-md);
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-left: auto;
+  }
+  .today-assign-btn:hover { background: #b91c1c; }
+  .today-worker-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: var(--bovo-bg-soft);
+    padding: 3px 8px;
+    border-radius: var(--r-full);
+    font-size: 0.78rem;
+    font-weight: 500;
+  }
+
+  /* ====== ACTIVITY FEED ====== */
+  .activity-item {
+    display: flex;
+    gap: 10px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--bovo-line-soft);
+    font-size: 0.88rem;
+  }
+  .activity-item:last-child { border-bottom: none; }
+  .activity-icon { font-size: 1.1rem; flex-shrink: 0; }
+  .activity-body { flex: 1; min-width: 0; }
+  .activity-text { color: var(--bovo-ink); }
+  .activity-time { font-size: 0.74rem; color: var(--bovo-muted); margin-top: 2px; }
+
+  /* ====== SIDEBAR ITEMS ====== */
+  .side-item {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--bovo-line-soft);
+  }
+  .side-item:last-child { border-bottom: none; }
+  .side-rank {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--bovo-bg-soft);
+    color: var(--bovo-muted);
+    font-size: 0.74rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .side-item:nth-child(1) .side-rank { background: #FEF3C7; color: #B45309; }
+  .side-item:nth-child(2) .side-rank { background: #E5E7EB; color: #4B5563; }
+  .side-item:nth-child(3) .side-rank { background: #FED7AA; color: #C2410C; }
+  .side-name { font-weight: 600; font-size: 0.9rem; flex: 1; min-width: 0; }
+  .side-meta { font-size: 0.78rem; color: var(--bovo-muted); }
+
+  /* ====== REALTIME DOT ====== */
+  .realtime-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--bovo-success);
+    box-shadow: 0 0 0 0 rgba(16,185,129,0.7);
+    animation: pulse-realtime 2s infinite;
+  }
+  .realtime-dot.is-offline {
+    background: var(--bovo-muted);
+    animation: none;
+  }
+  @keyframes pulse-realtime {
+    0% { box-shadow: 0 0 0 0 rgba(16,185,129,0.55); }
+    70% { box-shadow: 0 0 0 8px rgba(16,185,129,0); }
+    100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
+  }
+
+  /* ====== RESPONSIVE ====== */
+  @media (max-width: 640px) {
+    .dash-actions { flex-direction: column; align-items: stretch; }
+    .search-wrap { max-width: 100%; }
+    .today-hour { width: 48px; font-size: 0.85rem; padding-right: 8px; }
+  }
+</style>
+
 <script>
   import { getSupabase } from '@lib/supabase';
   import { createClient } from '@supabase/supabase-js';
@@ -201,110 +613,609 @@ import { ZONES } from '@lib/catalog';
   if (!supa) {
     document.getElementById('hello-line')!.textContent = 'Supabase non configuré.';
   } else {
+    // ====== DATES UTILES ======
     const now = new Date();
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
-    const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7).toISOString();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const tomorrowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
+    const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const yesterdayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    const last30Days = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30);
 
-    // Hello
+    const iso = (d: Date) => d.toISOString();
+
+    // ====== HELLO ======
     const hour = now.getHours();
     const salut = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
     document.getElementById('hello-line')!.textContent = `${salut} 👋 Voici l'activité Bovo du moment.`;
 
-    // ============= KPIs =============
-    async function loadKpis() {
-      const [todayRes, pendingRes, weekRes, revenueRes] = await Promise.all([
-        supa.from('reservations').select('id', { count: 'exact', head: true })
-          .gte('scheduled_at', todayStart).lt('scheduled_at', todayEnd).neq('status', 'cancelled'),
-        supa.from('reservations').select('id', { count: 'exact', head: true })
-          .in('status', ['pending', 'confirmed']),
-        supa.from('reservations').select('id', { count: 'exact', head: true })
-          .gte('scheduled_at', todayStart).lt('scheduled_at', weekEnd).neq('status', 'cancelled'),
-        supa.from('reservations').select('estimated_total_xof')
-          .gte('scheduled_at', monthStart).lt('scheduled_at', monthEnd)
-          .in('status', ['confirmed', 'assigned', 'in_progress', 'done']),
-      ]);
-      document.getElementById('kpi-today')!.textContent = String(todayRes.count ?? 0);
-      document.getElementById('kpi-pending')!.textContent = String(pendingRes.count ?? 0);
-      document.getElementById('kpi-week')!.textContent = String(weekRes.count ?? 0);
-      const revenue = (revenueRes.data ?? []).reduce((sum: number, r: any) => sum + (r.estimated_total_xof ?? 0), 0);
-      document.getElementById('kpi-revenue')!.textContent = fcfa(revenue);
+    document.getElementById('today-date')!.textContent =
+      '· ' + todayStart.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    // ====== CACHE GLOBAL ======
+    let workersCache: any[] = [];
+    let upcomingCache: any[] = [];
+
+    // ====== HELPERS ======
+    function trendBadge(current: number, previous: number, isCurrency = false): string {
+      if (previous === 0 && current === 0) return `<span class="kpi-trend-flat">—</span>`;
+      if (previous === 0) return `<span class="kpi-trend-up"><span class="kpi-trend-arrow">▲</span>nouveau</span>`;
+      const delta = ((current - previous) / previous) * 100;
+      const rounded = Math.round(delta);
+      if (Math.abs(rounded) < 1) return `<span class="kpi-trend-flat">≈ stable</span>`;
+      const cls = rounded > 0 ? 'kpi-trend-up' : 'kpi-trend-down';
+      const arrow = rounded > 0 ? '▲' : '▼';
+      const suffix = isCurrency ? ' vs mois préc.' : ' vs hier';
+      return `<span class="${cls}"><span class="kpi-trend-arrow">${arrow}</span>${Math.abs(rounded)}%</span><span style="color:var(--bovo-muted);">${suffix}</span>`;
     }
 
-    function renderResaCard(r: any) {
+    function relativeTime(date: string | Date): string {
+      const d = typeof date === 'string' ? new Date(date) : date;
+      const diff = (Date.now() - d.getTime()) / 1000;
+      if (diff < 60) return 'à l\'instant';
+      if (diff < 3600) return `il y a ${Math.floor(diff / 60)} min`;
+      if (diff < 86400) return `il y a ${Math.floor(diff / 3600)} h`;
+      if (diff < 86400 * 7) return `il y a ${Math.floor(diff / 86400)} j`;
+      return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+    }
+
+    function escapeHtml(s: string | null | undefined): string {
+      if (!s) return '';
+      return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
+    }
+
+    function workerName(workerId: string | null): string | null {
+      if (!workerId) return null;
+      const w = workersCache.find((x) => x.id === workerId);
+      return w?.full_name ?? 'Worker';
+    }
+
+    function isUrgent(r: any): boolean {
+      if (!r.scheduled_at || r.assigned_worker_id) return false;
+      const scheduled = new Date(r.scheduled_at);
+      const hoursUntil = (scheduled.getTime() - Date.now()) / 3600000;
+      return hoursUntil >= 0 && hoursUntil < 24 && (r.status === 'pending' || r.status === 'confirmed');
+    }
+
+    function isDepositLate(r: any): boolean {
+      if (r.deposit_status !== 'pending') return false;
+      if (!r.created_at) return false;
+      const hoursSince = (Date.now() - new Date(r.created_at).getTime()) / 3600000;
+      return hoursSince > 2;
+    }
+
+    function renderResaCard(r: any, opts: { showWorker?: boolean } = {}): string {
       const dateStr = r.scheduled_at
         ? new Date(r.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
         : '—';
       const statusColor = STATUS_COLORS[r.status] ?? '#6B7280';
+      const urgent = isUrgent(r);
+      const warn = isDepositLate(r);
+      const classes = ['resa-card'];
+      if (urgent) classes.push('is-urgent');
+      else if (warn) classes.push('is-warn');
+
+      const wName = r.assigned_worker_id ? workerName(r.assigned_worker_id) : null;
+      const workerHtml = opts.showWorker && wName
+        ? `<span class="today-worker-name">👤 ${escapeHtml(wName)}</span>`
+        : '';
+
+      const flags: string[] = [];
+      if (urgent) flags.push('<span class="resa-flag is-urgent">⚠ &lt;24h sans worker</span>');
+      if (warn) flags.push('<span class="resa-flag is-warn">💰 acompte en attente</span>');
+
       return `
-        <a href="/admin/reservations/?id=${r.id}" style="display:flex; gap:14px; padding:14px 16px; background:#fff; border:1px solid var(--bovo-line-soft); border-radius: var(--r-lg); margin-bottom:10px; align-items:center; text-decoration:none;">
-          <div style="font-size:1.6rem; flex-shrink:0;">${SERVICE_ICONS[r.service_type] ?? '✦'}</div>
-          <div style="flex:1; min-width:0;">
-            <div style="font-weight:600; color: var(--bovo-ink);">${SERVICE_LABELS[r.service_type] ?? r.service_type} — ${r.guest_name ?? 'Anonyme'}</div>
-            <div style="font-size:0.84rem; color: var(--bovo-muted); margin-top:2px;">${dateStr} · ${r.guest_phone ?? '—'}</div>
+        <a href="/admin/reservations/?id=${r.id}" class="${classes.join(' ')}">
+          <div class="resa-card-icon">${SERVICE_ICONS[r.service_type] ?? '✦'}</div>
+          <div class="resa-card-body">
+            <div class="resa-card-title">${SERVICE_LABELS[r.service_type] ?? r.service_type} — ${escapeHtml(r.guest_name) || 'Anonyme'}</div>
+            <div class="resa-card-meta">${dateStr} · ${escapeHtml(r.guest_phone) || '—'}${workerHtml ? ' · ' + workerHtml : ''}</div>
+            ${flags.length ? `<div class="resa-card-flags">${flags.join('')}</div>` : ''}
           </div>
           <span class="status-badge" style="background:${statusColor};">${STATUS_LABELS[r.status] ?? r.status}</span>
         </a>
       `;
     }
 
-    async function loadLists() {
-      // Urgents
-      const { data: urgent } = await supa.from('reservations')
-        .select('id, service_type, guest_name, guest_phone, scheduled_at, status')
+    // ====== CHARGEMENT WORKERS ======
+    async function loadWorkers() {
+      const { data } = await supa.from('profiles').select('id, full_name, phone, role').in('role', ['worker', 'admin']);
+      workersCache = data ?? [];
+    }
+
+    // ====== KPIs ACTIVITÉ ======
+    async function loadKpis() {
+      const [
+        revenueMonth, revenuePrevMonth,
+        customers, customersPrev,
+        pending,
+        todayCount, yesterdayCount,
+      ] = await Promise.all([
+        supa.from('reservations').select('estimated_total_xof')
+          .gte('scheduled_at', iso(monthStart)).lt('scheduled_at', iso(monthEnd))
+          .in('status', ['confirmed', 'assigned', 'in_progress', 'done']),
+        supa.from('reservations').select('estimated_total_xof')
+          .gte('scheduled_at', iso(prevMonthStart)).lt('scheduled_at', iso(monthStart))
+          .in('status', ['confirmed', 'assigned', 'in_progress', 'done']),
+        supa.from('reservations').select('user_id, guest_phone')
+          .in('status', ['confirmed', 'assigned', 'in_progress']),
+        supa.from('reservations').select('user_id, guest_phone')
+          .lt('created_at', iso(yesterdayStart))
+          .in('status', ['confirmed', 'assigned', 'in_progress']),
+        supa.from('reservations').select('id', { count: 'exact', head: true })
+          .in('status', ['pending', 'confirmed']).is('assigned_worker_id', null),
+        supa.from('reservations').select('id', { count: 'exact', head: true })
+          .gte('scheduled_at', iso(todayStart)).lt('scheduled_at', iso(todayEnd))
+          .neq('status', 'cancelled'),
+        supa.from('reservations').select('id', { count: 'exact', head: true })
+          .gte('scheduled_at', iso(yesterdayStart)).lt('scheduled_at', iso(todayStart))
+          .neq('status', 'cancelled'),
+      ]);
+
+      const revenueCurrent = (revenueMonth.data ?? []).reduce((s: number, r: any) => s + (r.estimated_total_xof ?? 0), 0);
+      const revenuePrev = (revenuePrevMonth.data ?? []).reduce((s: number, r: any) => s + (r.estimated_total_xof ?? 0), 0);
+      document.getElementById('kpi-revenue')!.textContent = fcfa(revenueCurrent);
+      document.getElementById('kpi-revenue-trend')!.innerHTML = trendBadge(revenueCurrent, revenuePrev, true);
+
+      const uniqueKey = (r: any) => r.user_id || r.guest_phone || Math.random().toString();
+      const customersCurrent = new Set((customers.data ?? []).map(uniqueKey)).size;
+      const customersPreviousCount = new Set((customersPrev.data ?? []).map(uniqueKey)).size;
+      document.getElementById('kpi-customers')!.textContent = String(customersCurrent);
+      document.getElementById('kpi-customers-trend')!.innerHTML = trendBadge(customersCurrent, customersPreviousCount);
+
+      document.getElementById('kpi-pending')!.textContent = String(pending.count ?? 0);
+      document.getElementById('kpi-pending-trend')!.innerHTML = `<span style="color:var(--bovo-muted);">sans worker</span>`;
+
+      document.getElementById('kpi-today')!.textContent = String(todayCount.count ?? 0);
+      document.getElementById('kpi-today-trend')!.innerHTML = trendBadge(todayCount.count ?? 0, yesterdayCount.count ?? 0);
+    }
+
+    // ====== KPIs WORKFORCE ======
+    async function loadWorkforceKpis() {
+      const workerProfiles = workersCache.filter((w) => w.role === 'worker');
+      const total = workerProfiles.length;
+
+      const { data: todayResa } = await supa.from('reservations')
+        .select('assigned_worker_id')
+        .gte('scheduled_at', iso(todayStart)).lt('scheduled_at', iso(todayEnd))
+        .not('assigned_worker_id', 'is', null)
+        .neq('status', 'cancelled');
+      const busyIds = new Set((todayResa ?? []).map((r: any) => r.assigned_worker_id).filter(Boolean));
+      const busy = busyIds.size;
+      const free = Math.max(0, total - busy);
+      const occupation = total > 0 ? Math.round((busy / total) * 100) : 0;
+
+      document.getElementById('kpi-workers-total')!.textContent = String(total);
+      document.getElementById('kpi-workers-busy')!.textContent = String(busy);
+      document.getElementById('kpi-workers-free')!.textContent = String(free);
+      document.getElementById('kpi-occupation')!.textContent = total > 0 ? `${occupation}%` : '—';
+    }
+
+    // ====== AUJOURD'HUI TIMELINE ======
+    async function loadToday() {
+      const { data } = await supa.from('reservations')
+        .select('id, service_type, guest_name, guest_phone, scheduled_at, status, assigned_worker_id, deposit_status, created_at')
+        .gte('scheduled_at', iso(todayStart))
+        .lt('scheduled_at', iso(tomorrowEnd))
+        .neq('status', 'cancelled')
+        .order('scheduled_at', { ascending: true });
+
+      document.getElementById('today-loading')!.hidden = true;
+      const list = document.getElementById('today-list')!;
+      const empty = document.getElementById('today-empty')!;
+
+      if (!data || data.length === 0) {
+        empty.hidden = false;
+        list.hidden = true;
+        return;
+      }
+
+      // Grouper par heure
+      const html = `<div class="today-timeline">${data.map((r: any) => {
+        const time = r.scheduled_at
+          ? new Date(r.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+          : '—';
+        const card = renderResaCard(r, { showWorker: true });
+        const assignBtn = !r.assigned_worker_id
+          ? `<button class="today-assign-btn" data-resa-id="${r.id}" data-service="${r.service_type}">Assigner</button>`
+          : '';
+        return `
+          <div class="today-row">
+            <div class="today-hour">${time}</div>
+            <div class="today-card-wrap" style="display:flex; gap:8px; align-items:flex-start;">
+              <div style="flex:1; min-width:0;">${card}</div>
+              ${assignBtn}
+            </div>
+          </div>
+        `;
+      }).join('')}</div>`;
+
+      list.innerHTML = html;
+      list.hidden = false;
+      empty.hidden = true;
+
+      // Bind assign buttons
+      list.querySelectorAll('.today-assign-btn').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const resaId = (btn as HTMLElement).dataset.resaId!;
+          const service = (btn as HTMLElement).dataset.service!;
+          openAssignModal(resaId, service);
+        });
+      });
+    }
+
+    // ====== URGENTS ======
+    async function loadUrgent() {
+      const { data } = await supa.from('reservations')
+        .select('id, service_type, guest_name, guest_phone, scheduled_at, status, assigned_worker_id, deposit_status, created_at')
         .in('status', ['pending', 'confirmed'])
-        .order('scheduled_at', { ascending: true })
+        .is('assigned_worker_id', null)
+        .order('scheduled_at', { ascending: true, nullsFirst: false })
         .limit(5);
 
       document.getElementById('urgent-loading')!.hidden = true;
-      const urgentList = document.getElementById('urgent-list')!;
-      const urgentEmpty = document.getElementById('urgent-empty')!;
-      if (!urgent || urgent.length === 0) {
-        urgentEmpty.hidden = false;
-        urgentList.hidden = true;
-      } else {
-        urgentList.innerHTML = urgent.map(renderResaCard).join('');
-        urgentList.hidden = false;
-        urgentEmpty.hidden = true;
-      }
+      const list = document.getElementById('urgent-list')!;
+      const empty = document.getElementById('urgent-empty')!;
 
-      // Upcoming
-      const { data: upcoming } = await supa.from('reservations')
-        .select('id, service_type, guest_name, guest_phone, scheduled_at, status')
-        .gte('scheduled_at', todayStart)
-        .lt('scheduled_at', weekEnd)
-        .in('status', ['assigned', 'in_progress'])
-        .order('scheduled_at', { ascending: true })
-        .limit(10);
-
-      document.getElementById('upcoming-loading')!.hidden = true;
-      const upcomingList = document.getElementById('upcoming-list')!;
-      const upcomingEmpty = document.getElementById('upcoming-empty')!;
-      if (!upcoming || upcoming.length === 0) {
-        upcomingEmpty.hidden = false;
-        upcomingList.hidden = true;
+      if (!data || data.length === 0) {
+        empty.hidden = false;
+        list.hidden = true;
       } else {
-        upcomingList.innerHTML = upcoming.map(renderResaCard).join('');
-        upcomingList.hidden = false;
-        upcomingEmpty.hidden = true;
+        list.innerHTML = data.map((r: any) => renderResaCard(r)).join('');
+        list.hidden = false;
+        empty.hidden = true;
       }
     }
 
-    await loadKpis();
-    await loadLists();
+    // ====== PROCHAINES (avec filtres) ======
+    async function loadUpcoming() {
+      const { data } = await supa.from('reservations')
+        .select('id, service_type, guest_name, guest_phone, scheduled_at, status, assigned_worker_id, deposit_status, created_at')
+        .gte('scheduled_at', iso(todayStart))
+        .lt('scheduled_at', iso(weekEnd))
+        .neq('status', 'cancelled')
+        .order('scheduled_at', { ascending: true })
+        .limit(50);
+      upcomingCache = data ?? [];
+      renderUpcoming();
+    }
 
-    // ============= MODAL NOUVELLE RÉSERVATION =============
+    function renderUpcoming() {
+      const search = (document.getElementById('filter-search') as HTMLInputElement).value.toLowerCase().trim();
+      const activePill = document.querySelector('.pill.is-active') as HTMLElement;
+      const service = activePill?.dataset.service ?? 'all';
+
+      let filtered = upcomingCache;
+      if (service !== 'all') filtered = filtered.filter((r) => r.service_type === service);
+      if (search) {
+        filtered = filtered.filter((r) =>
+          (r.guest_name ?? '').toLowerCase().includes(search) ||
+          (r.guest_phone ?? '').toLowerCase().includes(search)
+        );
+      }
+
+      const list = document.getElementById('upcoming-list')!;
+      const empty = document.getElementById('upcoming-empty')!;
+      document.getElementById('upcoming-loading')!.hidden = true;
+
+      if (filtered.length === 0) {
+        empty.hidden = false;
+        list.hidden = true;
+      } else {
+        list.innerHTML = filtered.map((r) => renderResaCard(r, { showWorker: true })).join('');
+        list.hidden = false;
+        empty.hidden = true;
+      }
+    }
+
+    // ====== ACTIVITY FEED ======
+    async function loadActivity() {
+      const [newResa, newProfiles] = await Promise.all([
+        supa.from('reservations')
+          .select('id, service_type, guest_name, status, created_at')
+          .gte('created_at', iso(last30Days))
+          .order('created_at', { ascending: false })
+          .limit(15),
+        supa.from('profiles')
+          .select('id, full_name, role, created_at')
+          .gte('created_at', iso(last30Days))
+          .order('created_at', { ascending: false })
+          .limit(15),
+      ]);
+
+      type Activity = { time: Date; html: string };
+      const items: Activity[] = [];
+
+      (newResa.data ?? []).forEach((r: any) => {
+        items.push({
+          time: new Date(r.created_at),
+          html: `
+            <div class="activity-item">
+              <span class="activity-icon">${SERVICE_ICONS[r.service_type] ?? '📋'}</span>
+              <div class="activity-body">
+                <div class="activity-text">Nouvelle résa <strong>${SERVICE_LABELS[r.service_type] ?? r.service_type}</strong> — ${escapeHtml(r.guest_name) || 'Anonyme'}</div>
+                <div class="activity-time">${relativeTime(r.created_at)}</div>
+              </div>
+            </div>
+          `,
+        });
+      });
+
+      (newProfiles.data ?? []).forEach((p: any) => {
+        const icon = p.role === 'worker' ? '👷' : p.role === 'admin' ? '🛡️' : '👤';
+        const label = p.role === 'worker' ? 'Nouveau worker' : p.role === 'admin' ? 'Nouvel admin' : 'Nouveau client';
+        items.push({
+          time: new Date(p.created_at),
+          html: `
+            <div class="activity-item">
+              <span class="activity-icon">${icon}</span>
+              <div class="activity-body">
+                <div class="activity-text">${label} : <strong>${escapeHtml(p.full_name) || 'Sans nom'}</strong></div>
+                <div class="activity-time">${relativeTime(p.created_at)}</div>
+              </div>
+            </div>
+          `,
+        });
+      });
+
+      items.sort((a, b) => b.time.getTime() - a.time.getTime());
+      const top = items.slice(0, 12);
+
+      document.getElementById('activity-loading')!.hidden = true;
+      const feed = document.getElementById('activity-feed')!;
+      const empty = document.getElementById('activity-empty')!;
+
+      if (top.length === 0) {
+        empty.hidden = false;
+        feed.hidden = true;
+      } else {
+        feed.innerHTML = top.map((i) => i.html).join('');
+        feed.hidden = false;
+        empty.hidden = true;
+      }
+    }
+
+    // ====== TOP WORKERS (30j) ======
+    async function loadTopWorkers() {
+      const { data } = await supa.from('reservations')
+        .select('assigned_worker_id')
+        .gte('scheduled_at', iso(last30Days))
+        .not('assigned_worker_id', 'is', null)
+        .neq('status', 'cancelled');
+
+      const counts: Record<string, number> = {};
+      (data ?? []).forEach((r: any) => {
+        if (r.assigned_worker_id) counts[r.assigned_worker_id] = (counts[r.assigned_worker_id] ?? 0) + 1;
+      });
+      const ranked = Object.entries(counts)
+        .map(([id, count]) => ({ id, count, name: workerName(id) ?? 'Worker' }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      document.getElementById('top-workers-loading')!.hidden = true;
+      const el = document.getElementById('top-workers')!;
+      const empty = document.getElementById('top-workers-empty')!;
+
+      if (ranked.length === 0) {
+        empty.hidden = false;
+        el.hidden = true;
+      } else {
+        el.innerHTML = ranked.map((w, i) => `
+          <div class="side-item">
+            <div class="side-rank">${i + 1}</div>
+            <div class="side-name">${escapeHtml(w.name)}</div>
+            <div class="side-meta">${w.count} résa</div>
+          </div>
+        `).join('');
+        el.hidden = false;
+        empty.hidden = true;
+      }
+    }
+
+    // ====== WORKERS LIBRES ======
+    async function loadFreeWorkers() {
+      const workerProfiles = workersCache.filter((w) => w.role === 'worker');
+      if (workerProfiles.length === 0) {
+        document.getElementById('free-workers-loading')!.hidden = true;
+        document.getElementById('free-workers-empty')!.hidden = false;
+        return;
+      }
+
+      const { data } = await supa.from('reservations')
+        .select('assigned_worker_id')
+        .gte('scheduled_at', iso(todayStart))
+        .lt('scheduled_at', iso(weekEnd))
+        .not('assigned_worker_id', 'is', null)
+        .neq('status', 'cancelled');
+
+      const busyIds = new Set((data ?? []).map((r: any) => r.assigned_worker_id));
+      const freeWorkers = workerProfiles.filter((w) => !busyIds.has(w.id)).slice(0, 5);
+
+      document.getElementById('free-workers-loading')!.hidden = true;
+      const el = document.getElementById('free-workers')!;
+      const empty = document.getElementById('free-workers-empty')!;
+
+      if (freeWorkers.length === 0) {
+        empty.hidden = false;
+        el.hidden = true;
+      } else {
+        el.innerHTML = freeWorkers.map((w, i) => `
+          <div class="side-item">
+            <div class="side-rank">${i + 1}</div>
+            <div class="side-name">${escapeHtml(w.full_name) || 'Sans nom'}</div>
+            <div class="side-meta">dispo 7j</div>
+          </div>
+        `).join('');
+        el.hidden = false;
+        empty.hidden = true;
+      }
+    }
+
+    // ====== RECHERCHE GLOBALE ======
+    const globalSearch = document.getElementById('global-search') as HTMLInputElement;
+    const searchResults = document.getElementById('search-results')!;
+    let searchTimer: number | undefined;
+
+    globalSearch.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(runGlobalSearch, 200);
+    });
+    globalSearch.addEventListener('focus', runGlobalSearch);
+    document.addEventListener('click', (e) => {
+      if (!searchResults.contains(e.target as Node) && e.target !== globalSearch) searchResults.hidden = true;
+    });
+
+    async function runGlobalSearch() {
+      const q = globalSearch.value.trim();
+      if (q.length < 2) { searchResults.hidden = true; return; }
+
+      const { data } = await supa.from('reservations')
+        .select('id, service_type, guest_name, guest_phone, scheduled_at, status')
+        .or(`guest_name.ilike.%${q}%,guest_phone.ilike.%${q}%`)
+        .order('scheduled_at', { ascending: false, nullsFirst: false })
+        .limit(8);
+
+      if (!data || data.length === 0) {
+        searchResults.innerHTML = `<div class="search-result"><span style="color:var(--bovo-muted);">Aucun résultat</span></div>`;
+      } else {
+        searchResults.innerHTML = data.map((r: any) => {
+          const dateStr = r.scheduled_at ? new Date(r.scheduled_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '—';
+          return `
+            <a href="/admin/reservations/?id=${r.id}" class="search-result">
+              <div>${SERVICE_ICONS[r.service_type] ?? '✦'} <strong>${escapeHtml(r.guest_name) || 'Anonyme'}</strong> — ${escapeHtml(r.guest_phone) || '—'}</div>
+              <div class="search-result-meta">${SERVICE_LABELS[r.service_type] ?? r.service_type} · ${dateStr} · ${STATUS_LABELS[r.status] ?? r.status}</div>
+            </a>
+          `;
+        }).join('');
+      }
+      searchResults.hidden = false;
+    }
+
+    // ====== FILTRES PROCHAINES PRESTATIONS ======
+    document.getElementById('filter-search')!.addEventListener('input', renderUpcoming);
+    document.querySelectorAll('.pill').forEach((p) => {
+      p.addEventListener('click', () => {
+        document.querySelectorAll('.pill').forEach((x) => x.classList.remove('is-active'));
+        p.classList.add('is-active');
+        renderUpcoming();
+      });
+    });
+
+    // ====== MODAL ASSIGNER WORKER ======
+    const assignModal = document.getElementById('assign-modal')!;
+    const assignForm = document.getElementById('assign-form') as HTMLFormElement;
+    const assignWorkerSelect = document.getElementById('assign-worker') as HTMLSelectElement;
+    const assignInfo = document.getElementById('assign-resa-info')!;
+    const assignError = document.getElementById('assign-error')!;
+    let assigningResaId: string | null = null;
+
+    async function openAssignModal(resaId: string, serviceType: string) {
+      assigningResaId = resaId;
+      assignError.style.display = 'none';
+
+      const cached = upcomingCache.find((r) => r.id === resaId);
+      const dateStr = cached?.scheduled_at
+        ? new Date(cached.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' })
+        : '';
+      assignInfo.innerHTML = `${SERVICE_ICONS[serviceType] ?? '✦'} <strong>${SERVICE_LABELS[serviceType] ?? serviceType}</strong>${cached?.guest_name ? ' — ' + escapeHtml(cached.guest_name) : ''}${dateStr ? '<br>' + dateStr : ''}`;
+
+      // Charger workers + skills pour mettre en tête ceux avec la skill
+      const { data: skills } = await supa.from('worker_skills').select('worker_id, skill, level').eq('skill', serviceType);
+      const skilledIds = new Set((skills ?? []).map((s: any) => s.worker_id));
+
+      const workersOnly = workersCache.filter((w) => w.role === 'worker');
+      const skilled = workersOnly.filter((w) => skilledIds.has(w.id));
+      const others = workersOnly.filter((w) => !skilledIds.has(w.id));
+
+      let html = '<option value="">— Choisir un worker —</option>';
+      if (skilled.length > 0) {
+        html += `<optgroup label="✓ Compétence ${SERVICE_LABELS[serviceType] ?? serviceType}">`;
+        html += skilled.map((w) => `<option value="${w.id}">${escapeHtml(w.full_name) || 'Sans nom'}</option>`).join('');
+        html += '</optgroup>';
+      }
+      if (others.length > 0) {
+        html += '<optgroup label="Autres workers">';
+        html += others.map((w) => `<option value="${w.id}">${escapeHtml(w.full_name) || 'Sans nom'}</option>`).join('');
+        html += '</optgroup>';
+      }
+      assignWorkerSelect.innerHTML = html;
+
+      assignModal.hidden = false;
+    }
+
+    document.getElementById('assign-close')!.addEventListener('click', () => assignModal.hidden = true);
+    assignModal.addEventListener('click', (e) => { if (e.target === assignModal) assignModal.hidden = true; });
+
+    assignForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      assignError.style.display = 'none';
+      const workerId = assignWorkerSelect.value;
+      if (!workerId || !assigningResaId) {
+        assignError.textContent = 'Veuillez choisir un worker.';
+        assignError.style.display = 'block';
+        return;
+      }
+      const { error } = await supa.from('reservations')
+        .update({ assigned_worker_id: workerId, status: 'assigned' })
+        .eq('id', assigningResaId);
+      if (error) {
+        assignError.textContent = error.message;
+        assignError.style.display = 'block';
+        return;
+      }
+      assignModal.hidden = true;
+      await refreshAll();
+    });
+
+    // ====== REFRESH GLOBAL ======
+    async function refreshAll() {
+      await Promise.all([
+        loadKpis(),
+        loadWorkforceKpis(),
+        loadToday(),
+        loadUrgent(),
+        loadUpcoming(),
+        loadActivity(),
+        loadTopWorkers(),
+        loadFreeWorkers(),
+      ]);
+    }
+
+    // ====== INIT ======
+    await loadWorkers();
+    await refreshAll();
+
+    // ====== REALTIME ======
+    const channel = supa.channel('admin-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'reservations' }, () => {
+        refreshAll();
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'profiles' }, () => {
+        loadActivity();
+        loadWorkforceKpis();
+      })
+      .subscribe((status) => {
+        const dot = document.getElementById('realtime-dot')!;
+        if (status === 'SUBSCRIBED') dot.classList.remove('is-offline');
+        else dot.classList.add('is-offline');
+      });
+
+    window.addEventListener('beforeunload', () => { channel.unsubscribe(); });
+
+    // ====== MODAL NOUVELLE RÉSERVATION ======
     const newResaModal = document.getElementById('new-resa-modal')!;
     const newResaForm = document.getElementById('new-resa-form') as HTMLFormElement;
     const ncCustomerSelect = document.getElementById('nr-customer') as HTMLSelectElement;
     const guestBlock = document.getElementById('nr-guest-block')!;
 
     document.getElementById('open-new-resa')!.addEventListener('click', async () => {
-      // Charger la liste des clients pour le picker
       const { data: customers } = await supa.from('profiles').select('id, full_name, phone').eq('role', 'customer').order('full_name').limit(500);
-      ncCustomerSelect.innerHTML = '<option value="">— Saisie manuelle (guest) —</option>' + (customers ?? []).map((c: any) => `<option value="${c.id}" data-name="${c.full_name ?? ''}" data-phone="${c.phone ?? ''}">${c.full_name ?? 'Sans nom'} — ${c.phone ?? '—'}</option>`).join('');
+      ncCustomerSelect.innerHTML = '<option value="">— Saisie manuelle (guest) —</option>' + (customers ?? []).map((c: any) => `<option value="${c.id}" data-name="${escapeHtml(c.full_name) || ''}" data-phone="${escapeHtml(c.phone) || ''}">${escapeHtml(c.full_name) || 'Sans nom'} — ${escapeHtml(c.phone) || '—'}</option>`).join('');
       newResaForm.reset();
       ncCustomerSelect.value = '';
       guestBlock.style.display = '';
@@ -318,7 +1229,6 @@ import { ZONES } from '@lib/catalog';
     ncCustomerSelect.addEventListener('change', () => {
       const opt = ncCustomerSelect.selectedOptions[0];
       if (ncCustomerSelect.value) {
-        // Auto-remplir guest fields à partir du client choisi
         (document.getElementById('nr-name') as HTMLInputElement).value = opt.dataset.name ?? '';
         (document.getElementById('nr-phone') as HTMLInputElement).value = opt.dataset.phone ?? '';
       }
@@ -376,12 +1286,11 @@ import { ZONES } from '@lib/catalog';
       okEl.style.display = 'block';
       setTimeout(async () => {
         newResaModal.hidden = true;
-        await loadKpis();
-        await loadLists();
+        await refreshAll();
       }, 800);
     });
 
-    // ============= MODAL NOUVEAU CLIENT =============
+    // ====== MODAL NOUVEAU CLIENT ======
     const newCustomerModal = document.getElementById('new-customer-modal')!;
     const newCustomerForm = document.getElementById('new-customer-form') as HTMLFormElement;
 
@@ -395,7 +1304,6 @@ import { ZONES } from '@lib/catalog';
     newCustomerModal.addEventListener('click', (e) => { if (e.target === newCustomerModal) newCustomerModal.hidden = true; });
 
     document.getElementById('nc-gen-password')!.addEventListener('click', () => {
-      // Mot de passe 12 caractères, sans confusion (pas de 0/O/l/I)
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$%';
       let pwd = '';
       for (let i = 0; i < 12; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -420,8 +1328,6 @@ import { ZONES } from '@lib/catalog';
         return;
       }
 
-      // On utilise un client Supabase temporaire SANS persistance de session,
-      // pour ne pas éjecter l'admin de sa propre session.
       const url = (import.meta as any).env.PUBLIC_SUPABASE_URL;
       const key = (import.meta as any).env.PUBLIC_SUPABASE_ANON_KEY;
       const tempClient = createClient(url, key, {
@@ -440,7 +1346,6 @@ import { ZONES } from '@lib/catalog';
         return;
       }
 
-      // Sign-out du temp client pour être propre
       await tempClient.auth.signOut();
 
       const waLink = `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(
@@ -456,3 +1361,4 @@ import { ZONES } from '@lib/catalog';
     });
   }
 </script>
+
