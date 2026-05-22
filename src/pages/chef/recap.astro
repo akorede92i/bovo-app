@@ -102,6 +102,7 @@ import Icon from '@components/Icon.astro';
       `Démarrage : ${s.startDate}`,
       `Adresse : ${s.address?.street}${s.address?.quartier ? `, ${s.address.quartier}` : ''}, ${s.address?.zone}`,
       s.address?.building ? `Précisions : ${s.address.building}` : '',
+      s.address?.lat && s.address?.lng ? `📍 https://maps.google.com/?q=${s.address.lat},${s.address.lng}` : '',
       '',
       `Client : ${s.customer?.fullName}`,
       `Tél : ${s.customer?.phone}`,

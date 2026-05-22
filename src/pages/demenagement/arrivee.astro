@@ -2,6 +2,7 @@
 import Layout from '@layouts/Layout.astro';
 import Stepper from '@components/Stepper.astro';
 import CtaFooter from '@components/CtaFooter.astro';
+import MapPicker from '@components/MapPicker.astro';
 import { ZONES, DEM_ETAGE_SUPP_XOF, fcfa } from '@lib/catalog';
 ---
 <Layout
@@ -59,6 +60,8 @@ import { ZONES, DEM_ETAGE_SUPP_XOF, fcfa } from '@lib/catalog';
     <textarea id="parking" class="textarea" placeholder="ex. Cour intérieure, portail à passer."></textarea>
   </div>
 
+  <MapPicker />
+
   <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
 </Layout>
 
@@ -81,6 +84,9 @@ import { ZONES, DEM_ETAGE_SUPP_XOF, fcfa } from '@lib/catalog';
     floor.value = String(s.to.floor ?? 0);
     elevator.checked = !!s.to.elevator;
     parking.value = s.to.parking ?? '';
+    if (s.to.lat != null && s.to.lng != null) {
+      (window as any).bovoMapSetPos?.(s.to.lat, s.to.lng);
+    }
   }
 
   function validate() {
@@ -90,6 +96,11 @@ import { ZONES, DEM_ETAGE_SUPP_XOF, fcfa } from '@lib/catalog';
   zone.addEventListener('change', validate);
 
   cta.addEventListener('click', () => {
+    const latRaw = (document.getElementById('map-lat') as HTMLInputElement)?.value;
+    const lngRaw = (document.getElementById('map-lng') as HTMLInputElement)?.value;
+    const lat = latRaw ? parseFloat(latRaw) : undefined;
+    const lng = lngRaw ? parseFloat(lngRaw) : undefined;
+
     saveState<DemenagementState>('demenagement', {
       to: {
         zone: zone.value,
@@ -98,6 +109,8 @@ import { ZONES, DEM_ETAGE_SUPP_XOF, fcfa } from '@lib/catalog';
         floor: Number(floor.value),
         elevator: elevator.checked,
         parking: parking.value.trim() || undefined,
+        lat: Number.isFinite(lat) ? lat : undefined,
+        lng: Number.isFinite(lng) ? lng : undefined,
       },
     });
     window.location.href = '/demenagement/options/';

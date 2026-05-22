@@ -1,0 +1,168 @@
+---
+// MapPicker.astro
+// Carte Leaflet + tuiles CartoDB Voyager (gratuit, sans clé API) pour préciser
+// l'adresse au Bénin. Indispensable car les adresses béninoises sont basées
+// sur des repères et non des numéros de rue.
+//
+// Écrit les coordonnées dans les inputs cachés #map-lat / #map-lng et dispatche
+// l'event `bovo:location` sur document. La page parent les lit dans son CTA.
+//
+// Props optionnelles : lat / lng (pour restaurer une position sauvée en state).
+interface Props {
+  lat?: number | null;
+  lng?: number | null;
+}
+const { lat, lng } = Astro.props;
+const initialLat = typeof lat === 'number' ? lat : '';
+const initialLng = typeof lng === 'number' ? lng : '';
+---
+
+<link rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+  crossorigin="" />
+
+<div class="map-section">
+  <div class="map-section-head">
+    <label class="field-label" style="margin:0;">Épinglez votre position</label>
+    <button type="button" id="map-gps-btn" class="map-gps-btn" aria-label="Me localiser">
+      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="3.5"/>
+        <line x1="12" y1="1"  x2="12" y2="5"/>
+        <line x1="12" y1="19" x2="12" y2="23"/>
+        <line x1="1"  y1="12" x2="5"  y2="12"/>
+        <line x1="19" y1="12" x2="23" y2="12"/>
+      </svg>
+      <span id="map-gps-label">Me localiser</span>
+    </button>
+  </div>
+  <div id="map-container" data-init-lat={initialLat} data-init-lng={initialLng}></div>
+  <p class="field-hint" style="margin-top:6px;">Touchez la carte ou déplacez le marqueur pour préciser l'emplacement exact.</p>
+  <input type="hidden" id="map-lat" value={initialLat} />
+  <input type="hidden" id="map-lng" value={initialLng} />
+</div>
+
+<style>
+  .map-section { margin: 24px 0 4px; }
+  .map-section-head {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px; gap: 12px;
+  }
+  #map-container {
+    height: 240px; border-radius: 14px;
+    overflow: hidden; border: 1.5px solid #e5e7eb;
+    background: #f3f4f6;
+  }
+  .map-gps-btn {
+    display: inline-flex; align-items: center; gap: 5px;
+    height: 34px; padding: 0 14px;
+    background: #4470b3; color: #fff;
+    border: none; border-radius: 100px;
+    font-size: 0.82rem; font-weight: 600;
+    cursor: pointer; transition: opacity 0.15s;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .map-gps-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .map-gps-btn:active:not(:disabled) { opacity: 0.85; }
+</style>
+
+<script is:inline
+  src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV/XN/WPeM="
+  crossorigin=""></script>
+<script is:inline>
+  (function () {
+    if (typeof L === 'undefined') return;
+    var container = document.getElementById('map-container');
+    if (!container) return;
+
+    var COTONOU = [6.3703, 2.3912];
+    var latInput = document.getElementById('map-lat');
+    var lngInput = document.getElementById('map-lng');
+    var gpsBtn   = document.getElementById('map-gps-btn');
+    var gpsLabel = document.getElementById('map-gps-label');
+
+    // Restaurer position depuis state si dispo
+    var initLat = parseFloat(container.getAttribute('data-init-lat') || '');
+    var initLng = parseFloat(container.getAttribute('data-init-lng') || '');
+    var hasSaved = !isNaN(initLat) && !isNaN(initLng);
+    var startPos = hasSaved ? [initLat, initLng] : COTONOU;
+    var startZoom = hasSaved ? 16 : 13;
+
+    var map = L.map('map-container', { scrollWheelZoom: false }).setView(startPos, startZoom);
+
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+      maxZoom: 19,
+    }).addTo(map);
+
+    // Icône hébergée chez unpkg (sinon Leaflet cherche en local et échoue)
+    var icon = L.icon({
+      iconUrl:       'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+      iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+      shadowUrl:     'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      iconSize:    [25, 41],
+      iconAnchor:  [12, 41],
+      popupAnchor: [1, -34],
+      shadowSize:  [41, 41],
+    });
+
+    var marker = L.marker(startPos, { draggable: true, icon: icon }).addTo(map);
+
+    function setCoords(lat, lng) {
+      latInput.value = lat;
+      lngInput.value = lng;
+      document.dispatchEvent(new CustomEvent('bovo:location', {
+        detail: { lat: lat, lng: lng }
+      }));
+    }
+
+    marker.on('dragend', function () {
+      var p = marker.getLatLng();
+      setCoords(p.lat, p.lng);
+    });
+
+    map.on('click', function (e) {
+      marker.setLatLng(e.latlng);
+      setCoords(e.latlng.lat, e.latlng.lng);
+    });
+
+    if (gpsBtn) {
+      gpsBtn.addEventListener('click', function () {
+        if (!navigator.geolocation) return;
+        gpsBtn.disabled = true;
+        gpsLabel.textContent = 'Localisation…';
+
+        navigator.geolocation.getCurrentPosition(
+          function (pos) {
+            var lat = pos.coords.latitude;
+            var lng = pos.coords.longitude;
+            map.setView([lat, lng], 17);
+            marker.setLatLng([lat, lng]);
+            setCoords(lat, lng);
+            gpsBtn.disabled = false;
+            gpsLabel.textContent = 'Me localiser';
+          },
+          function () {
+            gpsBtn.disabled = false;
+            gpsLabel.textContent = 'Me localiser';
+          },
+          { enableHighAccuracy: true, timeout: 10000 }
+        );
+      });
+    }
+
+    // Fix : la carte est parfois rendue avec 0px de haut si elle est dans un
+    // conteneur initialement caché. On force un recalcul après tick.
+    setTimeout(function () { map.invalidateSize(); }, 100);
+
+    // Expose un setter global pour que la page puisse restaurer la position
+    // depuis sessionStorage (loadState n'est dispo qu'en client-side).
+    window.bovoMapSetPos = function (lat, lng) {
+      if (typeof lat !== 'number' || typeof lng !== 'number') return;
+      map.setView([lat, lng], 16);
+      marker.setLatLng([lat, lng]);
+      setCoords(lat, lng);
+    };
+  })();
+</script>

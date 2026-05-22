@@ -2,6 +2,7 @@
 import Layout from '@layouts/Layout.astro';
 import Stepper from '@components/Stepper.astro';
 import CtaFooter from '@components/CtaFooter.astro';
+import MapPicker from '@components/MapPicker.astro';
 import { ZONES } from '@lib/catalog';
 ---
 <Layout
@@ -39,6 +40,8 @@ import { ZONES } from '@lib/catalog';
     <textarea id="building" class="textarea" placeholder="ex. 2e étage, sonnez à Konaté, portail bleu"></textarea>
   </div>
 
+  <MapPicker />
+
   <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
 </Layout>
 
@@ -57,6 +60,9 @@ import { ZONES } from '@lib/catalog';
     quartier.value = s.address.quartier ?? '';
     street.value = s.address.street ?? '';
     building.value = s.address.building ?? '';
+    if (s.address.lat != null && s.address.lng != null) {
+      (window as any).bovoMapSetPos?.(s.address.lat, s.address.lng);
+    }
   }
 
   function validate() {
@@ -66,12 +72,19 @@ import { ZONES } from '@lib/catalog';
   zone.addEventListener('change', validate);
 
   cta.addEventListener('click', () => {
+    const latRaw = (document.getElementById('map-lat') as HTMLInputElement)?.value;
+    const lngRaw = (document.getElementById('map-lng') as HTMLInputElement)?.value;
+    const lat = latRaw ? parseFloat(latRaw) : undefined;
+    const lng = lngRaw ? parseFloat(lngRaw) : undefined;
+
     saveState<MenageState>('menage', {
       address: {
         zone: zone.value,
         quartier: quartier.value.trim() || undefined,
         street: street.value.trim(),
         building: building.value.trim() || undefined,
+        lat: Number.isFinite(lat) ? lat : undefined,
+        lng: Number.isFinite(lng) ? lng : undefined,
       },
     });
     window.location.href = '/menage/creneau/';

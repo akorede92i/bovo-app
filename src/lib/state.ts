@@ -18,6 +18,8 @@ export interface AddressInfo {
   street?: string;
   building?: string;
   saveToProfile?: boolean;
+  lat?: number;
+  lng?: number;
 }
 
 export interface MenageState {
@@ -60,6 +62,8 @@ export interface DemenagementAddress {
   floor?: number;
   elevator?: boolean;
   parking?: string; // accès camion
+  lat?: number;
+  lng?: number;
 }
 
 export interface DemenagementState {

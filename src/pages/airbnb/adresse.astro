@@ -2,6 +2,7 @@
 import Layout from '@layouts/Layout.astro';
 import Stepper from '@components/Stepper.astro';
 import CtaFooter from '@components/CtaFooter.astro';
+import MapPicker from '@components/MapPicker.astro';
 import { ZONES } from '@lib/catalog';
 
 const ACCESS_MODES = [
@@ -40,6 +41,8 @@ const ACCESS_MODES = [
     <label class="field-label" for="street">Adresse exacte</label>
     <input id="street" class="input" type="text" placeholder="Rue, numéro, repères, résidence" required />
   </div>
+
+  <MapPicker />
 
   <h2 class="h-section" style="margin: 24px 0 12px;">Mode d'accès</h2>
   <div class="stack-sm" id="access-list">
@@ -80,6 +83,9 @@ const ACCESS_MODES = [
     zone.value = s.address.zone ?? '';
     quartier.value = s.address.quartier ?? '';
     street.value = s.address.street ?? '';
+    if (s.address.lat != null && s.address.lng != null) {
+      (window as any).bovoMapSetPos?.(s.address.lat, s.address.lng);
+    }
   }
   if (s.access?.details) accessDetails.value = s.access.details;
 
@@ -105,11 +111,18 @@ const ACCESS_MODES = [
   zone.addEventListener('change', validate);
 
   cta.addEventListener('click', () => {
+    const latRaw = (document.getElementById('map-lat') as HTMLInputElement)?.value;
+    const lngRaw = (document.getElementById('map-lng') as HTMLInputElement)?.value;
+    const lat = latRaw ? parseFloat(latRaw) : undefined;
+    const lng = lngRaw ? parseFloat(lngRaw) : undefined;
+
     saveState<AirbnbState>('airbnb', {
       address: {
         zone: zone.value,
         quartier: quartier.value.trim() || undefined,
         street: street.value.trim(),
+        lat: Number.isFinite(lat) ? lat : undefined,
+        lng: Number.isFinite(lng) ? lng : undefined,
       },
       access: {
         mode: accessMode as any,

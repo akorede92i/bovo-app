@@ -2,6 +2,7 @@
 import Layout from '@layouts/Layout.astro';
 import Stepper from '@components/Stepper.astro';
 import CtaFooter from '@components/CtaFooter.astro';
+import MapPicker from '@components/MapPicker.astro';
 import { ZONES } from '@lib/catalog';
 
 const minDate = (() => {
@@ -50,6 +51,8 @@ const minDate = (() => {
     <textarea id="building" class="textarea" placeholder="ex. Résidence Soleil, 3e étage, portail vert"></textarea>
   </div>
 
+  <MapPicker />
+
   <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
 </Layout>
 
@@ -70,6 +73,9 @@ const minDate = (() => {
     quartier.value = s.address.quartier ?? '';
     street.value = s.address.street ?? '';
     building.value = s.address.building ?? '';
+    if (s.address.lat != null && s.address.lng != null) {
+      (window as any).bovoMapSetPos?.(s.address.lat, s.address.lng);
+    }
   }
 
   function validate() {
@@ -79,6 +85,11 @@ const minDate = (() => {
   zone.addEventListener('change', validate);
 
   cta.addEventListener('click', () => {
+    const latRaw = (document.getElementById('map-lat') as HTMLInputElement)?.value;
+    const lngRaw = (document.getElementById('map-lng') as HTMLInputElement)?.value;
+    const lat = latRaw ? parseFloat(latRaw) : undefined;
+    const lng = lngRaw ? parseFloat(lngRaw) : undefined;
+
     saveState<ChefState>('chef', {
       startDate: startDate.value,
       address: {
@@ -86,6 +97,8 @@ const minDate = (() => {
         quartier: quartier.value.trim() || undefined,
         street: street.value.trim(),
         building: building.value.trim() || undefined,
+        lat: Number.isFinite(lat) ? lat : undefined,
+        lng: Number.isFinite(lng) ? lng : undefined,
       },
     });
     window.location.href = '/chef/contact/';

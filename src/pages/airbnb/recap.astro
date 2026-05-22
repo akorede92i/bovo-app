@@ -112,6 +112,7 @@ import Icon from '@components/Icon.astro';
       opts.length ? `Options : ${opts.map((o) => o.label).join(', ')}` : '',
       '',
       `Adresse : ${s.address?.street}${s.address?.quartier ? `, ${s.address.quartier}` : ''}, ${s.address?.zone}`,
+      s.address?.lat && s.address?.lng ? `📍 https://maps.google.com/?q=${s.address.lat},${s.address.lng}` : '',
       `Mode d'accès : ${accessLabels[s.access?.mode ?? ''] ?? '—'}`,
       s.access?.details ? `Détails : ${s.access.details}` : '',
       '',

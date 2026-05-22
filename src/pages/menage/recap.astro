@@ -108,6 +108,7 @@ import Icon from '@components/Icon.astro';
       '',
       `Adresse : ${addr?.street}${addr?.quartier ? `, ${addr.quartier}` : ''}, ${addr?.zone}`,
       addr?.building ? `Précisions : ${addr.building}` : '',
+      addr?.lat && addr?.lng ? `📍 https://maps.google.com/?q=${addr.lat},${addr.lng}` : '',
       '',
       `Date : ${s.date}`,
       `Créneau : ${s.slot}`,
