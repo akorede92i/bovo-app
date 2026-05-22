@@ -1,0 +1,379 @@
+---
+import AdminLayout from '@layouts/AdminLayout.astro';
+import { ZONES } from '@lib/catalog';
+---
+<AdminLayout title="Workers — Bovo Admin" pageTitle="Workers" active="workers">
+  <p class="admin-sub">Vos équipes terrain : skills, zones d'intervention, disponibilités, congés.</p>
+
+  <div style="display:flex; gap:8px; margin-bottom:18px; align-items:center;">
+    <input id="search" class="input" type="text" placeholder="Rechercher un worker par nom ou téléphone…" style="max-width:380px; flex:1;" />
+    <button id="promote-btn" class="btn btn-primary btn-sm">+ Promouvoir un user</button>
+  </div>
+
+  <div id="list-loading" style="color: var(--bovo-muted); padding: 24px; text-align:center;">Chargement…</div>
+
+  <table id="list-table" class="admin-table admin-table-mobile" hidden>
+    <thead>
+      <tr>
+        <th>Nom</th>
+        <th>Téléphone</th>
+        <th>Rôle</th>
+        <th>Skills</th>
+        <th>Zones</th>
+      </tr>
+    </thead>
+    <tbody id="list-body"></tbody>
+  </table>
+
+  <div id="list-mobile" class="mobile-cards" hidden></div>
+
+  <div id="list-empty" hidden class="empty-state">
+    <div class="empty-state-emoji">👥</div>
+    <div class="empty-state-title">Aucun worker enregistré</div>
+    <div class="empty-state-desc">Cliquez "Promouvoir un user" pour ajouter votre première équipe.</div>
+  </div>
+
+  <!-- MODAL PROMOTION -->
+  <div id="promote-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; width:100%; max-width:520px; border-radius: var(--r-xl); padding:24px;">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h2 style="font-family:'Jost'; font-weight:700;">Promouvoir un utilisateur</h2>
+        <button id="promote-close" class="topbar-back" aria-label="Fermer">✕</button>
+      </div>
+      <p class="text-muted" style="margin-bottom:16px;">L'utilisateur doit déjà avoir créé un compte Bovo (via /compte/inscription). Sélectionnez-le dans la liste pour le passer en role 'worker'.</p>
+      <div class="field">
+        <label class="field-label">Choisir un utilisateur</label>
+        <select id="promote-select" class="select">
+          <option value="">Chargement…</option>
+        </select>
+      </div>
+      <div id="promote-error" style="color:var(--bovo-danger); display:none; margin:8px 0;"></div>
+      <button id="promote-save" class="btn btn-primary btn-block">Promouvoir en worker</button>
+    </div>
+  </div>
+
+  <!-- MODAL DÉTAIL WORKER -->
+  <div id="worker-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; width:100%; max-width:720px; max-height:90vh; overflow-y:auto; border-radius: var(--r-xl); padding:24px;">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h2 id="worker-modal-title" style="font-family:'Jost'; font-weight:700;">Worker</h2>
+        <button id="worker-modal-close" class="topbar-back" aria-label="Fermer">✕</button>
+      </div>
+      <div id="worker-modal-body"></div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+  import { ZONES } from '@lib/catalog';
+
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('list-loading')!.textContent = 'Supabase non configuré.';
+  } else {
+    const SKILLS = ['menage', 'airbnb', 'demenagement', 'chef'] as const;
+    const SKILL_LABELS: Record<string, string> = {
+      menage: '🧹 Ménage', airbnb: '🏠 Airbnb', demenagement: '🚚 Déménagement', chef: '👨‍🍳 Chef',
+    };
+    const DAYS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+    const searchInput = document.getElementById('search') as HTMLInputElement;
+    const tableBody = document.getElementById('list-body')!;
+    const tableEl = document.getElementById('list-table')!;
+    const mobileEl = document.getElementById('list-mobile')!;
+    const emptyEl = document.getElementById('list-empty')!;
+    const loadingEl = document.getElementById('list-loading')!;
+
+    const promoteModal = document.getElementById('promote-modal')!;
+    const promoteSelect = document.getElementById('promote-select') as HTMLSelectElement;
+    const promoteErr = document.getElementById('promote-error')!;
+
+    const workerModal = document.getElementById('worker-modal')!;
+    const workerModalTitle = document.getElementById('worker-modal-title')!;
+    const workerModalBody = document.getElementById('worker-modal-body')!;
+
+    async function load() {
+      loadingEl.hidden = false;
+      tableEl.hidden = true;
+      mobileEl.hidden = true;
+      emptyEl.hidden = true;
+
+      const search = searchInput.value.trim().toLowerCase();
+      const { data, error } = await supa.from('profiles').select('*').in('role', ['worker', 'admin']).order('full_name');
+      loadingEl.hidden = true;
+      if (error) {
+        loadingEl.textContent = `Erreur : ${error.message}`;
+        loadingEl.hidden = false;
+        return;
+      }
+
+      let workers = data ?? [];
+      if (search) {
+        workers = workers.filter((w: any) => (w.full_name ?? '').toLowerCase().includes(search) || (w.phone ?? '').includes(search));
+      }
+
+      if (workers.length === 0) {
+        emptyEl.hidden = false;
+        return;
+      }
+
+      // Fetch skills et zones pour tous les workers
+      const ids = workers.map((w: any) => w.id);
+      const [{ data: skills }, { data: zones }] = await Promise.all([
+        supa.from('worker_skills').select('worker_id, skill').in('worker_id', ids),
+        supa.from('worker_zones').select('worker_id, zone').in('worker_id', ids),
+      ]);
+
+      const skillsMap = new Map<string, string[]>();
+      (skills ?? []).forEach((s: any) => {
+        const arr = skillsMap.get(s.worker_id) ?? [];
+        arr.push(s.skill);
+        skillsMap.set(s.worker_id, arr);
+      });
+      const zonesMap = new Map<string, string[]>();
+      (zones ?? []).forEach((z: any) => {
+        const arr = zonesMap.get(z.worker_id) ?? [];
+        arr.push(z.zone);
+        zonesMap.set(z.worker_id, arr);
+      });
+
+      tableBody.innerHTML = workers.map((w: any) => {
+        const ws = skillsMap.get(w.id) ?? [];
+        const wz = zonesMap.get(w.id) ?? [];
+        return `
+          <tr data-id="${w.id}">
+            <td><strong>${w.full_name ?? '—'}</strong></td>
+            <td>${w.phone ?? '—'}</td>
+            <td>${w.role === 'admin' ? '<span class="status-badge" style="background:var(--bovo-rouge);">Admin</span>' : '<span class="status-badge" style="background:var(--bovo-bleu);">Worker</span>'}</td>
+            <td style="font-size:0.84rem;">${ws.length ? ws.map((s: string) => SKILL_LABELS[s] ?? s).join(', ') : '<span style="color:var(--bovo-muted);">—</span>'}</td>
+            <td style="font-size:0.84rem;">${wz.length ? wz.join(', ') : '<span style="color:var(--bovo-muted);">—</span>'}</td>
+          </tr>
+        `;
+      }).join('');
+      tableEl.hidden = false;
+
+      mobileEl.innerHTML = workers.map((w: any) => {
+        const ws = skillsMap.get(w.id) ?? [];
+        const wz = zonesMap.get(w.id) ?? [];
+        return `
+          <div data-id="${w.id}" style="background:#fff; border:1px solid var(--bovo-line-soft); border-radius:var(--r-lg); padding:14px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+              <strong>${w.full_name ?? '—'}</strong>
+              ${w.role === 'admin' ? '<span class="status-badge" style="background:var(--bovo-rouge);">Admin</span>' : '<span class="status-badge" style="background:var(--bovo-bleu);">Worker</span>'}
+            </div>
+            <div style="font-size:0.84rem; color:var(--bovo-muted); margin-bottom:6px;">${w.phone ?? '—'}</div>
+            <div style="font-size:0.82rem;">${ws.length ? ws.map((s: string) => SKILL_LABELS[s] ?? s).join(', ') : 'Aucun skill'}</div>
+            <div style="font-size:0.82rem; color:var(--bovo-muted); margin-top:2px;">${wz.length ? wz.join(', ') : 'Aucune zone'}</div>
+          </div>
+        `;
+      }).join('');
+      mobileEl.hidden = false;
+
+      [...tableBody.querySelectorAll('tr[data-id]'), ...mobileEl.querySelectorAll('[data-id]')].forEach((el) => {
+        el.addEventListener('click', () => openWorkerModal(el.getAttribute('data-id')!));
+      });
+    }
+
+    async function openWorkerModal(id: string) {
+      workerModalBody.innerHTML = '<div style="text-align:center; padding:40px; color:var(--bovo-muted);">Chargement…</div>';
+      workerModal.hidden = false;
+
+      const [{ data: prof }, { data: skills }, { data: zones }, { data: avail }, { data: blackouts }] = await Promise.all([
+        supa.from('profiles').select('*').eq('id', id).maybeSingle(),
+        supa.from('worker_skills').select('*').eq('worker_id', id),
+        supa.from('worker_zones').select('*').eq('worker_id', id),
+        supa.from('worker_availability').select('*').eq('worker_id', id).order('day_of_week'),
+        supa.from('worker_blackouts').select('*').eq('worker_id', id).order('starts_at'),
+      ]);
+
+      if (!prof) {
+        workerModalBody.innerHTML = '<div style="color:var(--bovo-danger);">Worker introuvable.</div>';
+        return;
+      }
+
+      workerModalTitle.textContent = prof.full_name ?? prof.id.slice(0, 8);
+      const currentSkills = new Set((skills ?? []).map((s: any) => s.skill));
+      const currentZones = new Set((zones ?? []).map((z: any) => z.zone));
+
+      workerModalBody.innerHTML = `
+        <!-- INFOS -->
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Informations</h3>
+        <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:20px;">
+          <div style="font-size:0.86rem; line-height:1.6;">
+            <div><strong>${prof.full_name ?? 'Sans nom'}</strong></div>
+            <div style="color:var(--bovo-muted);">${prof.phone ?? '—'} · Role : <span style="font-weight:600; color:${prof.role === 'admin' ? 'var(--bovo-rouge)' : 'var(--bovo-bleu)'};">${prof.role}</span></div>
+          </div>
+        </div>
+
+        <!-- SKILLS -->
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Skills</h3>
+        <div id="skills-list" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
+          ${SKILLS.map((s) => `
+            <button class="chip ${currentSkills.has(s) ? 'is-active' : ''}" data-skill="${s}">${SKILL_LABELS[s]}</button>
+          `).join('')}
+        </div>
+
+        <!-- ZONES -->
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Zones d'intervention</h3>
+        <div id="zones-list" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
+          ${ZONES.map((z) => `
+            <button class="chip ${currentZones.has(z) ? 'is-active' : ''}" data-zone="${z}">${z}</button>
+          `).join('')}
+        </div>
+
+        <!-- DISPOS -->
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Disponibilités hebdomadaires</h3>
+        <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:14px; font-size:0.84rem;">
+          ${(avail ?? []).length === 0 ? '<div style="color:var(--bovo-muted);">Aucun créneau récurrent enregistré.</div>' : (avail ?? []).map((a: any) => `
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--bovo-line-soft);">
+              <span><strong>${DAYS[a.day_of_week]}</strong> · ${a.time_start.slice(0, 5)} → ${a.time_end.slice(0, 5)}</span>
+              <button class="del-avail" data-id="${a.id}" style="color:var(--bovo-danger); background:none; border:none; cursor:pointer;">✕</button>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:20px;">
+          <select id="new-avail-day" class="select" style="max-width:120px;">
+            ${DAYS.map((d, i) => `<option value="${i}">${d}</option>`).join('')}
+          </select>
+          <input id="new-avail-start" class="input" type="time" value="08:00" style="max-width:120px;" />
+          <input id="new-avail-end" class="input" type="time" value="18:00" style="max-width:120px;" />
+          <button id="add-avail" class="btn btn-ghost btn-sm">+ Ajouter</button>
+        </div>
+
+        <!-- BLACKOUTS -->
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Congés / indispos</h3>
+        <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:14px; font-size:0.84rem;">
+          ${(blackouts ?? []).length === 0 ? '<div style="color:var(--bovo-muted);">Aucune indisponibilité.</div>' : (blackouts ?? []).map((b: any) => `
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--bovo-line-soft);">
+              <span>${new Date(b.starts_at).toLocaleDateString('fr-FR')} → ${new Date(b.ends_at).toLocaleDateString('fr-FR')} ${b.reason ? `<em style="color:var(--bovo-muted);">— ${b.reason}</em>` : ''}</span>
+              <button class="del-blackout" data-id="${b.id}" style="color:var(--bovo-danger); background:none; border:none; cursor:pointer;">✕</button>
+            </div>
+          `).join('')}
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
+          <input id="new-bk-start" class="input" type="date" style="max-width:160px;" />
+          <input id="new-bk-end" class="input" type="date" style="max-width:160px;" />
+          <input id="new-bk-reason" class="input" type="text" placeholder="Motif (optionnel)" style="flex:1; min-width:180px;" />
+          <button id="add-blackout" class="btn btn-ghost btn-sm">+ Ajouter</button>
+        </div>
+
+        <!-- DANGER ZONE -->
+        <div style="margin-top:24px; padding-top:20px; border-top:1px solid var(--bovo-line-soft);">
+          <button id="demote-btn" class="btn btn-ghost btn-sm" style="color:var(--bovo-danger);">Rétrograder en customer</button>
+        </div>
+      `;
+
+      // Skills toggle
+      workerModalBody.querySelectorAll<HTMLButtonElement>('[data-skill]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const skill = btn.dataset.skill!;
+          const isActive = btn.classList.contains('is-active');
+          if (isActive) {
+            await supa.from('worker_skills').delete().eq('worker_id', id).eq('skill', skill);
+          } else {
+            await supa.from('worker_skills').insert({ worker_id: id, skill });
+          }
+          btn.classList.toggle('is-active');
+          load();
+        });
+      });
+
+      // Zones toggle
+      workerModalBody.querySelectorAll<HTMLButtonElement>('[data-zone]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const zone = btn.dataset.zone!;
+          const isActive = btn.classList.contains('is-active');
+          if (isActive) {
+            await supa.from('worker_zones').delete().eq('worker_id', id).eq('zone', zone);
+          } else {
+            await supa.from('worker_zones').insert({ worker_id: id, zone });
+          }
+          btn.classList.toggle('is-active');
+          load();
+        });
+      });
+
+      // Avail
+      document.getElementById('add-avail')!.addEventListener('click', async () => {
+        const day = Number((document.getElementById('new-avail-day') as HTMLSelectElement).value);
+        const start = (document.getElementById('new-avail-start') as HTMLInputElement).value;
+        const end = (document.getElementById('new-avail-end') as HTMLInputElement).value;
+        if (!start || !end) return;
+        await supa.from('worker_availability').insert({ worker_id: id, day_of_week: day, time_start: start, time_end: end });
+        openWorkerModal(id);
+      });
+      workerModalBody.querySelectorAll<HTMLButtonElement>('.del-avail').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await supa.from('worker_availability').delete().eq('id', btn.dataset.id!);
+          openWorkerModal(id);
+        });
+      });
+
+      // Blackouts
+      document.getElementById('add-blackout')!.addEventListener('click', async () => {
+        const s = (document.getElementById('new-bk-start') as HTMLInputElement).value;
+        const e = (document.getElementById('new-bk-end') as HTMLInputElement).value;
+        const r = (document.getElementById('new-bk-reason') as HTMLInputElement).value.trim();
+        if (!s || !e) return;
+        await supa.from('worker_blackouts').insert({ worker_id: id, starts_at: s, ends_at: e, reason: r || null });
+        openWorkerModal(id);
+      });
+      workerModalBody.querySelectorAll<HTMLButtonElement>('.del-blackout').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          await supa.from('worker_blackouts').delete().eq('id', btn.dataset.id!);
+          openWorkerModal(id);
+        });
+      });
+
+      // Demote
+      document.getElementById('demote-btn')!.addEventListener('click', async () => {
+        if (!confirm(`Rétrograder ${prof.full_name ?? 'ce worker'} en customer ? Il/elle perdra l'accès aux fonctions worker.`)) return;
+        await supa.from('profiles').update({ role: 'customer' }).eq('id', id);
+        workerModal.hidden = true;
+        load();
+      });
+    }
+
+    async function openPromoteModal() {
+      promoteErr.style.display = 'none';
+      promoteSelect.innerHTML = '<option value="">Chargement…</option>';
+      const { data, error } = await supa.from('profiles').select('id, full_name, phone, role').eq('role', 'customer').order('full_name').limit(200);
+      if (error) {
+        promoteSelect.innerHTML = `<option>Erreur : ${error.message}</option>`;
+      } else if (!data || data.length === 0) {
+        promoteSelect.innerHTML = '<option value="">Aucun utilisateur "customer" à promouvoir</option>';
+      } else {
+        promoteSelect.innerHTML = '<option value="">— Choisir un utilisateur —</option>' + data.map((u: any) => `<option value="${u.id}">${u.full_name ?? '(sans nom)'} — ${u.phone ?? '—'}</option>`).join('');
+      }
+      promoteModal.hidden = false;
+    }
+
+    document.getElementById('promote-btn')!.addEventListener('click', openPromoteModal);
+    document.getElementById('promote-close')!.addEventListener('click', () => promoteModal.hidden = true);
+    document.getElementById('worker-modal-close')!.addEventListener('click', () => workerModal.hidden = true);
+    promoteModal.addEventListener('click', (e) => { if (e.target === promoteModal) promoteModal.hidden = true; });
+    workerModal.addEventListener('click', (e) => { if (e.target === workerModal) workerModal.hidden = true; });
+
+    document.getElementById('promote-save')!.addEventListener('click', async () => {
+      const userId = promoteSelect.value;
+      if (!userId) return;
+      const { error } = await supa.from('profiles').update({ role: 'worker' }).eq('id', userId);
+      if (error) {
+        promoteErr.textContent = error.message;
+        promoteErr.style.display = 'block';
+        return;
+      }
+      promoteModal.hidden = true;
+      load();
+    });
+
+    let searchTimer: any;
+    searchInput.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(load, 250);
+    });
+
+    await load();
+  }
+</script>

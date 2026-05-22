@@ -46,6 +46,15 @@ import Layout from '@layouts/Layout.astro';
   const err = document.getElementById('signup-error') as HTMLDivElement;
   const ok = document.getElementById('signup-success') as HTMLDivElement;
 
+  // Pré-remplissage depuis les params URL (flow réservation → création compte)
+  const urlP = new URLSearchParams(window.location.search);
+  const pName  = document.getElementById('name')  as HTMLInputElement;
+  const pPhone = document.getElementById('phone') as HTMLInputElement;
+  const pEmail = document.getElementById('email') as HTMLInputElement;
+  if (urlP.get('name'))  pName.value  = urlP.get('name')!;
+  if (urlP.get('phone')) pPhone.value = urlP.get('phone')!;
+  if (urlP.get('email')) pEmail.value = urlP.get('email')!;
+
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
     err.style.display = 'none';

@@ -1,8 +1,22 @@
 ---
 import AdminLayout from '@layouts/AdminLayout.astro';
+import { ZONES } from '@lib/catalog';
 ---
 <AdminLayout title="Dashboard — Bovo Admin" pageTitle="Tableau de bord" active="dashboard">
   <p class="admin-sub" id="hello-line">Bienvenue 👋</p>
+
+  <!-- ACTIONS RAPIDES -->
+  <div style="display:flex; gap:10px; margin-bottom:24px; flex-wrap:wrap;">
+    <button id="open-new-resa" class="btn btn-primary btn-sm">
+      <span style="font-size:1.1rem;">📋</span> Nouvelle réservation
+    </button>
+    <button id="open-new-customer" class="btn btn-rouge btn-sm">
+      <span style="font-size:1.1rem;">👤</span> Nouveau client
+    </button>
+    <a href="/admin/workers/" class="btn btn-ghost btn-sm">
+      <span style="font-size:1.1rem;">👥</span> Gérer les workers
+    </a>
+  </div>
 
   <!-- KPIs -->
   <div class="kpi-grid">
@@ -46,10 +60,140 @@ import AdminLayout from '@layouts/AdminLayout.astro';
     <div class="empty-state-emoji">📭</div>
     <div class="empty-state-title">Aucune prestation à venir</div>
   </div>
+
+  <!-- MODAL NOUVELLE RÉSERVATION -->
+  <div id="new-resa-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; width:100%; max-width:640px; max-height:90vh; overflow-y:auto; border-radius: var(--r-xl); padding:24px;">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h2 style="font-family:'Jost'; font-weight:700;">Nouvelle réservation manuelle</h2>
+        <button id="new-resa-close" class="topbar-back" aria-label="Fermer">✕</button>
+      </div>
+
+      <form id="new-resa-form" novalidate>
+        <div class="field">
+          <label class="field-label">Service</label>
+          <select id="nr-service" class="select" required>
+            <option value="menage">🧹 Ménage</option>
+            <option value="airbnb">🏠 Airbnb</option>
+            <option value="demenagement">🚚 Déménagement</option>
+            <option value="chef">👨‍🍳 Chef à domicile</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Client (recherche ou saisie manuelle)</label>
+          <select id="nr-customer" class="select">
+            <option value="">— Saisie manuelle (guest) —</option>
+          </select>
+        </div>
+
+        <div id="nr-guest-block">
+          <div class="field">
+            <label class="field-label">Nom du client</label>
+            <input id="nr-name" class="input" type="text" required />
+          </div>
+          <div class="field">
+            <label class="field-label">Téléphone</label>
+            <input id="nr-phone" class="input" type="tel" required />
+          </div>
+          <div class="field">
+            <label class="field-label">Email (optionnel)</label>
+            <input id="nr-email" class="input" type="email" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Zone</label>
+          <select id="nr-zone" class="select" required>
+            <option value="">Choisir une zone…</option>
+            {ZONES.map((z) => <option value={z}>{z}</option>)}
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Adresse</label>
+          <input id="nr-address" class="input" type="text" placeholder="Rue, numéro, repère" required />
+        </div>
+
+        <div class="field">
+          <label class="field-label">Date et heure</label>
+          <input id="nr-datetime" class="input" type="datetime-local" required />
+        </div>
+
+        <div class="field">
+          <label class="field-label">Total estimé (FCFA)</label>
+          <input id="nr-total" class="input" type="number" min="0" step="500" placeholder="Ex. 12000" />
+        </div>
+
+        <div class="field">
+          <label class="field-label">Statut initial</label>
+          <select id="nr-status" class="select">
+            <option value="confirmed" selected>Confirmée (saisie manuelle)</option>
+            <option value="pending">En attente</option>
+            <option value="assigned">Assignée</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Notes (optionnel)</label>
+          <textarea id="nr-notes" class="textarea" placeholder="Allergie produits, animaux, instructions spéciales…"></textarea>
+        </div>
+
+        <div id="nr-error" style="color:var(--bovo-danger); display:none; margin:8px 0;"></div>
+        <div id="nr-success" style="color:var(--bovo-success); display:none; margin:8px 0;"></div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:14px;">Créer la réservation</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- MODAL NOUVEAU CLIENT -->
+  <div id="new-customer-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; width:100%; max-width:520px; max-height:90vh; overflow-y:auto; border-radius: var(--r-xl); padding:24px;">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h2 style="font-family:'Jost'; font-weight:700;">Nouveau client</h2>
+        <button id="new-customer-close" class="topbar-back" aria-label="Fermer">✕</button>
+      </div>
+
+      <p class="text-muted" style="margin-bottom:16px;">
+        Crée un compte client. Vous pourrez ensuite lui transmettre ses identifiants par WhatsApp pour qu'il accède à son espace.
+      </p>
+
+      <form id="new-customer-form" novalidate>
+        <div class="field">
+          <label class="field-label">Nom complet</label>
+          <input id="nc-name" class="input" type="text" required />
+        </div>
+        <div class="field">
+          <label class="field-label">Téléphone (WhatsApp)</label>
+          <input id="nc-phone" class="input" type="tel" placeholder="+229..." required />
+        </div>
+        <div class="field">
+          <label class="field-label">Email</label>
+          <input id="nc-email" class="input" type="email" required />
+          <span class="field-hint">Sert d'identifiant de connexion. Doit être unique.</span>
+        </div>
+        <div class="field">
+          <label class="field-label">Mot de passe temporaire</label>
+          <div style="display:flex; gap:8px;">
+            <input id="nc-password" class="input" type="text" required style="flex:1;" />
+            <button type="button" id="nc-gen-password" class="btn btn-ghost btn-sm">Générer</button>
+          </div>
+          <span class="field-hint">Le client pourra le changer après sa première connexion.</span>
+        </div>
+
+        <div id="nc-error" style="color:var(--bovo-danger); display:none; margin:8px 0;"></div>
+        <div id="nc-success" style="color:var(--bovo-success); display:none; margin:8px 0; padding:12px; background:var(--bovo-success-soft); border-radius:var(--r-md);"></div>
+
+        <button type="submit" class="btn btn-primary btn-block" style="margin-top:14px;">Créer le compte client</button>
+      </form>
+    </div>
+  </div>
 </AdminLayout>
 
 <script>
   import { getSupabase } from '@lib/supabase';
+  import { createClient } from '@supabase/supabase-js';
   import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS } from '@lib/admin';
   import { fcfa } from '@lib/catalog';
 
@@ -64,29 +208,30 @@ import AdminLayout from '@layouts/AdminLayout.astro';
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
 
-    // Hello line
+    // Hello
     const hour = now.getHours();
     const salut = hour < 12 ? 'Bonjour' : hour < 18 ? 'Bon après-midi' : 'Bonsoir';
     document.getElementById('hello-line')!.textContent = `${salut} 👋 Voici l'activité Bovo du moment.`;
 
-    // KPIs en parallèle
-    const [todayRes, pendingRes, weekRes, revenueRes] = await Promise.all([
-      supa.from('reservations').select('id', { count: 'exact', head: true })
-        .gte('scheduled_at', todayStart).lt('scheduled_at', todayEnd).neq('status', 'cancelled'),
-      supa.from('reservations').select('id', { count: 'exact', head: true })
-        .in('status', ['pending', 'confirmed']),
-      supa.from('reservations').select('id', { count: 'exact', head: true })
-        .gte('scheduled_at', todayStart).lt('scheduled_at', weekEnd).neq('status', 'cancelled'),
-      supa.from('reservations').select('estimated_total_xof')
-        .gte('scheduled_at', monthStart).lt('scheduled_at', monthEnd)
-        .in('status', ['confirmed', 'assigned', 'in_progress', 'done']),
-    ]);
-
-    document.getElementById('kpi-today')!.textContent = String(todayRes.count ?? 0);
-    document.getElementById('kpi-pending')!.textContent = String(pendingRes.count ?? 0);
-    document.getElementById('kpi-week')!.textContent = String(weekRes.count ?? 0);
-    const revenue = (revenueRes.data ?? []).reduce((sum: number, r: any) => sum + (r.estimated_total_xof ?? 0), 0);
-    document.getElementById('kpi-revenue')!.textContent = fcfa(revenue);
+    // ============= KPIs =============
+    async function loadKpis() {
+      const [todayRes, pendingRes, weekRes, revenueRes] = await Promise.all([
+        supa.from('reservations').select('id', { count: 'exact', head: true })
+          .gte('scheduled_at', todayStart).lt('scheduled_at', todayEnd).neq('status', 'cancelled'),
+        supa.from('reservations').select('id', { count: 'exact', head: true })
+          .in('status', ['pending', 'confirmed']),
+        supa.from('reservations').select('id', { count: 'exact', head: true })
+          .gte('scheduled_at', todayStart).lt('scheduled_at', weekEnd).neq('status', 'cancelled'),
+        supa.from('reservations').select('estimated_total_xof')
+          .gte('scheduled_at', monthStart).lt('scheduled_at', monthEnd)
+          .in('status', ['confirmed', 'assigned', 'in_progress', 'done']),
+      ]);
+      document.getElementById('kpi-today')!.textContent = String(todayRes.count ?? 0);
+      document.getElementById('kpi-pending')!.textContent = String(pendingRes.count ?? 0);
+      document.getElementById('kpi-week')!.textContent = String(weekRes.count ?? 0);
+      const revenue = (revenueRes.data ?? []).reduce((sum: number, r: any) => sum + (r.estimated_total_xof ?? 0), 0);
+      document.getElementById('kpi-revenue')!.textContent = fcfa(revenue);
+    }
 
     function renderResaCard(r: any) {
       const dateStr = r.scheduled_at
@@ -105,39 +250,209 @@ import AdminLayout from '@layouts/AdminLayout.astro';
       `;
     }
 
-    // À traiter en priorité (pending / confirmed à venir, max 5)
-    const { data: urgent } = await supa.from('reservations')
-      .select('id, service_type, guest_name, guest_phone, scheduled_at, status')
-      .in('status', ['pending', 'confirmed'])
-      .order('scheduled_at', { ascending: true })
-      .limit(5);
+    async function loadLists() {
+      // Urgents
+      const { data: urgent } = await supa.from('reservations')
+        .select('id, service_type, guest_name, guest_phone, scheduled_at, status')
+        .in('status', ['pending', 'confirmed'])
+        .order('scheduled_at', { ascending: true })
+        .limit(5);
 
-    document.getElementById('urgent-loading')!.hidden = true;
-    if (!urgent || urgent.length === 0) {
-      document.getElementById('urgent-empty')!.hidden = false;
-    } else {
-      const list = document.getElementById('urgent-list')!;
-      list.innerHTML = urgent.map(renderResaCard).join('');
-      list.hidden = false;
+      document.getElementById('urgent-loading')!.hidden = true;
+      const urgentList = document.getElementById('urgent-list')!;
+      const urgentEmpty = document.getElementById('urgent-empty')!;
+      if (!urgent || urgent.length === 0) {
+        urgentEmpty.hidden = false;
+        urgentList.hidden = true;
+      } else {
+        urgentList.innerHTML = urgent.map(renderResaCard).join('');
+        urgentList.hidden = false;
+        urgentEmpty.hidden = true;
+      }
+
+      // Upcoming
+      const { data: upcoming } = await supa.from('reservations')
+        .select('id, service_type, guest_name, guest_phone, scheduled_at, status')
+        .gte('scheduled_at', todayStart)
+        .lt('scheduled_at', weekEnd)
+        .in('status', ['assigned', 'in_progress'])
+        .order('scheduled_at', { ascending: true })
+        .limit(10);
+
+      document.getElementById('upcoming-loading')!.hidden = true;
+      const upcomingList = document.getElementById('upcoming-list')!;
+      const upcomingEmpty = document.getElementById('upcoming-empty')!;
+      if (!upcoming || upcoming.length === 0) {
+        upcomingEmpty.hidden = false;
+        upcomingList.hidden = true;
+      } else {
+        upcomingList.innerHTML = upcoming.map(renderResaCard).join('');
+        upcomingList.hidden = false;
+        upcomingEmpty.hidden = true;
+      }
     }
 
-    // Prochaines (assigned/in_progress, 7 jours, max 10)
-    const { data: upcoming } = await supa.from('reservations')
-      .select('id, service_type, guest_name, guest_phone, scheduled_at, status')
-      .gte('scheduled_at', todayStart)
-      .lt('scheduled_at', weekEnd)
-      .in('status', ['assigned', 'in_progress'])
-      .order('scheduled_at', { ascending: true })
-      .limit(10);
+    await loadKpis();
+    await loadLists();
 
-    document.getElementById('upcoming-loading')!.hidden = true;
-    if (!upcoming || upcoming.length === 0) {
-      document.getElementById('upcoming-empty')!.hidden = false;
-    } else {
-      const list = document.getElementById('upcoming-list')!;
-      list.innerHTML = upcoming.map(renderResaCard).join('');
-      list.hidden = false;
-    }
+    // ============= MODAL NOUVELLE RÉSERVATION =============
+    const newResaModal = document.getElementById('new-resa-modal')!;
+    const newResaForm = document.getElementById('new-resa-form') as HTMLFormElement;
+    const ncCustomerSelect = document.getElementById('nr-customer') as HTMLSelectElement;
+    const guestBlock = document.getElementById('nr-guest-block')!;
+
+    document.getElementById('open-new-resa')!.addEventListener('click', async () => {
+      // Charger la liste des clients pour le picker
+      const { data: customers } = await supa.from('profiles').select('id, full_name, phone').eq('role', 'customer').order('full_name').limit(500);
+      ncCustomerSelect.innerHTML = '<option value="">— Saisie manuelle (guest) —</option>' + (customers ?? []).map((c: any) => `<option value="${c.id}" data-name="${c.full_name ?? ''}" data-phone="${c.phone ?? ''}">${c.full_name ?? 'Sans nom'} — ${c.phone ?? '—'}</option>`).join('');
+      newResaForm.reset();
+      ncCustomerSelect.value = '';
+      guestBlock.style.display = '';
+      document.getElementById('nr-error')!.style.display = 'none';
+      document.getElementById('nr-success')!.style.display = 'none';
+      newResaModal.hidden = false;
+    });
+    document.getElementById('new-resa-close')!.addEventListener('click', () => newResaModal.hidden = true);
+    newResaModal.addEventListener('click', (e) => { if (e.target === newResaModal) newResaModal.hidden = true; });
+
+    ncCustomerSelect.addEventListener('change', () => {
+      const opt = ncCustomerSelect.selectedOptions[0];
+      if (ncCustomerSelect.value) {
+        // Auto-remplir guest fields à partir du client choisi
+        (document.getElementById('nr-name') as HTMLInputElement).value = opt.dataset.name ?? '';
+        (document.getElementById('nr-phone') as HTMLInputElement).value = opt.dataset.phone ?? '';
+      }
+    });
+
+    newResaForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById('nr-error')!;
+      const okEl = document.getElementById('nr-success')!;
+      errEl.style.display = 'none';
+      okEl.style.display = 'none';
+
+      const customerId = ncCustomerSelect.value || null;
+      const name = (document.getElementById('nr-name') as HTMLInputElement).value.trim();
+      const phone = (document.getElementById('nr-phone') as HTMLInputElement).value.trim();
+      const email = (document.getElementById('nr-email') as HTMLInputElement).value.trim();
+      const zone = (document.getElementById('nr-zone') as HTMLSelectElement).value;
+      const address = (document.getElementById('nr-address') as HTMLInputElement).value.trim();
+      const datetime = (document.getElementById('nr-datetime') as HTMLInputElement).value;
+      const total = Number((document.getElementById('nr-total') as HTMLInputElement).value) || null;
+      const status = (document.getElementById('nr-status') as HTMLSelectElement).value;
+      const notes = (document.getElementById('nr-notes') as HTMLTextAreaElement).value.trim();
+      const service = (document.getElementById('nr-service') as HTMLSelectElement).value;
+
+      if (!name || !phone || !zone || !address || !datetime) {
+        errEl.textContent = 'Veuillez remplir tous les champs obligatoires.';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      const payload: any = {
+        service_type: service,
+        user_id: customerId,
+        guest_name: name,
+        guest_phone: phone,
+        guest_email: email || null,
+        scheduled_at: new Date(datetime).toISOString(),
+        estimated_total_xof: total,
+        status,
+        deposit_status: 'none',
+        payload: {
+          address: { zone, street: address },
+          notes,
+          created_by: 'admin-manual',
+        },
+      };
+
+      const { error } = await supa.from('reservations').insert(payload);
+      if (error) {
+        errEl.textContent = error.message;
+        errEl.style.display = 'block';
+        return;
+      }
+      okEl.textContent = '✓ Réservation créée';
+      okEl.style.display = 'block';
+      setTimeout(async () => {
+        newResaModal.hidden = true;
+        await loadKpis();
+        await loadLists();
+      }, 800);
+    });
+
+    // ============= MODAL NOUVEAU CLIENT =============
+    const newCustomerModal = document.getElementById('new-customer-modal')!;
+    const newCustomerForm = document.getElementById('new-customer-form') as HTMLFormElement;
+
+    document.getElementById('open-new-customer')!.addEventListener('click', () => {
+      newCustomerForm.reset();
+      document.getElementById('nc-error')!.style.display = 'none';
+      document.getElementById('nc-success')!.style.display = 'none';
+      newCustomerModal.hidden = false;
+    });
+    document.getElementById('new-customer-close')!.addEventListener('click', () => newCustomerModal.hidden = true);
+    newCustomerModal.addEventListener('click', (e) => { if (e.target === newCustomerModal) newCustomerModal.hidden = true; });
+
+    document.getElementById('nc-gen-password')!.addEventListener('click', () => {
+      // Mot de passe 12 caractères, sans confusion (pas de 0/O/l/I)
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789@#$%';
+      let pwd = '';
+      for (let i = 0; i < 12; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+      (document.getElementById('nc-password') as HTMLInputElement).value = pwd;
+    });
+
+    newCustomerForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById('nc-error')!;
+      const okEl = document.getElementById('nc-success')!;
+      errEl.style.display = 'none';
+      okEl.style.display = 'none';
+
+      const name = (document.getElementById('nc-name') as HTMLInputElement).value.trim();
+      const phone = (document.getElementById('nc-phone') as HTMLInputElement).value.trim();
+      const email = (document.getElementById('nc-email') as HTMLInputElement).value.trim();
+      const password = (document.getElementById('nc-password') as HTMLInputElement).value;
+
+      if (!name || !phone || !email || password.length < 6) {
+        errEl.textContent = 'Veuillez remplir tous les champs (mot de passe ≥ 6 caractères).';
+        errEl.style.display = 'block';
+        return;
+      }
+
+      // On utilise un client Supabase temporaire SANS persistance de session,
+      // pour ne pas éjecter l'admin de sa propre session.
+      const url = (import.meta as any).env.PUBLIC_SUPABASE_URL;
+      const key = (import.meta as any).env.PUBLIC_SUPABASE_ANON_KEY;
+      const tempClient = createClient(url, key, {
+        auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+      });
+
+      const { data, error } = await tempClient.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: name, phone } },
+      });
+
+      if (error) {
+        errEl.textContent = error.message;
+        errEl.style.display = 'block';
+        return;
+      }
+
+      // Sign-out du temp client pour être propre
+      await tempClient.auth.signOut();
+
+      const waLink = `https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(
+        `Bonjour ${name},\n\nVotre compte Bovo est créé. Vous pouvez vous connecter ici :\n\nhttps://app.bovo.bj/compte/connexion\n\nEmail : ${email}\nMot de passe temporaire : ${password}\n\nÀ très vite,\nL'équipe Bovo.`
+      )}`;
+
+      okEl.innerHTML = `
+        <strong>✓ Compte créé.</strong><br>
+        <span style="font-size:0.84rem;">Email : ${email}<br>Mot de passe : <code style="background:#fff; padding:2px 6px; border-radius:4px;">${password}</code></span><br>
+        <a href="${waLink}" target="_blank" style="color: var(--bovo-bleu); font-weight:600; margin-top:8px; display:inline-block;">→ Envoyer les identifiants par WhatsApp</a>
+      `;
+      okEl.style.display = 'block';
+    });
   }
 </script>
-</AdminLayout>

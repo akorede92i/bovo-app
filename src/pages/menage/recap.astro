@@ -150,12 +150,25 @@ import Icon from '@components/Icon.astro';
     }
 
     // Toujours déclencher WhatsApp (notif admin + UX client)
-    const msg = encodeURIComponent(buildWhatsappMessage());
-    const adminWa = '2290196677743'; // numéro Bovo (cf. memory)
-    const url = `https://wa.me/${adminWa}?text=${msg}`;
+    const msg   = encodeURIComponent(buildWhatsappMessage());
+    const waUrl = `https://wa.me/2290196677743?text=${msg}`;
+    const wantAccount = sessionStorage.getItem('bovo:create-account') === '1';
+    const guestEmail  = cust?.email;
 
     clearState('menage');
-    // Petit délai pour que l'utilisateur voit l'état "envoi en cours"
-    setTimeout(() => { window.location.href = url; }, 400);
+    sessionStorage.removeItem('bovo:create-account');
+
+    if (wantAccount && guestEmail) {
+      // Ouvrir WhatsApp dans un onglet + rediriger vers inscription pré-remplie
+      window.open(waUrl, '_blank', 'noopener');
+      const iParams = new URLSearchParams({
+        email: guestEmail,
+        name:  cust?.fullName ?? '',
+        phone: cust?.phone   ?? '',
+      });
+      setTimeout(() => { window.location.href = `/compte/inscription/?${iParams}`; }, 300);
+    } else {
+      setTimeout(() => { window.location.href = waUrl; }, 400);
+    }
   });
 </script>

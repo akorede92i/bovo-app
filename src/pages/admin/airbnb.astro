@@ -1,0 +1,199 @@
+---
+import AdminLayout from '@layouts/AdminLayout.astro';
+---
+<AdminLayout title="Logements Airbnb — Bovo Admin" pageTitle="Airbnb" active="airbnb">
+  <p class="admin-sub">Vue globale des logements hosts et de leurs turnovers planifiés.</p>
+
+  <!-- KPIs Airbnb -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-label">Logements actifs</div>
+      <div class="kpi-value" id="kpi-properties">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">iCal connectés</div>
+      <div class="kpi-value" id="kpi-ical" style="color: var(--bovo-success);">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">Turnovers à venir</div>
+      <div class="kpi-value" id="kpi-upcoming" style="color: var(--bovo-bleu);">—</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-label">À assigner</div>
+      <div class="kpi-value" id="kpi-toassign" style="color: var(--bovo-warning);">—</div>
+    </div>
+  </div>
+
+  <h2 style="font-family: 'Jost', sans-serif; font-weight: 700; font-size: 1.1rem; margin: 24px 0 14px;">Logements hosts</h2>
+
+  <div id="props-loading" style="color: var(--bovo-muted); padding: 24px; text-align:center;">Chargement…</div>
+
+  <table id="props-table" class="admin-table admin-table-mobile" hidden>
+    <thead>
+      <tr>
+        <th>Logement</th>
+        <th>Host</th>
+        <th>Zone</th>
+        <th>Taille</th>
+        <th>iCal</th>
+        <th>Dernière sync</th>
+      </tr>
+    </thead>
+    <tbody id="props-body"></tbody>
+  </table>
+
+  <div id="props-mobile" class="mobile-cards" hidden></div>
+
+  <div id="props-empty" hidden class="empty-state">
+    <div class="empty-state-emoji">🏠</div>
+    <div class="empty-state-title">Aucun logement enregistré</div>
+    <div class="empty-state-desc">Les hosts pourront ajouter leurs logements depuis /compte/host.</div>
+  </div>
+
+  <h2 style="font-family: 'Jost', sans-serif; font-weight: 700; font-size: 1.1rem; margin: 32px 0 14px;">Prochains turnovers</h2>
+
+  <div id="tnv-loading" style="color: var(--bovo-muted); padding: 24px; text-align:center;">Chargement…</div>
+
+  <table id="tnv-table" class="admin-table admin-table-mobile" hidden>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Logement</th>
+        <th>Statut</th>
+        <th>Worker</th>
+      </tr>
+    </thead>
+    <tbody id="tnv-body"></tbody>
+  </table>
+
+  <div id="tnv-empty" hidden class="empty-state">
+    <div class="empty-state-emoji">📅</div>
+    <div class="empty-state-title">Aucun turnover planifié</div>
+    <div class="empty-state-desc">Les turnovers seront générés automatiquement à partir des calendriers iCal.</div>
+  </div>
+</AdminLayout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+  import { STATUS_LABELS, STATUS_COLORS } from '@lib/admin';
+
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('props-loading')!.textContent = 'Supabase non configuré.';
+    document.getElementById('tnv-loading')!.textContent = 'Supabase non configuré.';
+  } else {
+    const SIZE_LABELS: Record<string, string> = {
+      studio: 'Studio', f2: 'F2', f3: 'F3', f4: 'F4', villa: 'Villa',
+    };
+
+    // KPIs
+    const now = new Date().toISOString();
+
+    const [propsRes, icalRes, upcomingRes, toAssignRes] = await Promise.all([
+      supa.from('airbnb_properties').select('id', { count: 'exact', head: true }),
+      supa.from('airbnb_properties').select('id', { count: 'exact', head: true }).not('ical_url', 'is', null),
+      supa.from('airbnb_turnovers').select('id', { count: 'exact', head: true }).gte('check_out_at', now).neq('status', 'cancelled'),
+      supa.from('airbnb_turnovers').select('id', { count: 'exact', head: true }).gte('check_out_at', now).eq('status', 'pending'),
+    ]);
+
+    document.getElementById('kpi-properties')!.textContent = String(propsRes.count ?? 0);
+    document.getElementById('kpi-ical')!.textContent = String(icalRes.count ?? 0);
+    document.getElementById('kpi-upcoming')!.textContent = String(upcomingRes.count ?? 0);
+    document.getElementById('kpi-toassign')!.textContent = String(toAssignRes.count ?? 0);
+
+    // Logements + hosts
+    const { data: properties } = await supa.from('airbnb_properties').select('*').order('created_at', { ascending: false });
+    document.getElementById('props-loading')!.hidden = true;
+
+    if (!properties || properties.length === 0) {
+      document.getElementById('props-empty')!.hidden = false;
+    } else {
+      const ownerIds = [...new Set(properties.map((p: any) => p.owner_user_id))];
+      const { data: hosts } = await supa.from('profiles').select('id, full_name, phone').in('id', ownerIds);
+      const hostMap = new Map((hosts ?? []).map((h: any) => [h.id, h]));
+
+      const propsBody = document.getElementById('props-body')!;
+      const propsMobile = document.getElementById('props-mobile')!;
+
+      propsBody.innerHTML = properties.map((p: any) => {
+        const host = hostMap.get(p.owner_user_id) as any;
+        const synced = p.ical_last_synced_at ? new Date(p.ical_last_synced_at).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '<span style="color:var(--bovo-muted);">jamais</span>';
+        return `
+          <tr>
+            <td>
+              <div style="font-weight:600;">${p.label}</div>
+              <div style="font-size:0.8rem; color:var(--bovo-muted);">${p.street}${p.quartier ? `, ${p.quartier}` : ''}</div>
+            </td>
+            <td>
+              <div>${host?.full_name ?? '—'}</div>
+              <div style="font-size:0.8rem; color:var(--bovo-muted);">${host?.phone ?? ''}</div>
+            </td>
+            <td>${p.zone}</td>
+            <td>${SIZE_LABELS[p.size_type] ?? p.size_type}</td>
+            <td>${p.ical_url ? '<span class="status-badge" style="background:var(--bovo-success);">Connecté</span>' : '<span class="status-badge" style="background:var(--bovo-warning);">Sans iCal</span>'}</td>
+            <td style="font-size:0.84rem;">${synced}</td>
+          </tr>
+        `;
+      }).join('');
+      document.getElementById('props-table')!.hidden = false;
+
+      propsMobile.innerHTML = properties.map((p: any) => {
+        const host = hostMap.get(p.owner_user_id) as any;
+        return `
+          <div style="background:#fff; border:1px solid var(--bovo-line-soft); border-radius:var(--r-lg); padding:14px; margin-bottom:10px;">
+            <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+              <strong>${p.label}</strong>
+              ${p.ical_url ? '<span class="status-badge" style="background:var(--bovo-success);">iCal</span>' : '<span class="status-badge" style="background:var(--bovo-warning);">Sans iCal</span>'}
+            </div>
+            <div style="font-size:0.84rem; color:var(--bovo-muted); line-height:1.5;">
+              ${SIZE_LABELS[p.size_type] ?? p.size_type} · ${p.zone}<br>
+              Host : ${host?.full_name ?? '—'}
+            </div>
+          </div>
+        `;
+      }).join('');
+      propsMobile.hidden = false;
+    }
+
+    // Turnovers à venir
+    const { data: turnovers } = await supa.from('airbnb_turnovers')
+      .select('*')
+      .gte('check_out_at', now)
+      .neq('status', 'cancelled')
+      .order('check_out_at', { ascending: true })
+      .limit(50);
+
+    document.getElementById('tnv-loading')!.hidden = true;
+    if (!turnovers || turnovers.length === 0) {
+      document.getElementById('tnv-empty')!.hidden = false;
+    } else {
+      const propIds = [...new Set(turnovers.map((t: any) => t.property_id))];
+      const workerIds = [...new Set(turnovers.map((t: any) => t.assigned_worker_id).filter(Boolean))];
+
+      const [{ data: props }, { data: workers }] = await Promise.all([
+        supa.from('airbnb_properties').select('id, label').in('id', propIds),
+        workerIds.length ? supa.from('profiles').select('id, full_name').in('id', workerIds as string[]) : Promise.resolve({ data: [] }),
+      ]);
+
+      const propMap = new Map((props ?? []).map((p: any) => [p.id, p]));
+      const workerMap = new Map((workers ?? []).map((w: any) => [w.id, w]));
+
+      document.getElementById('tnv-body')!.innerHTML = turnovers.map((t: any) => {
+        const prop = propMap.get(t.property_id) as any;
+        const worker = workerMap.get(t.assigned_worker_id) as any;
+        return `
+          <tr>
+            <td>
+              <div style="font-weight:600;">${new Date(t.check_out_at).toLocaleDateString('fr-FR')}</div>
+              <div style="font-size:0.8rem; color:var(--bovo-muted);">${new Date(t.check_out_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} → ${new Date(t.check_in_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
+            </td>
+            <td>${prop?.label ?? '—'}</td>
+            <td><span class="status-badge" style="background:${STATUS_COLORS[t.status] ?? '#6B7280'};">${STATUS_LABELS[t.status] ?? t.status}</span></td>
+            <td>${worker?.full_name ?? '<span style="color:var(--bovo-muted);">non assigné</span>'}</td>
+          </tr>
+        `;
+      }).join('');
+      document.getElementById('tnv-table')!.hidden = false;
+    }
+  }
+</script>

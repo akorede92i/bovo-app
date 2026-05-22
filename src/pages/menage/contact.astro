@@ -27,9 +27,9 @@ import Icon from '@components/Icon.astro';
   </div>
 
   <div class="field">
-    <label class="field-label" for="email">Email (optionnel)</label>
+    <label class="field-label" for="email">Email</label>
     <input id="email" class="input" type="email" placeholder="vous@email.com" autocomplete="email" />
-    <span class="field-hint">Pour recevoir la confirmation et votre facture.</span>
+    <span class="field-hint" id="email-hint">Pour recevoir la confirmation et votre facture.</span>
   </div>
 
   <div class="field">
@@ -69,11 +69,25 @@ import Icon from '@components/Icon.astro';
     notes.value = s.customer.notes ?? '';
   }
 
+  // Indique que l'email est requis si la case "Créer un compte" est cochée
+  const emailHint = document.getElementById('email-hint')!;
+  createAccount.addEventListener('change', () => {
+    if (createAccount.checked) {
+      emailHint.textContent = 'Requis pour créer votre compte Bovo.';
+      (emailHint as HTMLElement).style.color = 'var(--bovo-bleu)';
+    } else {
+      emailHint.textContent = 'Pour recevoir la confirmation et votre facture.';
+      (emailHint as HTMLElement).style.color = '';
+    }
+    validate();
+  });
+
   function validPhone(v: string) {
     return v.replace(/\D/g, '').length >= 8;
   }
   function validate() {
-    cta.disabled = !(name.value.trim() && validPhone(phone.value));
+    const emailOk = createAccount.checked ? email.value.trim().includes('@') : true;
+    cta.disabled = !(name.value.trim() && validPhone(phone.value) && emailOk);
   }
   [name, phone, email, notes].forEach((el) => el.addEventListener('input', validate));
 

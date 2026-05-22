@@ -168,9 +168,24 @@ import Icon from '@components/Icon.astro';
       });
     }
 
-    const msg = encodeURIComponent(buildWhatsappMessage());
-    const url = `https://wa.me/2290196677743?text=${msg}`;
+    const msg   = encodeURIComponent(buildWhatsappMessage());
+    const waUrl = `https://wa.me/2290196677743?text=${msg}`;
+    const wantAccount = sessionStorage.getItem('bovo:create-account') === '1';
+    const guestEmail  = s.customer?.email;
+
     clearState('airbnb');
-    setTimeout(() => { window.location.href = url; }, 400);
+    sessionStorage.removeItem('bovo:create-account');
+
+    if (wantAccount && guestEmail) {
+      window.open(waUrl, '_blank', 'noopener');
+      const iParams = new URLSearchParams({
+        email: guestEmail,
+        name:  s.customer?.fullName ?? '',
+        phone: s.customer?.phone   ?? '',
+      });
+      setTimeout(() => { window.location.href = `/compte/inscription/?${iParams}`; }, 300);
+    } else {
+      setTimeout(() => { window.location.href = waUrl; }, 400);
+    }
   });
 </script>
