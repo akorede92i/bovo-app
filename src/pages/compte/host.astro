@@ -1,15 +1,17 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import Icon from '@components/Icon.astro';
+import CompteSidebar from '@components/CompteSidebar.astro';
 import { ZONES, AIRBNB_TURNOVERS } from '@lib/catalog';
 ---
 <Layout
   title="Mes logements Airbnb — Bovo"
-  topbar="back"
-  backHref="/compte/"
   pageTitle="Mes logements Airbnb"
+  shell="dashboard"
   noindex
 >
+  <Fragment slot="sidebar"><CompteSidebar active="host" /></Fragment>
+
   <div id="loading" style="text-align:center; padding:48px 20px;">
     <div class="text-muted">Chargement…</div>
   </div>

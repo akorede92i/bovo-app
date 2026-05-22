@@ -1,19 +1,32 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import Icon from '@components/Icon.astro';
+import CompteSidebar from '@components/CompteSidebar.astro';
 ---
 <Layout
   title="Mes réservations — Bovo"
-  topbar="back"
-  backHref="/compte/"
   pageTitle="Mes réservations"
+  shell="dashboard"
   noindex
 >
+  <Fragment slot="sidebar"><CompteSidebar active="reservations" /></Fragment>
+
   <div id="loading" style="text-align:center; padding:48px 20px;">
     <div class="text-muted">Chargement…</div>
   </div>
 
   <div id="content" hidden>
+    <!-- Flash message après dépôt d'avis -->
+    <div id="flash-review" hidden class="card card-elevated" style="margin-bottom:18px; background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.25);">
+      <div style="display:flex; align-items:flex-start; gap:12px;">
+        <div style="flex-shrink:0; color:#16a34a; font-weight:800; font-size:1.4rem; line-height:1;">✓</div>
+        <div>
+          <div style="font-family:'Jost'; font-weight:700; margin-bottom:2px;">Merci pour votre avis !</div>
+          <div class="text-muted" style="font-size:0.86rem;">Votre retour nous aide à améliorer la qualité de nos prestations.</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Filtres -->
     <div class="chips" style="margin-bottom:20px;">
       <button class="chip is-active" data-filter="all">Toutes</button>
@@ -47,19 +60,30 @@ import Icon from '@components/Icon.astro';
     const listEl = document.getElementById('reservations-list')!;
     const empty = document.getElementById('empty')!;
     let allReservations: Reservation[] = [];
+    let reviewedSet = new Set<string>();
     let currentFilter: 'all' | 'upcoming' | 'past' = 'all';
+
+    // Flash après dépôt d'avis
+    if (sessionStorage.getItem('bovo:flash') === 'review-thanks') {
+      sessionStorage.removeItem('bovo:flash');
+      const flash = document.getElementById('flash-review')!;
+      flash.hidden = false;
+      setTimeout(() => { flash.hidden = true; }, 6000);
+    }
 
     const labels: Record<string, string> = {
       menage: 'Ménage à domicile',
       airbnb: 'Service Airbnb',
       demenagement: 'Déménagement',
       chef: 'Chef à domicile',
+      plombier: 'Plombier à domicile',
     };
     const icons: Record<string, string> = {
       menage: 'broom',
       airbnb: 'airbnb',
       demenagement: 'truck',
       chef: 'chef',
+      plombier: 'wrench',
     };
     const statusConfig: Record<string, { label: string; color: string }> = {
       pending:     { label: 'En attente', color: 'var(--bovo-warning)' },
@@ -92,6 +116,8 @@ import Icon from '@components/Icon.astro';
           : 'Date à confirmer';
         const sc = statusConfig[r.status] ?? { label: r.status, color: 'var(--bovo-muted)' };
         const iconName = icons[r.service_type] ?? 'broom';
+        const canReview = r.status === 'done' && !reviewedSet.has(r.id);
+        const wasReviewed = r.status === 'done' && reviewedSet.has(r.id);
         const div = document.createElement('div');
         div.className = 'card card-elevated';
         div.innerHTML = `
@@ -107,6 +133,8 @@ import Icon from '@components/Icon.astro';
               <div class="text-muted" style="font-size:0.86rem; margin-bottom:6px;">${dateStr}</div>
               ${r.estimated_total_xof ? `<div style="font-family:'Jost'; font-weight:700; color: var(--bovo-bleu);">${fcfa(r.estimated_total_xof)}</div>` : ''}
               ${r.deposit_status === 'paid' ? '<div style="font-size:0.74rem; color: var(--bovo-success); margin-top:4px;">✓ Acompte payé</div>' : ''}
+              ${canReview ? `<a href="/compte/avis/?id=${r.id}" class="btn btn-primary btn-sm" style="margin-top:12px;">★ Laisser un avis</a>` : ''}
+              ${wasReviewed ? '<div style="font-size:0.78rem; color: var(--bovo-muted); margin-top:10px; display:flex; align-items:center; gap:4px;"><span style="color:#f5b400;">★</span> Avis déposé</div>' : ''}
             </div>
           </div>
         `;
@@ -117,7 +145,7 @@ import Icon from '@components/Icon.astro';
       listEl.querySelectorAll<HTMLElement>('[data-icon]').forEach((el) => {
         const name = el.getAttribute('data-icon');
         const map: Record<string, string> = {
-          broom: '🧹', airbnb: '🏠', truck: '🚚', chef: '👨‍🍳',
+          broom: '🧹', airbnb: '🏠', truck: '🚚', chef: '👨‍🍳', wrench: '🔧',
         };
         el.innerHTML = `<span style="font-size:1.4rem;">${map[name!] ?? '✦'}</span>`;
       });
@@ -132,16 +160,20 @@ import Icon from '@components/Icon.astro';
       });
     });
 
-    const { data, error } = await supa
-      .from('reservations')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('scheduled_at', { ascending: false, nullsFirst: false });
+    const [{ data, error }, { data: reviews }] = await Promise.all([
+      supa
+        .from('reservations')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('scheduled_at', { ascending: false, nullsFirst: false }),
+      supa.from('reviews').select('reservation_id').eq('customer_id', user.id),
+    ]);
 
     if (error) {
       listEl.innerHTML = `<div class="text-muted" style="color: var(--bovo-danger);">Erreur : ${error.message}</div>`;
     } else {
       allReservations = (data ?? []) as Reservation[];
+      reviewedSet = new Set((reviews ?? []).map((r: any) => r.reservation_id));
       render();
     }
 

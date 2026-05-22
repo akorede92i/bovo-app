@@ -1,14 +1,16 @@
 ---
 import Layout from '@layouts/Layout.astro';
 import Icon from '@components/Icon.astro';
+import CompteSidebar from '@components/CompteSidebar.astro';
 ---
 <Layout
   title="Mon compte — Bovo"
-  topbar="back"
-  backHref="/"
-  pageTitle="Mon compte"
+  pageTitle="Tableau de bord"
+  shell="dashboard"
   noindex
 >
+  <Fragment slot="sidebar"><CompteSidebar active="home" /></Fragment>
+
   <!-- Loading state -->
   <div id="loading" style="text-align:center; padding:48px 20px;">
     <div class="text-muted">Chargement…</div>
@@ -17,97 +19,162 @@ import Icon from '@components/Icon.astro';
   <!-- Content -->
   <div id="content" hidden>
     <!-- Greeting -->
-    <div class="card card-elevated" style="background: linear-gradient(135deg, var(--bovo-bleu-light), #fff); border-color:transparent; margin-bottom:20px;">
-      <div style="display:flex; gap:14px; align-items:center;">
-        <div style="flex-shrink:0; width:54px; height:54px; border-radius:50%; background: var(--bovo-bleu); color:#fff; display:flex; align-items:center; justify-content:center; font-family:'Jost'; font-weight:800; font-size:1.4rem;" id="avatar">B</div>
-        <div style="flex:1; min-width:0;">
-          <div style="font-family:'Jost'; font-weight:700; font-size:1.15rem;" id="hello">Bonjour 👋</div>
-          <div class="text-muted" id="user-email">—</div>
-        </div>
+    <div class="dash-greeting">
+      <div>
+        <div class="dash-greeting-tag">● Tableau de bord</div>
+        <h1 class="dash-greeting-title" id="hello">Bonjour 👋</h1>
+        <p class="dash-greeting-sub" id="user-email">—</p>
       </div>
+      <a href="/" class="btn btn-primary btn-sm dash-greeting-cta">
+        <Icon name="sparkles" size={16} /> Nouvelle réservation
+      </a>
     </div>
 
-    <!-- Stats rapides -->
-    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-bottom:24px;">
-      <div class="card card-elevated" style="text-align:center; padding:18px 12px;">
-        <div style="font-family:'Jost'; font-weight:800; font-size:1.6rem; color: var(--bovo-bleu);" id="stat-reservations">0</div>
-        <div class="text-muted" style="font-size:0.78rem;">Réservations</div>
+    <!-- Stats -->
+    <div class="grid-2 dash-stats">
+      <div class="dash-stat">
+        <div class="dash-stat-label">Réservations</div>
+        <div class="dash-stat-value" id="stat-reservations">0</div>
+        <div class="dash-stat-meta">Total depuis votre inscription</div>
       </div>
-      <div class="card card-elevated" style="text-align:center; padding:18px 12px;">
-        <div style="font-family:'Jost'; font-weight:800; font-size:1.6rem; color: var(--bovo-rouge);" id="stat-addresses">0</div>
-        <div class="text-muted" style="font-size:0.78rem;">Adresses sauvées</div>
+      <div class="dash-stat">
+        <div class="dash-stat-label">Adresses sauvées</div>
+        <div class="dash-stat-value" style="color: var(--bovo-rouge);" id="stat-addresses">0</div>
+        <div class="dash-stat-meta">Pour réserver en 1 clic</div>
       </div>
     </div>
 
     <!-- Prochaine résa -->
-    <div id="next-reservation" hidden style="margin-bottom:24px;">
-      <h2 class="h-section" style="margin-bottom:12px;">Votre prochaine prestation</h2>
+    <div id="next-reservation" hidden>
+      <h2 class="h-section" style="margin: 28px 0 12px;">Votre prochaine prestation</h2>
       <div class="card card-elevated" id="next-card"></div>
     </div>
 
-    <!-- Actions rapides -->
-    <h2 class="h-section" style="margin-bottom:12px;">Accès rapide</h2>
-    <div class="stack-md" style="margin-bottom:24px;">
-      <a href="/" class="svc-card">
-        <div class="svc-card-icon"><Icon name="sparkles" size={24} /></div>
-        <div class="svc-card-body">
-          <div class="svc-card-title">Nouvelle réservation</div>
-          <div class="svc-card-meta">Ménage, Airbnb, déménagement, chef</div>
+    <!-- Suggestions / quick CTAs -->
+    <h2 class="h-section" style="margin: 28px 0 12px;">Nos services</h2>
+    <div class="grid-2 dash-services">
+      <a href="/menage/" class="dash-service-card">
+        <div class="dash-service-icon"><Icon name="broom" size={22} /></div>
+        <div>
+          <div class="dash-service-title">Ménage</div>
+          <div class="dash-service-meta">Dès 7 000 FCFA</div>
         </div>
-        <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
       </a>
-      <a href="/compte/reservations/" class="svc-card">
-        <div class="svc-card-icon"><Icon name="calendar" size={24} /></div>
-        <div class="svc-card-body">
-          <div class="svc-card-title">Mes réservations</div>
-          <div class="svc-card-meta">Historique et prestations à venir</div>
+      <a href="/airbnb/" class="dash-service-card">
+        <div class="dash-service-icon" style="background: rgba(162,28,38,0.10); color: var(--bovo-rouge);"><Icon name="airbnb" size={22} /></div>
+        <div>
+          <div class="dash-service-title">Service Airbnb</div>
+          <div class="dash-service-meta">Dès 8 000 FCFA / turnover</div>
         </div>
-        <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
       </a>
-      <a href="/compte/adresses/" class="svc-card">
-        <div class="svc-card-icon rouge"><Icon name="pin" size={24} /></div>
-        <div class="svc-card-body">
-          <div class="svc-card-title">Mes adresses</div>
-          <div class="svc-card-meta">Pour réserver en 1 clic</div>
+      <a href="/demenagement/" class="dash-service-card">
+        <div class="dash-service-icon"><Icon name="truck" size={22} /></div>
+        <div>
+          <div class="dash-service-title">Déménagement</div>
+          <div class="dash-service-meta">Cartons inclus</div>
         </div>
-        <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
       </a>
-      <a href="/compte/host/" class="svc-card">
-        <div class="svc-card-icon rouge"><Icon name="airbnb" size={24} /></div>
-        <div class="svc-card-body">
-          <div class="svc-card-title">Mes logements Airbnb</div>
-          <div class="svc-card-meta">Calendriers iCal et turnovers</div>
+      <a href="/chef/" class="dash-service-card">
+        <div class="dash-service-icon" style="background: rgba(162,28,38,0.10); color: var(--bovo-rouge);"><Icon name="chef" size={22} /></div>
+        <div>
+          <div class="dash-service-title">Chef à domicile</div>
+          <div class="dash-service-meta">Engagement 1 mois min.</div>
         </div>
-        <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
-      </a>
-      <a href="/compte/parametres/" class="svc-card">
-        <div class="svc-card-icon"><Icon name="user" size={24} /></div>
-        <div class="svc-card-body">
-          <div class="svc-card-title">Paramètres</div>
-          <div class="svc-card-meta">Profil, notifications, déconnexion</div>
-        </div>
-        <div class="svc-card-arrow"><Icon name="chevron-right" size={20} /></div>
       </a>
     </div>
-
-    <!-- Lien admin (visible uniquement si role=admin) -->
-    <a href="/admin/" id="admin-link" hidden class="card card-elevated card-tap" style="margin-top:18px; background: var(--bovo-ink); color:#fff; display:flex; align-items:center; gap:14px; text-decoration:none; border-color: transparent;">
-      <div style="flex-shrink:0; width:44px; height:44px; border-radius: var(--r-md); background: rgba(255,255,255,0.1); color: #fff; display:flex; align-items:center; justify-content:center; font-size:1.4rem;">⚙️</div>
-      <div style="flex:1;">
-        <div style="font-family:'Jost'; font-weight:700;">Espace admin Bovo</div>
-        <div style="color:rgba(255,255,255,0.7); font-size:0.84rem;">Réservations, workers, planning</div>
-      </div>
-      <Icon name="chevron-right" size={20} />
-    </a>
-
-    <button id="signout-btn" class="btn btn-ghost btn-block" style="margin-top:24px;">
-      Se déconnecter
-    </button>
   </div>
 </Layout>
 
+<style>
+  .dash-greeting {
+    background: linear-gradient(135deg, var(--bovo-bleu-light) 0%, #fff 100%);
+    border-radius: var(--r-lg);
+    padding: 24px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .dash-greeting-tag {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    color: var(--bovo-bleu);
+    margin-bottom: 6px;
+  }
+  .dash-greeting-title {
+    font-family: 'Jost', sans-serif;
+    font-weight: 800;
+    font-size: 1.5rem;
+    color: var(--bovo-ink);
+    margin-bottom: 4px;
+    line-height: 1.2;
+  }
+  .dash-greeting-sub { color: var(--bovo-muted); font-size: 0.9rem; }
+  .dash-greeting-cta { flex-shrink: 0; }
+
+  .dash-stat {
+    background: #fff;
+    border-radius: var(--r-lg);
+    border: 1px solid var(--bovo-line-soft);
+    padding: 20px;
+  }
+  .dash-stat-label {
+    font-size: 0.74rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: var(--bovo-muted);
+    margin-bottom: 6px;
+  }
+  .dash-stat-value {
+    font-family: 'Jost', sans-serif;
+    font-weight: 800;
+    font-size: 2rem;
+    color: var(--bovo-bleu);
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .dash-stat-meta { font-size: 0.82rem; color: var(--bovo-muted); }
+
+  .dash-service-card {
+    background: #fff;
+    border: 1px solid var(--bovo-line-soft);
+    border-radius: var(--r-lg);
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: all var(--t-fast) var(--ease);
+  }
+  .dash-service-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--bovo-bleu);
+    box-shadow: 0 8px 24px rgba(68,112,179,0.08);
+  }
+  .dash-service-icon {
+    width: 42px; height: 42px;
+    border-radius: var(--r-md);
+    background: var(--bovo-bleu-light);
+    color: var(--bovo-bleu);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .dash-service-title { font-weight: 600; font-size: 0.95rem; margin-bottom: 2px; }
+  .dash-service-meta { font-size: 0.82rem; color: var(--bovo-muted); }
+
+  @media (max-width: 640px) {
+    .dash-greeting-cta { width: 100%; }
+  }
+</style>
+
 <script>
-  import { requireAuth, signOut } from '@lib/auth';
+  import { requireAuth } from '@lib/auth';
   import { getSupabase } from '@lib/supabase';
   import { fcfa } from '@lib/catalog';
 
@@ -116,18 +183,10 @@ import Icon from '@components/Icon.astro';
   if (!supa) {
     document.getElementById('loading')!.textContent = 'Service indisponible.';
   } else {
-    // Hello
     const name = user.profile?.full_name ?? user.email.split('@')[0];
     document.getElementById('hello')!.textContent = `Bonjour ${name.split(' ')[0]} 👋`;
     document.getElementById('user-email')!.textContent = user.email;
-    document.getElementById('avatar')!.textContent = name.slice(0, 1).toUpperCase();
 
-    // Lien admin si role=admin
-    if (user.profile?.role === 'admin') {
-      document.getElementById('admin-link')!.hidden = false;
-    }
-
-    // Stats + prochaine résa
     const [resCountRes, addrCountRes, nextRes] = await Promise.all([
       supa.from('reservations').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
       supa.from('addresses').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
@@ -153,6 +212,7 @@ import Icon from '@components/Icon.astro';
         airbnb: 'Service Airbnb',
         demenagement: 'Déménagement',
         chef: 'Chef à domicile',
+        plombier: 'Plombier',
       };
       const statusLabels: Record<string, string> = {
         pending: 'En attente',
@@ -178,6 +238,4 @@ import Icon from '@components/Icon.astro';
     document.getElementById('loading')!.hidden = true;
     document.getElementById('content')!.hidden = false;
   }
-
-  document.getElementById('signout-btn')?.addEventListener('click', () => signOut());
 </script>

@@ -1,0 +1,127 @@
+---
+// CompteSidebar.astro
+// Sidebar de navigation pour les pages /compte/* en mode dashboard.
+// À placer dans le slot "sidebar" du Layout avec shell="dashboard".
+import Icon from './Icon.astro';
+
+interface Props {
+  active?: 'home' | 'reservations' | 'adresses' | 'host' | 'parametres';
+}
+const { active = 'home' } = Astro.props;
+
+const nav = [
+  { id: 'home',         href: '/compte/',              label: 'Tableau de bord',  icon: 'home' as const },
+  { id: 'reservations', href: '/compte/reservations/', label: 'Mes réservations', icon: 'calendar' as const },
+  { id: 'adresses',     href: '/compte/adresses/',     label: 'Mes adresses',     icon: 'pin' as const },
+  { id: 'host',         href: '/compte/host/',         label: 'Logements Airbnb', icon: 'airbnb' as const },
+  { id: 'parametres',   href: '/compte/parametres/',   label: 'Paramètres',       icon: 'user' as const },
+];
+---
+
+<div class="compte-sb-head">
+  <div class="compte-sb-avatar" id="compte-sb-avatar" aria-hidden="true">B</div>
+  <div class="compte-sb-info">
+    <div class="compte-sb-name" id="compte-sb-name">Mon compte</div>
+    <div class="compte-sb-email" id="compte-sb-email">…</div>
+  </div>
+</div>
+
+<nav class="compte-sb-nav" aria-label="Navigation compte">
+  {nav.map((item) => (
+    <a href={item.href} class:list={['dash-nav-item', { 'is-active': item.id === active }]}>
+      <Icon name={item.icon} size={18} />
+      <span>{item.label}</span>
+    </a>
+  ))}
+
+  <a id="compte-sb-admin" href="/admin/" class="dash-nav-item compte-sb-admin" hidden>
+    <span style="font-size:1.05rem;">⚙️</span>
+    <span>Espace admin</span>
+  </a>
+</nav>
+
+<button id="compte-sb-signout" class="dash-nav-item compte-sb-signout" type="button">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+  </svg>
+  <span>Se déconnecter</span>
+</button>
+
+<style>
+  .compte-sb-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 4px 8px 18px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--bovo-line-soft);
+  }
+  .compte-sb-avatar {
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    background: var(--bovo-bleu);
+    color: #fff;
+    font-family: 'Jost', sans-serif;
+    font-weight: 800;
+    font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .compte-sb-info { min-width: 0; flex: 1; }
+  .compte-sb-name {
+    font-family: 'Jost', sans-serif;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: var(--bovo-ink);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .compte-sb-email {
+    font-size: 0.78rem;
+    color: var(--bovo-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .compte-sb-nav { display: flex; flex-direction: column; }
+  .compte-sb-admin {
+    background: var(--bovo-ink);
+    color: #fff !important;
+    margin-top: 18px;
+  }
+  .compte-sb-admin:hover { background: var(--bovo-ink); opacity: 0.9; }
+  .compte-sb-signout {
+    width: 100%;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    text-align: left;
+    margin-top: auto;
+    color: var(--bovo-rouge) !important;
+  }
+  .compte-sb-signout:hover { background: rgba(162,28,38,0.06) !important; }
+</style>
+
+<script>
+  import { getSessionUser, signOut } from '@lib/auth';
+
+  // On hydrate juste l'avatar/nom/email — la page principale fait sa propre requireAuth
+  getSessionUser().then((user) => {
+    if (!user) return;
+    const name = user.profile?.full_name ?? user.email.split('@')[0];
+    const nameEl = document.getElementById('compte-sb-name');
+    const emailEl = document.getElementById('compte-sb-email');
+    const avatarEl = document.getElementById('compte-sb-avatar');
+    if (nameEl) nameEl.textContent = name;
+    if (emailEl) emailEl.textContent = user.email;
+    if (avatarEl) avatarEl.textContent = name.slice(0, 1).toUpperCase();
+    if (user.profile?.role === 'admin') {
+      const a = document.getElementById('compte-sb-admin');
+      if (a) a.hidden = false;
+    }
+  });
+
+  document.getElementById('compte-sb-signout')?.addEventListener('click', () => signOut());
+</script>
