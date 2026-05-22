@@ -131,6 +131,7 @@ img, svg { display: block; max-width: 100%; }
 
   .app {
     width: 100%;
+    max-width: 560px; /* élargi sur tablette/desktop pour respirer */
     min-height: auto;
     border-radius: var(--r-xl);
     /* overflow: clip clips content to radius sans bloquer position: sticky */
@@ -143,6 +144,22 @@ img, svg { display: block; max-width: 100%; }
 
   .page {
     min-height: auto;
+  }
+
+  /* Trust pills : pas de scroll horizontal sur desktop, on wrap */
+  .trust-row {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    margin: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* ===== DESKTOP LARGE (≥ 1024px) ===== */
+@media (min-width: 1024px) {
+  .app {
+    max-width: 640px;
   }
 }
 
