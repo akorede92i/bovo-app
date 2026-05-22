@@ -41,28 +41,30 @@ import { ZONES } from '@lib/catalog';
     </div>
   </div>
 
-  <!-- ============ WORKFORCE ============ -->
-  <h2 class="dash-section">👥 Workforce</h2>
-  <div class="kpi-grid">
-    <div class="kpi">
-      <div class="kpi-label">Workers actifs</div>
-      <div class="kpi-value" id="kpi-workers-total">—</div>
-      <div class="kpi-trend">total équipe Bovo</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Placés aujourd'hui</div>
-      <div class="kpi-value" id="kpi-workers-busy" style="color: var(--bovo-success);">—</div>
-      <div class="kpi-trend">workers en mission</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Dispos aujourd'hui</div>
-      <div class="kpi-value" id="kpi-workers-free" style="color: var(--bovo-bleu);">—</div>
-      <div class="kpi-trend">non assignés</div>
-    </div>
-    <div class="kpi">
-      <div class="kpi-label">Taux occupation</div>
-      <div class="kpi-value" id="kpi-occupation">—</div>
-      <div class="kpi-trend">aujourd'hui</div>
+  <!-- ============ WORKFORCE (desktop only) ============ -->
+  <div class="desktop-only-section">
+    <h2 class="dash-section">👥 Workforce</h2>
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Workers actifs</div>
+        <div class="kpi-value" id="kpi-workers-total">—</div>
+        <div class="kpi-trend">total équipe Bovo</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Placés aujourd'hui</div>
+        <div class="kpi-value" id="kpi-workers-busy" style="color: var(--bovo-success);">—</div>
+        <div class="kpi-trend">workers en mission</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Dispos aujourd'hui</div>
+        <div class="kpi-value" id="kpi-workers-free" style="color: var(--bovo-bleu);">—</div>
+        <div class="kpi-trend">non assignés</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Taux occupation</div>
+        <div class="kpi-value" id="kpi-occupation">—</div>
+        <div class="kpi-trend">aujourd'hui</div>
+      </div>
     </div>
   </div>
 
@@ -595,11 +597,59 @@ import { ZONES } from '@lib/catalog';
     100% { box-shadow: 0 0 0 0 rgba(16,185,129,0); }
   }
 
-  /* ====== RESPONSIVE ====== */
+  /* ====== RESPONSIVE — VERSION MOBILE MINIMALISTE ====== */
   @media (max-width: 640px) {
-    .dash-actions { flex-direction: column; align-items: stretch; }
-    .search-wrap { max-width: 100%; }
-    .today-hour { width: 48px; font-size: 0.85rem; padding-right: 8px; }
+    /* Cacher tout ce qui est secondaire sur petit écran */
+    .desktop-only-section { display: none !important; }
+    .dash-col-side { display: none !important; }
+
+    /* Compacter le header */
+    .dash-actions {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .search-wrap { max-width: 100%; min-width: 0; }
+    .dash-actions .btn-sm { padding: 10px 14px; font-size: 0.92rem; }
+
+    /* KPI grid plus dense — 2 colonnes au lieu d'auto-fit */
+    .kpi-grid {
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+    .kpi { padding: 12px; }
+    .kpi-label { font-size: 0.7rem; margin-bottom: 4px; }
+    .kpi-value { font-size: 1.4rem; }
+    .kpi-trend { font-size: 0.72rem; margin-top: 4px; }
+
+    /* Sections plus serrées */
+    .dash-section { margin: 18px 0 10px; font-size: 0.78rem; }
+    .dash-block { margin-bottom: 22px; }
+    .dash-block-head h2 { font-size: 0.98rem; }
+
+    /* Timeline aujourd'hui compacte */
+    .today-hour {
+      width: 44px;
+      font-size: 0.82rem;
+      padding-right: 8px;
+      padding-top: 12px;
+    }
+    .resa-card { padding: 10px 12px; gap: 10px; }
+    .resa-card-icon { font-size: 1.3rem; }
+    .resa-card-title { font-size: 0.9rem; }
+    .resa-card-meta { font-size: 0.76rem; }
+    .today-assign-btn { padding: 8px 12px; font-size: 0.82rem; }
+
+    /* Filtres pills scrollables horizontalement */
+    .pills {
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      scrollbar-width: none;
+      -webkit-overflow-scrolling: touch;
+    }
+    .pills::-webkit-scrollbar { display: none; }
+    .pill { flex-shrink: 0; }
   }
 </style>
 
