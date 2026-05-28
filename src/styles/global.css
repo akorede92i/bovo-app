@@ -31,7 +31,13 @@ body {
   -moz-osx-font-smoothing: grayscale;
   min-height: 100vh;
   min-height: 100dvh;
-  overflow-x: hidden;
+  /* NOTE: overflow-x sur <body> casse window.scrollTo() et position: sticky
+     car body devient un scroll container distinct de <html>.
+     On le porte sur html via 'clip' qui ne crée pas de scroll container. */
+}
+
+html {
+  overflow-x: clip;
 }
 
 h1, h2, h3, h4, h5, h6 {
