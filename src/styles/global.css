@@ -187,6 +187,7 @@ img, svg { display: block; max-width: 100%; }
     top: 80px; /* sous la topbar */
     align-self: start;
     max-height: calc(100vh - 100px);
+    max-height: calc(100dvh - 100px);
     overflow-y: auto;
   }
   .tunnel-aside:empty { display: none; }
@@ -505,6 +506,7 @@ body[data-shell='dashboard'] {
 .page {
   padding: 24px var(--app-pad) 120px;
   min-height: calc(100vh - 60px);
+  min-height: calc(100dvh - 60px); /* suit l'address bar Android Chrome */
 }
 
 /* ===== TYPOGRAPHY HELPERS ===== */
