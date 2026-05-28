@@ -359,7 +359,10 @@ const plombierPriceFrom = Math.min(...PLOMBIER_TYPES.map((t) => t.priceXof));
   .home-hero-card-2 .home-hero-card-badge { background: rgba(68,112,179,0.10); color: var(--bovo-bleu); }
   .home-hero-card-3 { top: 320px; right: 10px; transform: rotate(-1deg); }
 
-  /* ============ SERVICES GRID (5 cards) ============ */
+  /* ============ SERVICES GRID (5 cards, layout 3+2) ============ */
+  /* On reste max à 3 colonnes : les 4e/5e cards descendent naturellement en
+     ligne 2. Plus aéré que 5-col aligné (cards trop étroites = titres
+     wrappés en 3 lignes). */
   .home-services {
     display: grid;
     grid-template-columns: 1fr;
@@ -369,12 +372,7 @@ const plombierPriceFrom = Math.min(...PLOMBIER_TYPES.map((t) => t.priceXof));
     .home-services { grid-template-columns: repeat(2, 1fr); gap: 20px; }
   }
   @media (min-width: 1024px) {
-    /* 5 cards → 3+2 sur ligne 1+2, mieux équilibré que 4+1 */
     .home-services { grid-template-columns: repeat(3, 1fr); gap: 24px; }
-  }
-  @media (min-width: 1280px) {
-    /* Sur très grand écran, 5 cards alignées sur une seule ligne */
-    .home-services { grid-template-columns: repeat(5, 1fr); gap: 18px; }
   }
 
   /* ============ SECTIONS ============ */
