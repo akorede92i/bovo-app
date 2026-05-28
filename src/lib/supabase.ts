@@ -60,7 +60,7 @@ export interface Reservation {
   guest_name: string | null;
   guest_phone: string | null;
   guest_email: string | null;
-  service_type: 'menage' | 'airbnb' | 'demenagement' | 'chef';
+  service_type: 'menage' | 'airbnb' | 'demenagement' | 'chef' | 'plombier';
   payload: Record<string, unknown>;
   address_id: string | null;
   scheduled_at: string | null;

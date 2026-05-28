@@ -1,0 +1,199 @@
+---
+import Layout from '@layouts/Layout.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Laisser un avis — Bovo"
+  topbar="back"
+  backHref="/compte/reservations/"
+  pageTitle="Laisser un avis"
+  noindex
+>
+  <div id="loading" style="text-align:center; padding:48px 20px;">
+    <div class="text-muted">Chargement…</div>
+  </div>
+
+  <div id="error" hidden class="card card-elevated" style="text-align:center; padding:32px 20px; background:#fff5f5; border-color:rgba(217,30,24,0.2);">
+    <div style="color: var(--bovo-danger); margin-bottom:12px;">
+      <Icon name="info" size={40} />
+    </div>
+    <div id="error-msg" style="font-family:'Jost'; font-weight:700; margin-bottom:6px;">Impossible de noter cette réservation</div>
+    <div id="error-detail" class="text-muted" style="margin-bottom:18px;"></div>
+    <a href="/compte/reservations/" class="btn btn-ghost">Retour à mes réservations</a>
+  </div>
+
+  <div id="content" hidden>
+    <!-- Récap de la résa -->
+    <div class="card card-elevated" id="reservation-summary" style="margin-bottom:24px;">
+      <div id="summary-body"></div>
+    </div>
+
+    <h1 class="h-display" style="margin-bottom:8px;">Comment s'est passée votre prestation&nbsp;?</h1>
+    <p class="text-lead" style="margin-bottom:24px;">Votre avis aide notre équipe à s'améliorer et guide les futurs clients.</p>
+
+    <!-- Notation par étoiles -->
+    <div class="field">
+      <label class="field-label">Votre note</label>
+      <div id="rating-stars" style="display:flex; gap:10px; padding:10px 0;">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button class="star-btn" data-rating={n} aria-label={`${n} étoile${n > 1 ? 's' : ''}`} style="background:none; border:none; cursor:pointer; padding:4px; color:var(--bovo-line-soft); transition: color 0.15s ease, transform 0.15s ease;">
+            <Icon name="star" size={36} />
+          </button>
+        ))}
+      </div>
+      <span id="rating-label" class="field-hint">Touchez une étoile pour noter</span>
+    </div>
+
+    <!-- Commentaire -->
+    <div class="field">
+      <label class="field-label" for="comment">Votre commentaire (optionnel)</label>
+      <textarea id="comment" class="textarea" placeholder="Ponctualité, qualité du travail, attitude de l'équipe…" maxlength="2000" rows="5"></textarea>
+      <span class="field-hint">Maximum 2000 caractères</span>
+    </div>
+
+    <CtaFooter buttonLabel="Envoyer mon avis" buttonType="button" buttonId="cta-submit" disabled={true} />
+  </div>
+</Layout>
+
+<style>
+  .star-btn.is-active { color: #f5b400; transform: scale(1.1); }
+  .star-btn:hover { color: #f5b400; }
+</style>
+
+<script>
+  import { requireAuth } from '@lib/auth';
+  import { getSupabase, type Reservation } from '@lib/supabase';
+  import { fcfa } from '@lib/catalog';
+
+  const labels: Record<string, string> = {
+    menage: 'Ménage à domicile',
+    airbnb: 'Service Airbnb',
+    demenagement: 'Déménagement',
+    chef: 'Chef à domicile',
+    plombier: 'Plombier à domicile',
+  };
+
+  const params = new URLSearchParams(window.location.search);
+  const reservationId = params.get('id');
+
+  const loadingEl = document.getElementById('loading')!;
+  const errorEl = document.getElementById('error')!;
+  const errorMsg = document.getElementById('error-msg')!;
+  const errorDetail = document.getElementById('error-detail')!;
+  const contentEl = document.getElementById('content')!;
+
+  function showError(msg: string, detail?: string) {
+    errorMsg.textContent = msg;
+    errorDetail.textContent = detail ?? '';
+    loadingEl.hidden = true;
+    contentEl.hidden = true;
+    errorEl.hidden = false;
+  }
+
+  if (!reservationId) {
+    showError('Réservation introuvable', 'Aucun identifiant fourni dans l\'URL.');
+  } else {
+    const user = await requireAuth();
+    const supa = getSupabase();
+
+    if (!supa) {
+      showError('Service indisponible', 'Le serveur n\'est pas joignable. Réessayez plus tard.');
+    } else {
+      // Récupère la résa
+      const { data: resa, error } = await supa
+        .from('reservations')
+        .select('*')
+        .eq('id', reservationId)
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (error || !resa) {
+        showError('Réservation introuvable', 'Cette réservation n\'existe pas ou ne vous appartient pas.');
+      } else if ((resa as Reservation).status !== 'done') {
+        showError('Prestation pas encore terminée', 'Vous pourrez noter cette prestation une fois qu\'elle sera marquée comme terminée par notre équipe.');
+      } else {
+        // Check si déjà notée
+        const { data: existing } = await supa
+          .from('reviews')
+          .select('id')
+          .eq('reservation_id', reservationId)
+          .maybeSingle();
+
+        if (existing) {
+          showError('Avis déjà déposé', 'Vous avez déjà noté cette prestation. Contactez-nous sur WhatsApp pour la modifier.');
+        } else {
+          mountForm(resa as Reservation);
+        }
+      }
+    }
+  }
+
+  function mountForm(resa: Reservation) {
+    // Remplir le récap
+    const dateStr = resa.scheduled_at
+      ? new Date(resa.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })
+      : 'Date à confirmer';
+    document.getElementById('summary-body')!.innerHTML = `
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">${labels[resa.service_type] ?? resa.service_type}</div>
+      <div class="text-muted" style="font-size:0.86rem;">${dateStr}</div>
+      ${resa.estimated_total_xof ? `<div style="font-family:'Jost'; font-weight:700; color: var(--bovo-bleu); margin-top:6px;">${fcfa(resa.estimated_total_xof)}</div>` : ''}
+    `;
+
+    loadingEl.hidden = true;
+    contentEl.hidden = false;
+
+    // Logique étoiles
+    let rating = 0;
+    const RATING_LABELS = ['', 'Très insatisfait', 'Insatisfait', 'Correct', 'Satisfait', 'Excellent'];
+    const stars = document.querySelectorAll<HTMLButtonElement>('.star-btn');
+    const ratingLabel = document.getElementById('rating-label')!;
+    const cta = document.getElementById('cta-submit') as HTMLButtonElement;
+    const comment = document.getElementById('comment') as HTMLTextAreaElement;
+
+    function renderStars() {
+      stars.forEach((s) => {
+        const n = Number(s.dataset.rating);
+        s.classList.toggle('is-active', n <= rating);
+      });
+      ratingLabel.textContent = rating > 0 ? `${rating}/5 — ${RATING_LABELS[rating]}` : 'Touchez une étoile pour noter';
+      cta.disabled = rating === 0;
+    }
+
+    stars.forEach((s) => {
+      s.addEventListener('click', () => {
+        rating = Number(s.dataset.rating);
+        renderStars();
+      });
+    });
+
+    cta.addEventListener('click', async () => {
+      if (rating === 0) return;
+      cta.disabled = true;
+      cta.textContent = 'Envoi…';
+
+      const supa = getSupabase()!;
+      const { error: insertErr } = await supa.from('reviews').insert({
+        reservation_id: resa.id,
+        customer_id: resa.user_id,
+        worker_id: resa.assigned_worker_id,
+        service_type: resa.service_type,
+        rating,
+        comment: comment.value.trim() || null,
+      });
+
+      if (insertErr) {
+        cta.disabled = false;
+        cta.textContent = 'Envoyer mon avis';
+        alert(`Erreur : ${insertErr.message}`);
+        return;
+      }
+
+      // Succès — redirection vers la liste avec un flash
+      sessionStorage.setItem('bovo:flash', 'review-thanks');
+      window.location.href = '/compte/reservations/';
+    });
+
+    renderStars();
+  }
+</script>

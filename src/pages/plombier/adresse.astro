@@ -1,0 +1,94 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import MapPicker from '@components/MapPicker.astro';
+import { ZONES } from '@lib/catalog';
+---
+<Layout
+  title="Plombier — Étape 3 : Adresse | Bovo"
+  topbar="back"
+  backHref="/plombier/options/"
+  pageTitle="Plombier à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={6} current={3} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Où intervenons-nous&nbsp;?</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Précisez votre zone et votre adresse exacte.</p>
+
+  <div class="field">
+    <label class="field-label" for="zone">Zone</label>
+    <select id="zone" class="select" required>
+      <option value="">Choisir une zone…</option>
+      {ZONES.map((z) => <option value={z}>{z}</option>)}
+    </select>
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="quartier">Quartier (optionnel)</label>
+    <input id="quartier" class="input" type="text" placeholder="ex. Haie Vive, Fidjrosse, Akpakpa…" />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="street">Adresse</label>
+    <input id="street" class="input" type="text" placeholder="Rue, numéro, repère" required />
+  </div>
+
+  <div class="field">
+    <label class="field-label" for="building">Précisions (étage, code, instructions)</label>
+    <textarea id="building" class="textarea" placeholder="ex. 2e étage, sonnez à Konaté, portail bleu"></textarea>
+  </div>
+
+  <MapPicker />
+
+  <CtaFooter buttonLabel="Continuer" buttonType="button" buttonId="cta-next" disabled={true} />
+</Layout>
+
+<script>
+  import { loadState, saveState, type PlombierState } from '@lib/state';
+
+  const zone = document.getElementById('zone') as HTMLSelectElement;
+  const quartier = document.getElementById('quartier') as HTMLInputElement;
+  const street = document.getElementById('street') as HTMLInputElement;
+  const building = document.getElementById('building') as HTMLTextAreaElement;
+  const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  const s = loadState<PlombierState>('plombier');
+  if (s.address) {
+    zone.value = s.address.zone ?? '';
+    quartier.value = s.address.quartier ?? '';
+    street.value = s.address.street ?? '';
+    building.value = s.address.building ?? '';
+    if (s.address.lat != null && s.address.lng != null) {
+      (window as any).bovoMapSetPos?.(s.address.lat, s.address.lng);
+    }
+  }
+
+  function validate() {
+    cta.disabled = !(zone.value && street.value.trim());
+  }
+  [zone, quartier, street, building].forEach((el) => el.addEventListener('input', validate));
+  zone.addEventListener('change', validate);
+
+  cta.addEventListener('click', () => {
+    const latRaw = (document.getElementById('map-lat') as HTMLInputElement)?.value;
+    const lngRaw = (document.getElementById('map-lng') as HTMLInputElement)?.value;
+    const lat = latRaw ? parseFloat(latRaw) : undefined;
+    const lng = lngRaw ? parseFloat(lngRaw) : undefined;
+
+    saveState<PlombierState>('plombier', {
+      address: {
+        zone: zone.value,
+        quartier: quartier.value.trim() || undefined,
+        street: street.value.trim(),
+        building: building.value.trim() || undefined,
+        lat: Number.isFinite(lat) ? lat : undefined,
+        lng: Number.isFinite(lng) ? lng : undefined,
+      },
+    });
+    window.location.href = '/plombier/creneau/';
+  });
+
+  validate();
+</script>

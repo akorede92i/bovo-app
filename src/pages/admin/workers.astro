@@ -20,6 +20,7 @@ import { ZONES } from '@lib/catalog';
         <th>Rôle</th>
         <th>Skills</th>
         <th>Zones</th>
+        <th>Note</th>
       </tr>
     </thead>
     <tbody id="list-body"></tbody>
@@ -72,9 +73,9 @@ import { ZONES } from '@lib/catalog';
   if (!supa) {
     document.getElementById('list-loading')!.textContent = 'Supabase non configuré.';
   } else {
-    const SKILLS = ['menage', 'airbnb', 'demenagement', 'chef'] as const;
+    const SKILLS = ['menage', 'airbnb', 'demenagement', 'chef', 'plombier'] as const;
     const SKILL_LABELS: Record<string, string> = {
-      menage: '🧹 Ménage', airbnb: '🏠 Airbnb', demenagement: '🚚 Déménagement', chef: '👨‍🍳 Chef',
+      menage: '🧹 Ménage', airbnb: '🏠 Airbnb', demenagement: '🚚 Déménagement', chef: '👨‍🍳 Chef', plombier: '🔧 Plombier',
     };
     const DAYS = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
 
@@ -118,11 +119,12 @@ import { ZONES } from '@lib/catalog';
         return;
       }
 
-      // Fetch skills et zones pour tous les workers
+      // Fetch skills, zones et reviews pour tous les workers
       const ids = workers.map((w: any) => w.id);
-      const [{ data: skills }, { data: zones }] = await Promise.all([
+      const [{ data: skills }, { data: zones }, { data: reviewRows }] = await Promise.all([
         supa.from('worker_skills').select('worker_id, skill').in('worker_id', ids),
         supa.from('worker_zones').select('worker_id, zone').in('worker_id', ids),
+        supa.from('reviews').select('worker_id, rating').in('worker_id', ids),
       ]);
 
       const skillsMap = new Map<string, string[]>();
@@ -137,6 +139,19 @@ import { ZONES } from '@lib/catalog';
         arr.push(z.zone);
         zonesMap.set(z.worker_id, arr);
       });
+      const reviewMap = new Map<string, { count: number; sum: number }>();
+      (reviewRows ?? []).forEach((rv: any) => {
+        const agg = reviewMap.get(rv.worker_id) ?? { count: 0, sum: 0 };
+        agg.count += 1;
+        agg.sum += rv.rating;
+        reviewMap.set(rv.worker_id, agg);
+      });
+      function ratingCell(workerId: string) {
+        const agg = reviewMap.get(workerId);
+        if (!agg || agg.count === 0) return '<span style="color:var(--bovo-muted);">—</span>';
+        const avg = (agg.sum / agg.count).toFixed(1).replace('.', ',');
+        return `<span style="font-weight:600;"><span style="color:#f5b400;">★</span> ${avg}<span style="color:var(--bovo-muted); font-weight:400;"> (${agg.count})</span></span>`;
+      }
 
       tableBody.innerHTML = workers.map((w: any) => {
         const ws = skillsMap.get(w.id) ?? [];
@@ -148,6 +163,7 @@ import { ZONES } from '@lib/catalog';
             <td>${w.role === 'admin' ? '<span class="status-badge" style="background:var(--bovo-rouge);">Admin</span>' : '<span class="status-badge" style="background:var(--bovo-bleu);">Worker</span>'}</td>
             <td style="font-size:0.84rem;">${ws.length ? ws.map((s: string) => SKILL_LABELS[s] ?? s).join(', ') : '<span style="color:var(--bovo-muted);">—</span>'}</td>
             <td style="font-size:0.84rem;">${wz.length ? wz.join(', ') : '<span style="color:var(--bovo-muted);">—</span>'}</td>
+            <td style="font-size:0.84rem;">${ratingCell(w.id)}</td>
           </tr>
         `;
       }).join('');
@@ -165,6 +181,7 @@ import { ZONES } from '@lib/catalog';
             <div style="font-size:0.84rem; color:var(--bovo-muted); margin-bottom:6px;">${w.phone ?? '—'}</div>
             <div style="font-size:0.82rem;">${ws.length ? ws.map((s: string) => SKILL_LABELS[s] ?? s).join(', ') : 'Aucun skill'}</div>
             <div style="font-size:0.82rem; color:var(--bovo-muted); margin-top:2px;">${wz.length ? wz.join(', ') : 'Aucune zone'}</div>
+            <div style="font-size:0.82rem; margin-top:6px;">${ratingCell(w.id)}</div>
           </div>
         `;
       }).join('');
@@ -179,12 +196,13 @@ import { ZONES } from '@lib/catalog';
       workerModalBody.innerHTML = '<div style="text-align:center; padding:40px; color:var(--bovo-muted);">Chargement…</div>';
       workerModal.hidden = false;
 
-      const [{ data: prof }, { data: skills }, { data: zones }, { data: avail }, { data: blackouts }] = await Promise.all([
+      const [{ data: prof }, { data: skills }, { data: zones }, { data: avail }, { data: blackouts }, { data: reviewsList }] = await Promise.all([
         supa.from('profiles').select('*').eq('id', id).maybeSingle(),
         supa.from('worker_skills').select('*').eq('worker_id', id),
         supa.from('worker_zones').select('*').eq('worker_id', id),
         supa.from('worker_availability').select('*').eq('worker_id', id).order('day_of_week'),
         supa.from('worker_blackouts').select('*').eq('worker_id', id).order('starts_at'),
+        supa.from('reviews').select('rating, comment, service_type, created_at').eq('worker_id', id).order('created_at', { ascending: false }).limit(20),
       ]);
 
       if (!prof) {
@@ -256,6 +274,25 @@ import { ZONES } from '@lib/catalog';
           <input id="new-bk-end" class="input" type="date" style="max-width:160px;" />
           <input id="new-bk-reason" class="input" type="text" placeholder="Motif (optionnel)" style="flex:1; min-width:180px;" />
           <button id="add-blackout" class="btn btn-ghost btn-sm">+ Ajouter</button>
+        </div>
+
+        <!-- AVIS CLIENTS -->
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Avis clients ${(() => {
+          const list = reviewsList ?? [];
+          if (list.length === 0) return '';
+          const avg = (list.reduce((s: number, r: any) => s + r.rating, 0) / list.length).toFixed(1).replace('.', ',');
+          return `<span style="font-weight:400; color:var(--bovo-muted); font-size:0.86rem;">— <span style="color:#f5b400;">★</span> ${avg}/5 sur ${list.length} avis</span>`;
+        })()}</h3>
+        <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:20px; font-size:0.86rem;">
+          ${(reviewsList ?? []).length === 0 ? '<div style="color:var(--bovo-muted);">Aucun avis client pour le moment.</div>' : (reviewsList ?? []).map((rv: any) => `
+            <div style="padding:8px 0; border-bottom:1px solid var(--bovo-line-soft);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <span style="font-weight:600;"><span style="color:#f5b400;">${'★'.repeat(rv.rating)}${'☆'.repeat(5 - rv.rating)}</span> <span style="color:var(--bovo-muted); font-weight:400;">${SKILL_LABELS[rv.service_type] ?? rv.service_type}</span></span>
+                <span style="color:var(--bovo-muted); font-size:0.78rem;">${new Date(rv.created_at).toLocaleDateString('fr-FR')}</span>
+              </div>
+              ${rv.comment ? `<div style="color:var(--bovo-ink-soft); line-height:1.5;">${rv.comment.replace(/</g, '&lt;')}</div>` : '<div style="color:var(--bovo-muted); font-style:italic;">(sans commentaire)</div>'}
+            </div>
+          `).join('')}
         </div>
 
         <!-- DANGER ZONE -->

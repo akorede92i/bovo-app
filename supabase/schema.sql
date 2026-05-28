@@ -64,7 +64,7 @@ create index if not exists addresses_user_idx on public.addresses(user_id);
 create table if not exists public.worker_skills (
   id uuid primary key default uuid_generate_v4(),
   worker_id uuid not null references auth.users(id) on delete cascade,
-  skill text not null check (skill in ('menage', 'airbnb', 'demenagement', 'chef')),
+  skill text not null check (skill in ('menage', 'airbnb', 'demenagement', 'chef', 'plombier')),
   level int default 1 check (level between 1 and 5),
   unique(worker_id, skill)
 );
@@ -144,7 +144,7 @@ create table if not exists public.reservations (
   guest_email text,
 
   -- service
-  service_type text not null check (service_type in ('menage', 'airbnb', 'demenagement', 'chef')),
+  service_type text not null check (service_type in ('menage', 'airbnb', 'demenagement', 'chef', 'plombier')),
   payload jsonb not null default '{}'::jsonb, -- les étapes du tunnel
 
   -- adresse (référence si user a compte, sinon stocké dans payload)
@@ -174,6 +174,23 @@ create index if not exists reservations_scheduled_idx on public.reservations(sch
 create index if not exists reservations_worker_idx on public.reservations(assigned_worker_id);
 
 -- ============================================
+-- REVIEWS — notes et avis après prestation
+-- ============================================
+create table if not exists public.reviews (
+  id uuid primary key default uuid_generate_v4(),
+  reservation_id uuid not null unique references public.reservations(id) on delete cascade,
+  customer_id uuid not null references auth.users(id) on delete cascade,
+  worker_id uuid references auth.users(id) on delete set null,
+  service_type text not null check (service_type in ('menage', 'airbnb', 'demenagement', 'chef', 'plombier')),
+  rating int not null check (rating between 1 and 5),
+  comment text,
+  created_at timestamptz not null default now()
+);
+create index if not exists reviews_worker_idx on public.reviews(worker_id);
+create index if not exists reviews_service_idx on public.reviews(service_type);
+create index if not exists reviews_customer_idx on public.reviews(customer_id);
+
+-- ============================================
 -- RLS POLICIES
 -- ============================================
 alter table public.profiles enable row level security;
@@ -185,6 +202,7 @@ alter table public.worker_skills enable row level security;
 alter table public.worker_zones enable row level security;
 alter table public.worker_availability enable row level security;
 alter table public.worker_blackouts enable row level security;
+alter table public.reviews enable row level security;
 
 -- helper : is_admin
 create or replace function public.is_admin()
@@ -241,6 +259,55 @@ create policy "owner reads turnovers" on public.airbnb_turnovers for select
     or (public.is_worker() and assigned_worker_id = auth.uid())
   );
 create policy "admin manages turnovers" on public.airbnb_turnovers for all using (public.is_admin());
+
+-- reviews
+-- Insert : le client peut noter UNIQUEMENT sa résa terminée (status='done')
+create policy "customer creates review for own done reservation" on public.reviews for insert
+  with check (
+    auth.uid() = customer_id
+    and exists (
+      select 1 from public.reservations r
+      where r.id = reservation_id
+        and r.user_id = auth.uid()
+        and r.status = 'done'
+    )
+  );
+-- Select : le client voit ses propres avis ; l'admin voit tout ; le worker voit les avis le concernant
+create policy "customer reads own reviews" on public.reviews for select
+  using (
+    auth.uid() = customer_id
+    or public.is_admin()
+    or (public.is_worker() and worker_id = auth.uid())
+  );
+-- Update / Delete : admin uniquement (un avis ne se modifie pas par le client une fois posté)
+create policy "admin manages reviews" on public.reviews for all using (public.is_admin());
+
+-- Fonction publique pour la note moyenne affichée sur la home (security definer car la table reviews est en RLS)
+create or replace function public.global_review_stats()
+returns table(review_count bigint, avg_rating numeric)
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select count(*)::bigint, coalesce(round(avg(rating)::numeric, 1), 0)::numeric
+  from public.reviews;
+$$;
+grant execute on function public.global_review_stats() to anon, authenticated;
+
+-- Fonction admin pour les stats par worker
+create or replace function public.worker_review_stats(p_worker_id uuid)
+returns table(review_count bigint, avg_rating numeric)
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select count(*)::bigint, coalesce(round(avg(rating)::numeric, 1), 0)::numeric
+  from public.reviews
+  where worker_id = p_worker_id;
+$$;
+grant execute on function public.worker_review_stats(uuid) to authenticated;
 
 -- ============================================
 -- NOTIFICATION WHATSAPP À CHAQUE NOUVELLE RÉSA

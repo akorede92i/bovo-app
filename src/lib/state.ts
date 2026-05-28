@@ -3,7 +3,7 @@
  * Survit aux changements de page (navigation Astro classique), perdu à la fermeture du tab.
  */
 
-export type ServiceKey = 'menage' | 'airbnb' | 'demenagement' | 'chef';
+export type ServiceKey = 'menage' | 'airbnb' | 'demenagement' | 'chef' | 'plombier';
 
 export interface CustomerInfo {
   fullName?: string;
@@ -91,7 +91,18 @@ export interface ChefState {
   wantsDeposit?: boolean;
 }
 
-export type AnyState = MenageState | AirbnbState | DemenagementState | ChefState;
+export interface PlombierState {
+  type?: string;          // urgence | reparation | installation | debouchage
+  description?: string;   // texte libre — précisions sur le problème
+  options?: string[];
+  date?: string;
+  slot?: string;
+  address?: AddressInfo;
+  customer?: CustomerInfo;
+  estimatedTotal?: number;
+}
+
+export type AnyState = MenageState | AirbnbState | DemenagementState | ChefState | PlombierState;
 
 const KEY_PREFIX = 'bovo:tunnel:';
 

@@ -124,6 +124,27 @@ export const CHEF_CUISINES = [
 ] as const;
 
 // ============================================
+// PLOMBIER À DOMICILE
+// ============================================
+export const PLOMBIER_BASE_XOF = 8000; // frais de déplacement de base
+
+export const PLOMBIER_TYPES = [
+  { id: 'urgence',      label: 'Urgence',      meta: 'Fuite, dégât des eaux, intervention rapide', priceXof: 15000, durationMin: 60 },
+  { id: 'reparation',   label: 'Réparation',   meta: 'Robinet, WC, siphon, chasse d\'eau',          priceXof: 10000, durationMin: 90 },
+  { id: 'installation', label: 'Installation', meta: 'Sanitaire, chauffe-eau, mitigeur',            priceXof: 18000, durationMin: 180 },
+  { id: 'debouchage',   label: 'Débouchage',   meta: 'Évier, douche, WC, canalisation',             priceXof: 12000, durationMin: 90 },
+] as const;
+export type PlombierTypeId = (typeof PLOMBIER_TYPES)[number]['id'];
+
+export const PLOMBIER_OPTIONS = [
+  { id: 'pieces',     label: 'Pièces fournies par Bovo',  meta: 'Robinetterie, joints standard',          priceXof: 5000 },
+  { id: 'urgence-2h', label: 'Intervention < 2h',         meta: 'Supplément urgence absolue',             priceXof: 8000 },
+  { id: 'devis',      label: 'Devis écrit avant travaux', meta: 'Vous validez le prix avant intervention', priceXof: 0 },
+  { id: 'soir',       label: 'Soir / weekend',            meta: 'En dehors des heures ouvrées',           priceXof: 4000 },
+] as const;
+export type PlombierOptionId = (typeof PLOMBIER_OPTIONS)[number]['id'];
+
+// ============================================
 // UTIL — FORMATAGE FCFA
 // ============================================
 export function fcfa(amount: number): string {

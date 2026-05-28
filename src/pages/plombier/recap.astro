@@ -1,0 +1,172 @@
+---
+import Layout from '@layouts/Layout.astro';
+import Stepper from '@components/Stepper.astro';
+import CtaFooter from '@components/CtaFooter.astro';
+import Icon from '@components/Icon.astro';
+---
+<Layout
+  title="Plombier — Récapitulatif | Bovo"
+  topbar="back"
+  backHref="/plombier/contact/"
+  pageTitle="Plombier à domicile"
+  noindex
+>
+  <Fragment slot="topbar-extra"><Stepper total={6} current={6} /></Fragment>
+
+  <h1 class="h-display" style="margin-bottom:8px;">Récapitulatif</h1>
+  <p class="text-lead" style="margin-bottom:24px;">Vérifiez les détails avant d'envoyer votre demande.</p>
+
+  <div class="stack-md" id="recap-cards">
+    <!-- Rempli en JS -->
+  </div>
+
+  <div class="card card-elevated" style="margin-top:18px; padding:18px; background: var(--bovo-bg-soft);">
+    <div class="text-muted" style="font-size:0.82rem; line-height:1.5;">
+      <Icon name="info" size={14} class="" />
+      Le tarif final dépend du diagnostic sur place — notre équipe vous confirme l'estimation par WhatsApp en moins d'1h.
+      Vous pouvez régler en espèces, en Mobile Money ou par virement à la prestation.
+    </div>
+  </div>
+
+  <CtaFooter buttonLabel="Envoyer ma demande" buttonType="button" buttonId="cta-submit" priceLabel="Estimation totale" priceValue="—" variant="rouge" />
+</Layout>
+
+<script>
+  import { loadState, clearState, type PlombierState } from '@lib/state';
+  import { getSupabase } from '@lib/supabase';
+  import { PLOMBIER_TYPES, PLOMBIER_OPTIONS, fcfa } from '@lib/catalog';
+
+  const s = loadState<PlombierState>('plombier');
+
+  // calcul final
+  const t = PLOMBIER_TYPES.find((x) => x.id === s.type);
+  const base = t?.priceXof ?? 0;
+  const opts = (s.options ?? []).map((id) => PLOMBIER_OPTIONS.find((o) => o.id === id)!).filter(Boolean);
+  const optsTotal = opts.reduce((sum, o) => sum + o.priceXof, 0);
+  const total = Math.round(base + optsTotal);
+
+  const addr = s.address;
+  const cust = s.customer;
+
+  function row(label: string, value: string) {
+    return `
+      <div class="flex-between" style="padding:10px 0; border-bottom:1px solid var(--bovo-line-soft);">
+        <span class="text-muted" style="font-size:0.84rem;">${label}</span>
+        <span style="font-weight:600; text-align:right;">${value}</span>
+      </div>
+    `;
+  }
+
+  const recapEl = document.getElementById('recap-cards')!;
+  recapEl.innerHTML = `
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Votre intervention</div>
+      ${row('Type', t?.label ?? '—')}
+      ${s.description ? row('Détails', s.description) : ''}
+      ${row('Durée estimée', `${t?.durationMin ?? 60} min`)}
+      ${opts.length ? row('Options', opts.map((o) => o.label).join(', ')) : ''}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Adresse</div>
+      ${row('Zone', addr?.zone ?? '—')}
+      ${addr?.quartier ? row('Quartier', addr.quartier) : ''}
+      ${row('Adresse', addr?.street ?? '—')}
+      ${addr?.building ? row('Précisions', addr.building) : ''}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Quand</div>
+      ${row('Date', s.date ?? '—')}
+      ${row('Créneau', s.slot ?? '—')}
+    </div>
+    <div class="card card-elevated">
+      <div style="font-family:'Jost'; font-weight:700; font-size:1rem; margin-bottom:6px;">Vos coordonnées</div>
+      ${row('Nom', cust?.fullName ?? '—')}
+      ${row('Téléphone', cust?.phone ?? '—')}
+      ${cust?.email ? row('Email', cust.email) : ''}
+      ${cust?.notes ? row('Notes', cust.notes) : ''}
+    </div>
+  `;
+
+  document.querySelector('.cta-footer .price-line strong')!.textContent = fcfa(total);
+
+  // ============= SOUMISSION =============
+  const cta = document.getElementById('cta-submit') as HTMLButtonElement;
+
+  function buildWhatsappMessage(): string {
+    const lines = [
+      '*Nouvelle demande Bovo — Plombier*',
+      '',
+      `Type : ${t?.label}`,
+      s.description ? `Détails : ${s.description}` : '',
+      `Durée estimée : ${t?.durationMin ?? 60} min`,
+      opts.length ? `Options : ${opts.map((o) => o.label).join(', ')}` : '',
+      '',
+      `Adresse : ${addr?.street}${addr?.quartier ? `, ${addr.quartier}` : ''}, ${addr?.zone}`,
+      addr?.building ? `Précisions : ${addr.building}` : '',
+      addr?.lat && addr?.lng ? `📍 https://maps.google.com/?q=${addr.lat},${addr.lng}` : '',
+      '',
+      `Date : ${s.date}`,
+      `Créneau : ${s.slot}`,
+      '',
+      `Client : ${cust?.fullName}`,
+      `Tél : ${cust?.phone}`,
+      cust?.email ? `Email : ${cust.email}` : '',
+      cust?.notes ? `Notes : ${cust.notes}` : '',
+      '',
+      `*Estimation : ${fcfa(total)}*`,
+    ].filter(Boolean);
+    return lines.join('\n');
+  }
+
+  cta.addEventListener('click', async () => {
+    cta.disabled = true;
+    cta.textContent = 'Envoi en cours…';
+
+    const payload = {
+      service_type: 'plombier' as const,
+      payload: {
+        type: s.type,
+        description: s.description,
+        options: s.options ?? [],
+        date: s.date,
+        slot: s.slot,
+        address: s.address,
+      },
+      estimated_total_xof: total,
+      duration_min: t?.durationMin ?? 60,
+      guest_name: cust?.fullName,
+      guest_phone: cust?.phone,
+      guest_email: cust?.email,
+      scheduled_at: s.date ? new Date(`${s.date}T${(s.slot ?? '08-10').split('-')[0]}:00:00`).toISOString() : null,
+      status: 'pending' as const,
+    };
+
+    let saved = false;
+    const supa = getSupabase();
+    if (supa) {
+      const { error } = await supa.from('reservations').insert(payload);
+      if (!error) saved = true;
+      else console.warn('[Bovo] Supabase insert failed, fallback to WhatsApp:', error.message);
+    }
+
+    const msg   = encodeURIComponent(buildWhatsappMessage());
+    const waUrl = `https://wa.me/2290196677743?text=${msg}`;
+    const wantAccount = sessionStorage.getItem('bovo:create-account') === '1';
+    const guestEmail  = cust?.email;
+
+    clearState('plombier');
+    sessionStorage.removeItem('bovo:create-account');
+
+    if (wantAccount && guestEmail) {
+      window.open(waUrl, '_blank', 'noopener');
+      const iParams = new URLSearchParams({
+        email: guestEmail,
+        name:  cust?.fullName ?? '',
+        phone: cust?.phone   ?? '',
+      });
+      setTimeout(() => { window.location.href = `/compte/inscription/?${iParams}`; }, 300);
+    } else {
+      setTimeout(() => { window.location.href = waUrl; }, 400);
+    }
+  });
+</script>
