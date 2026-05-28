@@ -37,7 +37,10 @@ body {
 }
 
 html {
-  overflow-x: clip;
+  /* hidden plutôt que clip : clip transforme <html> en non-scrollable et
+     bloque window.scrollTo() quand body dépasse. hidden garde le scroll Y
+     sur <html> (le scrollingElement). */
+  overflow-x: hidden;
 }
 
 h1, h2, h3, h4, h5, h6 {
