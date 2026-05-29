@@ -504,7 +504,10 @@ body[data-shell='dashboard'] {
 
 /* ===== MAIN CONTENT ===== */
 .page {
-  padding: 24px var(--app-pad) 120px;
+  /* 140px de padding-bottom : le CTA footer fixed avec price-line fait
+     jusqu'à ~130px (price 30 + button 52 + paddings 32 + safe-area), donc
+     120 laissait la dernière option partiellement cachée derrière le CTA. */
+  padding: 24px var(--app-pad) 140px;
   min-height: calc(100vh - 60px);
   min-height: calc(100dvh - 60px); /* suit l'address bar Android Chrome */
 }
