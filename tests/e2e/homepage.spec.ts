@@ -24,14 +24,15 @@ test.describe('Homepage', () => {
     await expect(page.getByRole('heading', { name: /Votre prestation/i })).toBeVisible();
     await expect(page.getByText(/Cotonou.*Calavi.*Porto-Novo/i)).toBeVisible();
 
-    // Section services : 5 cards visibles dans la grille
+    // Section services : 4 cards visibles dans la grille (Plombier caché jusqu'à
+    // application de la migration Supabase pour le CHECK constraint service_type)
     const cards = page.locator('.home-services .svc-card');
-    await expect(cards).toHaveCount(5);
+    await expect(cards).toHaveCount(4);
     await expect(cards.filter({ hasText: 'Ménage à domicile' })).toHaveCount(1);
     await expect(cards.filter({ hasText: 'Service Airbnb (hosts)' })).toHaveCount(1);
     await expect(cards.filter({ hasText: 'Déménagement' })).toHaveCount(1);
     await expect(cards.filter({ hasText: 'Chef à domicile' })).toHaveCount(1);
-    await expect(cards.filter({ hasText: 'Plombier à domicile' })).toHaveCount(1);
+    await expect(cards.filter({ hasText: 'Plombier à domicile' })).toHaveCount(0);
 
     // Comment ça marche : 3 étapes
     await expect(page.getByRole('heading', { name: 'Comment ça marche' })).toBeVisible();

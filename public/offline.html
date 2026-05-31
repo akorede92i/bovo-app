@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Hors ligne — Bovo</title>
+  <meta name="theme-color" content="#4470B3" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: 'Montserrat', system-ui, -apple-system, sans-serif;
+      background: #F7F8FA;
+      color: #1B2430;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      min-height: 100vh;
+      min-height: 100dvh;
+      -webkit-font-smoothing: antialiased;
+    }
+    .card {
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+    }
+    .logo {
+      font-family: 'Jost', system-ui, sans-serif;
+      font-weight: 800;
+      font-size: 34px;
+      letter-spacing: 0.5px;
+      color: #4470B3;
+      margin-bottom: 28px;
+    }
+    .logo .o { color: #A21C26; }
+    .icon {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 20px;
+      border-radius: 50%;
+      background: #EAF0F9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #4470B3;
+    }
+    h1 {
+      font-family: 'Jost', system-ui, sans-serif;
+      font-size: 22px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    p { color: #5A6472; font-size: 15px; line-height: 1.55; margin-bottom: 24px; }
+    .btn {
+      display: inline-block;
+      width: 100%;
+      padding: 15px 20px;
+      border-radius: 14px;
+      background: #4470B3;
+      color: #fff;
+      font-weight: 600;
+      font-size: 16px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(68, 112, 179, 0.28);
+    }
+    .btn:active { background: #345a8f; transform: scale(0.97); }
+    .wa {
+      display: block;
+      margin-top: 16px;
+      color: #25D366;
+      font-weight: 600;
+      font-size: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">B<span class="o">O</span>VO</div>
+    <div class="icon" aria-hidden="true">
+      <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M1 1l22 22" />
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+        <path d="M10.71 5.05A16 16 0 0 1 22.58 9" />
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+        <line x1="12" y1="20" x2="12.01" y2="20" />
+      </svg>
+    </div>
+    <h1>Vous êtes hors ligne</h1>
+    <p>Pas de connexion internet pour le moment. Vérifiez votre réseau, puis réessayez. Vos infos de réservation en cours sont sauvegardées.</p>
+    <button class="btn" onclick="location.reload()">Réessayer</button>
+    <a class="wa" href="https://wa.me/2290197199185" target="_blank" rel="noopener">Nous contacter sur WhatsApp</a>
+  </div>
+  <script>
+    // Recharge automatiquement dès que la connexion revient.
+    window.addEventListener('online', function () { location.reload(); });
+  </script>
+</body>
+</html>

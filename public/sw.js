@@ -2,12 +2,15 @@
  * Service worker Bovo — stratégie network-first avec fallback cache.
  * Cache les assets statiques (CSS, fonts, icônes) pour offline.
  */
-const VERSION = 'bovo-v1';
+const VERSION = 'bovo-v2';
 const STATIC_CACHE = `${VERSION}-static`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
+const OFFLINE_URL = '/offline.html';
+
 const STATIC_ASSETS = [
   '/',
+  '/offline.html',
   '/manifest.webmanifest',
   '/favicon.svg',
 ];
@@ -37,7 +40,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Network-first pour les pages HTML
+  // Network-first pour les pages HTML, avec fallback page offline dédiée.
   if (request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
       fetch(request)
@@ -46,7 +49,11 @@ self.addEventListener('fetch', (event) => {
           caches.open(RUNTIME_CACHE).then((c) => c.put(request, copy));
           return res;
         })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match('/')))
+        .catch(() =>
+          caches.match(request).then(
+            (cached) => cached || caches.match(OFFLINE_URL) || caches.match('/')
+          )
+        )
     );
     return;
   }

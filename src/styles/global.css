@@ -4,7 +4,8 @@
    Typo : Jost (titres), Montserrat (corps)
    ============================================ */
 
-@import url('https://fonts.googleapis.com/css2?family=Jost:wght@500;600;700;800&family=Montserrat:wght@400;500;600;700&display=swap');
+/* Polices chargées via <link> dans Layout.astro (head) — non bloquant après
+   parse du CSS, contrairement à @import. */
 
 /* ===== RESET ===== */
 *, *::before, *::after {
