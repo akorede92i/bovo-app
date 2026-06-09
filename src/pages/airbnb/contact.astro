@@ -9,6 +9,7 @@ import CtaFooter from '@components/CtaFooter.astro';
   backHref="/airbnb/planning/"
   pageTitle="Service Airbnb"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={7} /></Fragment>
 
@@ -39,7 +40,7 @@ import CtaFooter from '@components/CtaFooter.astro';
   <!-- Offre compte client -->
   <div class="card card-elevated" style="margin-top:24px; background: linear-gradient(135deg, var(--bovo-bleu-light), #fff); border-color: transparent;">
     <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer;">
-      <input type="checkbox" id="create-account" checked style="margin-top:3px; transform: scale(1.2); accent-color: var(--bovo-bleu);" />
+      <input type="checkbox" id="create-account" style="margin-top:3px; transform: scale(1.2); accent-color: var(--bovo-bleu);" />
       <span>
         <span style="font-weight:600; display:block; margin-bottom:4px;">Créer mon espace host Bovo</span>
         <span class="text-muted">Ajoutez d'autres logements, consultez les rapports après chaque turnover, suivez votre planning iCal en temps réel.</span>
@@ -52,6 +53,10 @@ import CtaFooter from '@components/CtaFooter.astro';
 
 <script>
   import { loadState, saveState, type AirbnbState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('name')) return;
 
   const name = document.getElementById('name') as HTMLInputElement;
   const phone = document.getElementById('phone') as HTMLInputElement;
@@ -83,8 +88,10 @@ import CtaFooter from '@components/CtaFooter.astro';
       },
     });
     sessionStorage.setItem('bovo:create-account', createAccount.checked ? '1' : '0');
-    window.location.href = '/airbnb/recap/';
+    navigate('/airbnb/recap/');
   });
 
   validate();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

@@ -30,6 +30,7 @@ export const SERVICE_LABELS: Record<string, string> = {
   airbnb: 'Airbnb',
   demenagement: 'Déménagement',
   chef: 'Chef',
+  plombier: 'Plombier',
 };
 
 export const SERVICE_ICONS: Record<string, string> = {
@@ -37,6 +38,7 @@ export const SERVICE_ICONS: Record<string, string> = {
   airbnb: '🏠',
   demenagement: '🚚',
   chef: '👨‍🍳',
+  plombier: '🔧',
 };
 
 export const STATUS_LABELS: Record<string, string> = {
@@ -56,3 +58,14 @@ export const STATUS_COLORS: Record<string, string> = {
   done: '#6B7280',        // muted
   cancelled: '#DC2626',   // danger
 };
+
+/**
+ * Échappe les caractères HTML dangereux avant injection via innerHTML.
+ * À appliquer sur TOUTE donnée d'origine client/DB (guest_*, payload, full_name…)
+ * rendue dans un template HTML — les réservations invité étant insérables par
+ * n'importe qui, le back-office est sinon vulnérable au XSS stocké.
+ */
+export function escapeHtml(s: string | null | undefined): string {
+  if (!s) return '';
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
+}

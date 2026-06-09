@@ -1,5 +1,6 @@
 ---
 import '@styles/global.css';
+import { ViewTransitions } from 'astro:transitions';
 
 interface Props {
   title?: string;
@@ -16,6 +17,14 @@ interface Props {
    * - 'dashboard'    : sidebar nav + content (compte/*)
    */
   shell?: 'app' | 'landing' | 'tunnel' | 'dashboard';
+  /**
+   * Active les View Transitions (navigation client app-like) sur cette page.
+   * Opt-in par page : la navigation entre 2 pages avec transitions=true est
+   * fluide, sinon Astro fait un rechargement complet (fallback sûr).
+   * IMPORTANT : tout script de page doit être (ré)initialisé sur
+   * `astro:page-load` et court-circuiter si son élément racine est absent.
+   */
+  transitions?: boolean;
 }
 
 const {
@@ -26,6 +35,7 @@ const {
   pageTitle,
   noindex = false,
   shell = 'app',
+  transitions = false,
 } = Astro.props;
 
 const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj').toString();
@@ -87,6 +97,8 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Jost:wght@500;600;700;800&family=Montserrat:wght@400;500;600;700&display=swap"
     />
+
+    {transitions && <ViewTransitions />}
 
     <slot name="head" />
   </head>
@@ -179,13 +191,23 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
       </div>
     )}
 
-    <!-- Register PWA service worker -->
+    <!-- Register PWA service worker (web only — désactivé dans l'app native
+         Capacitor, où il entrerait en conflit avec le serveur local). -->
+    <script is:inline>
+      (function () {
+        var isNative = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+        if (!isNative && 'serviceWorker' in navigator) {
+          window.addEventListener('load', function () {
+            navigator.serviceWorker.register('/sw.js').catch(function () {});
+          });
+        }
+      })();
+    </script>
+
+    <!-- Initialisation des fonctionnalités natives (no-op sur le web). -->
     <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
-        });
-      }
+      import { initNative } from '@lib/native';
+      initNative();
     </script>
 
     <!-- Mobile drawer toggle (landing + dashboard shells) -->

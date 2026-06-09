@@ -11,6 +11,7 @@ import { MENAGE_OPTIONS, fcfa } from '@lib/catalog';
   backHref="/menage/duree/"
   pageTitle="Ménage à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={3} /></Fragment>
 
@@ -43,6 +44,8 @@ import { MENAGE_OPTIONS, fcfa } from '@lib/catalog';
   import { loadState, saveState, type MenageState } from '@lib/state';
   import { MENAGE_HOURLY_XOF, MENAGE_OPTIONS, MENAGE_FREQUENCES, fcfa } from '@lib/catalog';
 
+  function init() {
+  if (!document.getElementById('opt-list')) return;
   const list = document.getElementById('opt-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
   const priceEl = document.querySelector('.cta-footer .price-line strong')!;
@@ -85,4 +88,6 @@ import { MENAGE_OPTIONS, fcfa } from '@lib/catalog';
   });
 
   render();
+  }
+  document.addEventListener('astro:page-load', init);
 </script>

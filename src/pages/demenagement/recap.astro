@@ -10,6 +10,7 @@ import Icon from '@components/Icon.astro';
   backHref="/demenagement/contact/"
   pageTitle="Déménagement"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={7} /></Fragment>
 
@@ -35,11 +36,19 @@ import Icon from '@components/Icon.astro';
 <script src="https://cdn.kkiapay.me/k.js"></script>
 
 <script>
-  import { loadState, clearState, type DemenagementState } from '@lib/state';
+  import { loadState, type DemenagementState } from '@lib/state';
   import { getSupabase } from '@lib/supabase';
+  import { getCurrentUserId, submitReservation, submitAndRedirect, navigateAfterSubmit, whatsappUrl, isOffline, showSubmitError } from '@lib/tunnel';
+  import { openDeposit, isKkiapayReady } from '@lib/kkiapay';
   import { DEM_VOLUMES, DEM_OPTIONS, DEM_ETAGE_SUPP_XOF, fcfa } from '@lib/catalog';
 
+  function init() {
+  if (!document.getElementById('recap-cards')) return;
+
   const s = loadState<DemenagementState>('demenagement');
+
+  // Garde d'étapes : recap atteint sans données → retour au début du tunnel.
+  if (!s.volume || !s.customer?.phone) { window.location.href = '/demenagement/'; return; }
   const vol = DEM_VOLUMES.find((v) => v.id === s.volume);
   const opts = (s.options ?? []).map((id) => DEM_OPTIONS.find((o) => o.id === id)!).filter(Boolean);
   const optsTotal = opts.reduce((sum, o) => sum + o.priceXof, 0);
@@ -138,9 +147,11 @@ import Icon from '@components/Icon.astro';
     return lines.filter(Boolean).join('\n');
   }
 
-  async function submitToSupabase(depositStatus: 'none' | 'paid' = 'none', kkiapayTx?: string) {
-    const payload = {
-      service_type: 'demenagement' as const,
+  // Le client ne peut écrire que 'none' ou 'pending' : le passage à 'paid' et
+  // l'enregistrement du tx Kkiapay se font côté serveur après vérification (cf. RLS).
+  function buildPayload(depositStatus: 'none' | 'pending') {
+    return {
+      service_type: 'demenagement',
       payload: {
         volume: s.volume, options: s.options ?? [],
         from: s.from, to: s.to, date: s.date, slot: s.slot,
@@ -150,68 +161,46 @@ import Icon from '@components/Icon.astro';
       guest_phone: s.customer?.phone,
       guest_email: s.customer?.email,
       scheduled_at: s.date ? new Date(`${s.date}T${(s.slot ?? '08-13').split('-')[0]}:00:00`).toISOString() : null,
-      status: 'pending' as const,
+      status: 'pending',
       deposit_status: depositStatus,
-      deposit_kkiapay_tx: kkiapayTx ?? null,
+      deposit_kkiapay_tx: null,
     };
-    const supa = getSupabase();
-    if (supa) {
-      const { error } = await supa.from('reservations').insert(payload);
-      if (error) console.warn('[Bovo] Supabase insert failed:', error.message);
-    }
   }
 
-  function goToWhatsapp() {
-    const msg   = encodeURIComponent(buildWhatsappMessage());
-    const waUrl = `https://wa.me/2290196677743?text=${msg}`;
-    const wantAccount = sessionStorage.getItem('bovo:create-account') === '1';
-    const guestEmail  = s.customer?.email;
-
-    clearState('demenagement');
-    sessionStorage.removeItem('bovo:create-account');
-
-    if (wantAccount && guestEmail) {
-      window.open(waUrl, '_blank', 'noopener');
-      const iParams = new URLSearchParams({
-        email: guestEmail,
-        name:  s.customer?.fullName ?? '',
-        phone: s.customer?.phone   ?? '',
-      });
-      setTimeout(() => { window.location.href = `/compte/inscription/?${iParams}`; }, 300);
-    } else {
-      setTimeout(() => { window.location.href = waUrl; }, 400);
-    }
-  }
-
-  cta.addEventListener('click', async () => {
-    cta.disabled = true;
-    cta.textContent = 'Envoi en cours…';
-
-    if (s.wantsDeposit && typeof (window as any).openKkiapayWidget === 'function') {
-      // Lance Kkiapay pour l'acompte
-      (window as any).openKkiapayWidget({
-        amount: deposit,
-        api_key: import.meta.env.PUBLIC_KKIAPAY_PUBLIC_KEY ?? 'DEMO',
-        callback: '',
-        position: 'center',
-        sandbox: true,
-        data: 'demenagement',
-        theme: '#4470B3',
-        name: s.customer?.fullName ?? '',
-        email: s.customer?.email ?? '',
-        phone: s.customer?.phone ?? '',
-      });
-      (window as any).addKkiapayListener?.('success', async (resp: any) => {
-        await submitToSupabase('paid', resp?.transactionId);
-        goToWhatsapp();
-      });
-      (window as any).addKkiapayListener?.('failed', async () => {
-        await submitToSupabase('none');
-        goToWhatsapp();
+  cta.addEventListener('click', () => {
+    // Avec acompte : passage par le widget Kkiapay (sandbox piloté par l'env, jamais 'paid' en dur).
+    if (s.wantsDeposit && isKkiapayReady()) {
+      if (isOffline()) {
+        showSubmitError('Vous semblez hors-ligne. Vérifiez votre connexion et réessayez — vos informations sont conservées.');
+        return;
+      }
+      cta.disabled = true;
+      cta.textContent = 'Envoi en cours…';
+      const finish = async (depositStatus: 'none' | 'pending') => {
+        const supa = getSupabase();
+        const userId = await getCurrentUserId(supa);
+        await submitReservation(supa, { ...buildPayload(depositStatus), user_id: userId });
+        navigateAfterSubmit('demenagement', whatsappUrl(buildWhatsappMessage()), s.customer);
+      };
+      openDeposit({
+        amountXof: deposit,
+        customerName: s.customer?.fullName,
+        customerEmail: s.customer?.email,
+        customerPhone: s.customer?.phone,
+        reason: 'Acompte déménagement Bovo',
+        onSuccess: () => finish('pending'),
+        onFailed: () => finish('none'),
       });
     } else {
-      await submitToSupabase(s.wantsDeposit ? 'pending' : 'none');
-      goToWhatsapp();
+      void submitAndRedirect({
+        service: 'demenagement',
+        payload: buildPayload(s.wantsDeposit ? 'pending' : 'none'),
+        message: buildWhatsappMessage(),
+        customer: s.customer,
+        cta,
+      });
     }
   });
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

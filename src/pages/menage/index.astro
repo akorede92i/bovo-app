@@ -10,6 +10,7 @@ import { MENAGE_LOGEMENTS } from '@lib/catalog';
   backHref="/"
   pageTitle="Ménage à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra">
     <Stepper total={7} current={1} />
@@ -41,7 +42,10 @@ import { MENAGE_LOGEMENTS } from '@lib/catalog';
 
 <script>
   import { loadState, saveState, type MenageState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
 
+  function init() {
+  if (!document.getElementById('logement-list')) return;
   const list = document.getElementById('logement-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
   let current = loadState<MenageState>('menage').logement ?? '';
@@ -65,8 +69,10 @@ import { MENAGE_LOGEMENTS } from '@lib/catalog';
 
   cta.addEventListener('click', () => {
     if (!current) return;
-    window.location.href = '/menage/duree/';
+    navigate('/menage/duree/');
   });
 
   render();
+  }
+  document.addEventListener('astro:page-load', init);
 </script>

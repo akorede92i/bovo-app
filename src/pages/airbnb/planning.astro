@@ -4,10 +4,6 @@ import Stepper from '@components/Stepper.astro';
 import CtaFooter from '@components/CtaFooter.astro';
 import Icon from '@components/Icon.astro';
 
-const tomorrow = new Date();
-tomorrow.setDate(tomorrow.getDate() + 1);
-const minDate = tomorrow.toISOString().slice(0, 10);
-
 const SLOTS = [
   { id: '11-13', label: '11:00 — 13:00', meta: 'Standard check-out → check-in' },
   { id: '13-15', label: '13:00 — 15:00', meta: 'Créneau court' },
@@ -26,6 +22,7 @@ const DURATIONS = [
   backHref="/airbnb/adresse/"
   pageTitle="Service Airbnb"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={6} /></Fragment>
 
@@ -36,7 +33,7 @@ const DURATIONS = [
   <div id="block-ponctuel" hidden>
     <div class="field">
       <label class="field-label" for="ponctuel-date">Date du turnover</label>
-      <input id="ponctuel-date" class="input" type="date" min={minDate} />
+      <input id="ponctuel-date" class="input" type="date" />
     </div>
     <div class="field" style="margin-top:18px;">
       <span class="field-label">Créneau souhaité</span>
@@ -74,7 +71,7 @@ const DURATIONS = [
 
     <div class="field">
       <label class="field-label" for="start-date">Date de démarrage</label>
-      <input id="start-date" class="input" type="date" min={minDate} />
+      <input id="start-date" class="input" type="date" />
     </div>
 
     <div class="field" style="margin-top:18px;">
@@ -98,9 +95,18 @@ const DURATIONS = [
 
 <script>
   import { loadState, saveState, type AirbnbState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('block-ponctuel')) return;
 
   const s = loadState<AirbnbState>('airbnb');
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  // date minimum = demain (calculée au runtime, pas au build)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().slice(0, 10);
 
   const blockPonctuel = document.getElementById('block-ponctuel')!;
   const blockRecurrent = document.getElementById('block-recurrent')!;
@@ -117,6 +123,7 @@ const DURATIONS = [
 
   // PONCTUEL
   const ponctuelDate = document.getElementById('ponctuel-date') as HTMLInputElement;
+  if (ponctuelDate) ponctuelDate.min = minDate;
   const slotList = document.getElementById('slot-list');
   let slot = s.ponctuelSlot ?? '';
   if (s.ponctuelDate && ponctuelDate) ponctuelDate.value = s.ponctuelDate;
@@ -131,6 +138,7 @@ const DURATIONS = [
   // RÉCURRENT
   const icalUrl = document.getElementById('ical-url') as HTMLInputElement | null;
   const startDate = document.getElementById('start-date') as HTMLInputElement | null;
+  if (startDate) startDate.min = minDate;
   const durationList = document.getElementById('duration-list');
   let duration = s.durationMonths ?? 0;
   if (icalUrl && s.icalUrl) icalUrl.value = s.icalUrl;
@@ -173,21 +181,35 @@ const DURATIONS = [
 
   cta.addEventListener('click', () => {
     if (s.mode === 'recurrent') {
+      if (startDate?.value && startDate.value < minDate) {
+        startDate.value = '';
+        validate();
+        alert('Cette date de démarrage n\'est plus disponible. Merci de choisir une nouvelle date.');
+        return;
+      }
       saveState<AirbnbState>('airbnb', {
         icalUrl: icalUrl?.value.trim(),
         startDate: startDate?.value,
         durationMonths: duration,
       });
     } else {
+      if (ponctuelDate?.value && ponctuelDate.value < minDate) {
+        ponctuelDate.value = '';
+        validate();
+        alert('Cette date n\'est plus disponible. Merci de choisir une nouvelle date.');
+        return;
+      }
       saveState<AirbnbState>('airbnb', {
         ponctuelDate: ponctuelDate.value,
         ponctuelSlot: slot,
       });
     }
-    window.location.href = '/airbnb/contact/';
+    navigate('/airbnb/contact/');
   });
 
   renderSlot();
   renderDuration();
   validate();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

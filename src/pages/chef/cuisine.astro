@@ -11,6 +11,7 @@ import { CHEF_CUISINES } from '@lib/catalog';
   backHref="/chef/duree/"
   pageTitle="Chef à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={3} /></Fragment>
 
@@ -34,6 +35,10 @@ import { CHEF_CUISINES } from '@lib/catalog';
 
 <script>
   import { loadState, saveState, type ChefState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('cuisine-list')) return;
 
   const list = document.getElementById('cuisine-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
@@ -59,8 +64,10 @@ import { CHEF_CUISINES } from '@lib/catalog';
 
   cta.addEventListener('click', () => {
     if (cuisines.size === 0) return;
-    window.location.href = '/chef/preferences/';
+    navigate('/chef/preferences/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

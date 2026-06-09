@@ -10,6 +10,7 @@ import { PLOMBIER_TYPES, fcfa } from '@lib/catalog';
   backHref="/"
   pageTitle="Plombier à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra">
     <Stepper total={6} current={1} />
@@ -46,6 +47,10 @@ import { PLOMBIER_TYPES, fcfa } from '@lib/catalog';
 
 <script>
   import { loadState, saveState, type PlombierState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('type-list')) return;
 
   const list = document.getElementById('type-list')!;
   const desc = document.getElementById('description') as HTMLTextAreaElement;
@@ -76,8 +81,10 @@ import { PLOMBIER_TYPES, fcfa } from '@lib/catalog';
 
   cta.addEventListener('click', () => {
     if (!current) return;
-    window.location.href = '/plombier/options/';
+    navigate('/plombier/options/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

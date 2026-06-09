@@ -210,33 +210,6 @@ const chefPriceFrom = CHEF_FREQUENCES[0].baseXof;
   </footer>
 </Layout>
 
-<script>
-  // Note moyenne globale chargée dynamiquement depuis Supabase.
-  // ⚠️ Désactivé tant que la migration 20260522_plombier_and_reviews.sql
-  // (qui définit la fonction RPC public.global_review_stats()) n'a pas
-  // été appliquée en prod. Chaque appel à la RPC inexistante générait un
-  // 404 réseau bruyant à chaque page load.
-  // Pour réactiver : appliquer la migration côté Supabase + retirer le `if (false)`.
-  import { getSupabase } from '@lib/supabase';
-
-  const supa = getSupabase();
-  if (false && supa) {
-    const { data, error } = await supa.rpc('global_review_stats');
-    if (!error && Array.isArray(data) && data.length > 0) {
-      const row = data[0] as { review_count: number; avg_rating: number };
-      const count = Number(row.review_count ?? 0);
-      const avg = Number(row.avg_rating ?? 0);
-      if (count > 0 && avg > 0) {
-        const target = document.querySelector('#trust-rating [data-rating-text]');
-        if (target) {
-          const formatted = avg.toFixed(1).replace('.', ',');
-          target.textContent = `${formatted}/5 · ${count} avis`;
-        }
-      }
-    }
-  }
-</script>
-
 <style>
   /* ============ HERO ============ */
   .home-hero {

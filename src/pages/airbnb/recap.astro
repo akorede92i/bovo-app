@@ -10,6 +10,7 @@ import Icon from '@components/Icon.astro';
   backHref="/airbnb/contact/"
   pageTitle="Service Airbnb"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={7} /></Fragment>
 
@@ -29,11 +30,17 @@ import Icon from '@components/Icon.astro';
 </Layout>
 
 <script>
-  import { loadState, clearState, type AirbnbState } from '@lib/state';
-  import { getSupabase } from '@lib/supabase';
+  import { loadState, type AirbnbState } from '@lib/state';
+  import { submitAndRedirect } from '@lib/tunnel';
   import { AIRBNB_TURNOVERS, AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
 
+  function init() {
+  if (!document.getElementById('recap-cards')) return;
+
   const s = loadState<AirbnbState>('airbnb');
+
+  // Garde d'étapes : recap atteint sans données → retour au début du tunnel.
+  if (!s.size || !s.customer?.phone) { window.location.href = '/airbnb/'; return; }
   const size = AIRBNB_TURNOVERS.find((t) => t.id === s.size);
   const opts = (s.options ?? []).map((id) => AIRBNB_OPTIONS.find((o) => o.id === id)!).filter(Boolean);
   const optsTotal = opts.reduce((sum, o) => sum + o.priceXof, 0);
@@ -136,57 +143,35 @@ import Icon from '@components/Icon.astro';
     return lines.filter(Boolean).join('\n');
   }
 
-  cta.addEventListener('click', async () => {
-    cta.disabled = true;
-    cta.textContent = 'Envoi en cours…';
-
-    const payload = {
-      service_type: 'airbnb' as const,
+  cta.addEventListener('click', () => {
+    void submitAndRedirect({
+      service: 'airbnb',
       payload: {
-        size: s.size, options: s.options ?? [], mode: s.mode,
-        propertyCount: s.propertyCount,
-        address: s.address, access: s.access,
-        ponctuelDate: s.ponctuelDate, ponctuelSlot: s.ponctuelSlot,
-        icalUrl: s.icalUrl, startDate: s.startDate, durationMonths: s.durationMonths,
+        service_type: 'airbnb',
+        payload: {
+          size: s.size, options: s.options ?? [], mode: s.mode,
+          propertyCount: s.propertyCount,
+          address: s.address, access: s.access,
+          ponctuelDate: s.ponctuelDate, ponctuelSlot: s.ponctuelSlot,
+          icalUrl: s.icalUrl, startDate: s.startDate, durationMonths: s.durationMonths,
+        },
+        estimated_total_xof: total,
+        duration_min: size?.durationMin ?? null,
+        guest_name: s.customer?.fullName,
+        guest_phone: s.customer?.phone,
+        guest_email: s.customer?.email,
+        scheduled_at: s.mode === 'ponctuel' && s.ponctuelDate
+          ? new Date(`${s.ponctuelDate}T${(s.ponctuelSlot ?? '11-13').split('-')[0]}:00:00`).toISOString()
+          : s.startDate
+            ? new Date(`${s.startDate}T09:00:00`).toISOString()
+            : null,
+        status: 'pending',
       },
-      estimated_total_xof: total,
-      duration_min: size?.durationMin ?? null,
-      guest_name: s.customer?.fullName,
-      guest_phone: s.customer?.phone,
-      guest_email: s.customer?.email,
-      scheduled_at: s.mode === 'ponctuel' && s.ponctuelDate
-        ? new Date(`${s.ponctuelDate}T${(s.ponctuelSlot ?? '11-13').split('-')[0]}:00:00`).toISOString()
-        : s.startDate
-          ? new Date(`${s.startDate}T09:00:00`).toISOString()
-          : null,
-      status: 'pending' as const,
-    };
-
-    const supa = getSupabase();
-    if (supa) {
-      await supa.from('reservations').insert(payload).then(({ error }) => {
-        if (error) console.warn('[Bovo] Supabase insert failed:', error.message);
-      });
-    }
-
-    const msg   = encodeURIComponent(buildWhatsappMessage());
-    const waUrl = `https://wa.me/2290196677743?text=${msg}`;
-    const wantAccount = sessionStorage.getItem('bovo:create-account') === '1';
-    const guestEmail  = s.customer?.email;
-
-    clearState('airbnb');
-    sessionStorage.removeItem('bovo:create-account');
-
-    if (wantAccount && guestEmail) {
-      window.open(waUrl, '_blank', 'noopener');
-      const iParams = new URLSearchParams({
-        email: guestEmail,
-        name:  s.customer?.fullName ?? '',
-        phone: s.customer?.phone   ?? '',
-      });
-      setTimeout(() => { window.location.href = `/compte/inscription/?${iParams}`; }, 300);
-    } else {
-      setTimeout(() => { window.location.href = waUrl; }, 400);
-    }
+      message: buildWhatsappMessage(),
+      customer: s.customer,
+      cta,
+    });
   });
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

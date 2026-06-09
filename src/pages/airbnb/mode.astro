@@ -10,6 +10,7 @@ import Icon from '@components/Icon.astro';
   backHref="/airbnb/logement/"
   pageTitle="Service Airbnb"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={3} /></Fragment>
 
@@ -49,6 +50,10 @@ import Icon from '@components/Icon.astro';
 
 <script>
   import { loadState, saveState, type AirbnbState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('mode-list')) return;
 
   const list = document.getElementById('mode-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
@@ -71,8 +76,10 @@ import Icon from '@components/Icon.astro';
 
   cta.addEventListener('click', () => {
     if (!mode) return;
-    window.location.href = '/airbnb/options/';
+    navigate('/airbnb/options/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

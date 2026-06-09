@@ -10,6 +10,7 @@ import { CHEF_DUREES, CHEF_FREQUENCES, fcfa } from '@lib/catalog';
   backHref="/chef/"
   pageTitle="Chef à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={2} /></Fragment>
 
@@ -38,6 +39,10 @@ import { CHEF_DUREES, CHEF_FREQUENCES, fcfa } from '@lib/catalog';
 <script>
   import { loadState, saveState, type ChefState } from '@lib/state';
   import { CHEF_FREQUENCES, CHEF_DUREES, fcfa } from '@lib/catalog';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('duree-list')) return;
 
   const list = document.getElementById('duree-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
@@ -73,8 +78,10 @@ import { CHEF_DUREES, CHEF_FREQUENCES, fcfa } from '@lib/catalog';
 
   cta.addEventListener('click', () => {
     if (!current) return;
-    window.location.href = '/chef/cuisine/';
+    navigate('/chef/cuisine/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

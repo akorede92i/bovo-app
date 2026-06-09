@@ -10,6 +10,7 @@ import Icon from '@components/Icon.astro';
   backHref="/"
   pageTitle="Service Airbnb"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={1} /></Fragment>
 
@@ -78,10 +79,15 @@ import Icon from '@components/Icon.astro';
 
 <script>
   import { loadState, saveState, type AirbnbState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('count-list')) return;
 
   const list = document.getElementById('count-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
-  let selected = loadState<AirbnbState>('airbnb').propertyCount?.toString() ?? '';
+  const savedCount = loadState<AirbnbState>('airbnb').propertyCount;
+  let selected = savedCount === 4 ? '4+' : savedCount === 2 ? '2-3' : savedCount === 1 ? '1' : '';
 
   function render() {
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
@@ -112,8 +118,10 @@ import Icon from '@components/Icon.astro';
       window.location.href = `https://wa.me/2290196677743?text=${msg}`;
       return;
     }
-    window.location.href = '/airbnb/logement/';
+    navigate('/airbnb/logement/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

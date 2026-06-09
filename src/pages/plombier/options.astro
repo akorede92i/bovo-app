@@ -11,6 +11,7 @@ import { PLOMBIER_OPTIONS, fcfa } from '@lib/catalog';
   backHref="/plombier/"
   pageTitle="Plombier à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={6} current={2} /></Fragment>
 
@@ -42,6 +43,9 @@ import { PLOMBIER_OPTIONS, fcfa } from '@lib/catalog';
 <script>
   import { loadState, saveState, type PlombierState } from '@lib/state';
   import { PLOMBIER_TYPES, PLOMBIER_OPTIONS, fcfa } from '@lib/catalog';
+
+  function init() {
+  if (!document.getElementById('opt-list')) return;
 
   const list = document.getElementById('opt-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
@@ -82,4 +86,6 @@ import { PLOMBIER_OPTIONS, fcfa } from '@lib/catalog';
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

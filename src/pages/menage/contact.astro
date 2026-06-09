@@ -10,6 +10,7 @@ import Icon from '@components/Icon.astro';
   backHref="/menage/creneau/"
   pageTitle="Ménage à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={6} /></Fragment>
 
@@ -53,7 +54,10 @@ import Icon from '@components/Icon.astro';
 
 <script>
   import { loadState, saveState, type MenageState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
 
+  function init() {
+  if (!document.getElementById('create-account')) return;
   const name = document.getElementById('name') as HTMLInputElement;
   const phone = document.getElementById('phone') as HTMLInputElement;
   const email = document.getElementById('email') as HTMLInputElement;
@@ -102,8 +106,10 @@ import Icon from '@components/Icon.astro';
     });
     const wantAccount = createAccount.checked;
     sessionStorage.setItem('bovo:create-account', wantAccount ? '1' : '0');
-    window.location.href = '/menage/recap/';
+    navigate('/menage/recap/');
   });
 
   validate();
+  }
+  document.addEventListener('astro:page-load', init);
 </script>

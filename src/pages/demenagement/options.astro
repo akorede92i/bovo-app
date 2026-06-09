@@ -11,6 +11,7 @@ import { DEM_OPTIONS, fcfa } from '@lib/catalog';
   backHref="/demenagement/arrivee/"
   pageTitle="Déménagement"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={4} /></Fragment>
 
@@ -36,6 +37,10 @@ import { DEM_OPTIONS, fcfa } from '@lib/catalog';
 <script>
   import { loadState, saveState, type DemenagementState } from '@lib/state';
   import { DEM_VOLUMES, DEM_OPTIONS, DEM_ETAGE_SUPP_XOF, fcfa } from '@lib/catalog';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('opt-list')) return;
 
   const list = document.getElementById('opt-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
@@ -75,8 +80,10 @@ import { DEM_OPTIONS, fcfa } from '@lib/catalog';
 
   cta.addEventListener('click', () => {
     saveState<DemenagementState>('demenagement', { options: [...options], estimatedTotal: compute() });
-    window.location.href = '/demenagement/date/';
+    navigate('/demenagement/date/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

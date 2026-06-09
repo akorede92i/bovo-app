@@ -10,6 +10,7 @@ import Icon from '@components/Icon.astro';
   backHref="/menage/contact/"
   pageTitle="Ménage à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={7} /></Fragment>
 
@@ -32,13 +33,19 @@ import Icon from '@components/Icon.astro';
 </Layout>
 
 <script>
-  import { loadState, clearState, type MenageState } from '@lib/state';
-  import { getSupabase } from '@lib/supabase';
+  import { loadState, type MenageState } from '@lib/state';
+  import { submitAndRedirect } from '@lib/tunnel';
   import {
     MENAGE_LOGEMENTS, MENAGE_FREQUENCES, MENAGE_OPTIONS, MENAGE_HOURLY_XOF, fcfa,
   } from '@lib/catalog';
 
+  function init() {
+  if (!document.getElementById('recap-cards')) return;
   const s = loadState<MenageState>('menage');
+
+  // Garde d'étapes : un recap atteint sans données (deep-link, session expirée,
+  // nouvel onglet) repart au début du tunnel plutôt que de soumettre du vide.
+  if (!s.logement || !s.customer?.phone) { window.location.href = '/menage/'; return; }
 
   // calcul final
   const hours = s.hours ?? 2;
@@ -123,53 +130,28 @@ import Icon from '@components/Icon.astro';
     return lines.join('\n');
   }
 
-  cta.addEventListener('click', async () => {
-    cta.disabled = true;
-    cta.textContent = 'Envoi en cours…';
-
-    const payload = {
-      service_type: 'menage' as const,
+  cta.addEventListener('click', () => {
+    void submitAndRedirect({
+      service: 'menage',
       payload: {
-        logement: s.logement, hours, frequence: s.frequence, options: s.options ?? [],
-        date: s.date, slot: s.slot, address: s.address,
+        service_type: 'menage',
+        payload: {
+          logement: s.logement, hours, frequence: s.frequence, options: s.options ?? [],
+          date: s.date, slot: s.slot, address: s.address,
+        },
+        estimated_total_xof: total,
+        duration_min: hours * 60,
+        guest_name: cust?.fullName,
+        guest_phone: cust?.phone,
+        guest_email: cust?.email,
+        scheduled_at: s.date ? new Date(`${s.date}T${(s.slot ?? '08-10').split('-')[0]}:00:00`).toISOString() : null,
+        status: 'pending',
       },
-      estimated_total_xof: total,
-      duration_min: hours * 60,
-      guest_name: cust?.fullName,
-      guest_phone: cust?.phone,
-      guest_email: cust?.email,
-      scheduled_at: s.date ? new Date(`${s.date}T${(s.slot ?? '08-10').split('-')[0]}:00:00`).toISOString() : null,
-      status: 'pending' as const,
-    };
-
-    let saved = false;
-    const supa = getSupabase();
-    if (supa) {
-      const { error } = await supa.from('reservations').insert(payload);
-      if (!error) saved = true;
-      else console.warn('[Bovo] Supabase insert failed, fallback to WhatsApp:', error.message);
-    }
-
-    // Toujours déclencher WhatsApp (notif admin + UX client)
-    const msg   = encodeURIComponent(buildWhatsappMessage());
-    const waUrl = `https://wa.me/2290196677743?text=${msg}`;
-    const wantAccount = sessionStorage.getItem('bovo:create-account') === '1';
-    const guestEmail  = cust?.email;
-
-    clearState('menage');
-    sessionStorage.removeItem('bovo:create-account');
-
-    if (wantAccount && guestEmail) {
-      // Ouvrir WhatsApp dans un onglet + rediriger vers inscription pré-remplie
-      window.open(waUrl, '_blank', 'noopener');
-      const iParams = new URLSearchParams({
-        email: guestEmail,
-        name:  cust?.fullName ?? '',
-        phone: cust?.phone   ?? '',
-      });
-      setTimeout(() => { window.location.href = `/compte/inscription/?${iParams}`; }, 300);
-    } else {
-      setTimeout(() => { window.location.href = waUrl; }, 400);
-    }
+      message: buildWhatsappMessage(),
+      customer: cust,
+      cta,
+    });
   });
+  }
+  document.addEventListener('astro:page-load', init);
 </script>

@@ -10,6 +10,7 @@ import Icon from '@components/Icon.astro';
   backHref="/demenagement/date/"
   pageTitle="Déménagement"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={6} /></Fragment>
 
@@ -28,7 +29,8 @@ import Icon from '@components/Icon.astro';
 
   <div class="field">
     <label class="field-label" for="email">Email</label>
-    <input id="email" class="input" type="email" autocomplete="email" required />
+    <input id="email" class="input" type="email" autocomplete="email" />
+    <span class="field-hint" id="email-hint">Pour recevoir la confirmation et votre facture.</span>
   </div>
 
   <div class="field">
@@ -66,6 +68,11 @@ import Icon from '@components/Icon.astro';
 
 <script>
   import { loadState, saveState, type DemenagementState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+  import { validPhone, validEmail } from '@lib/tunnel';
+
+  function init() {
+  if (!document.getElementById('name')) return;
 
   const name = document.getElementById('name') as HTMLInputElement;
   const phone = document.getElementById('phone') as HTMLInputElement;
@@ -84,8 +91,25 @@ import Icon from '@components/Icon.astro';
   }
   if (s.wantsDeposit) deposit.checked = true;
 
+  // Indique que l'email est requis si la case "Créer un compte" est cochée
+  const emailHint = document.getElementById('email-hint')!;
+  createAccount.addEventListener('change', () => {
+    if (createAccount.checked) {
+      emailHint.textContent = 'Requis pour créer votre compte Bovo.';
+      (emailHint as HTMLElement).style.color = 'var(--bovo-bleu)';
+    } else {
+      emailHint.textContent = 'Pour recevoir la confirmation et votre facture.';
+      (emailHint as HTMLElement).style.color = '';
+    }
+    validate();
+  });
+
   function validate() {
-    cta.disabled = !(name.value.trim() && phone.value.trim() && email.value.trim().includes('@'));
+    // Email optionnel ; requis seulement si « créer mon compte » est coché.
+    const emailOk = createAccount.checked
+      ? validEmail(email.value)
+      : (!email.value.trim() || validEmail(email.value));
+    cta.disabled = !(name.value.trim() && validPhone(phone.value) && emailOk);
   }
   [name, phone, email, notes].forEach((el) => el.addEventListener('input', validate));
 
@@ -94,14 +118,16 @@ import Icon from '@components/Icon.astro';
       customer: {
         fullName: name.value.trim(),
         phone: phone.value.trim(),
-        email: email.value.trim(),
+        email: email.value.trim() || undefined,
         notes: notes.value.trim() || undefined,
       },
       wantsDeposit: deposit.checked,
     });
     sessionStorage.setItem('bovo:create-account', createAccount.checked ? '1' : '0');
-    window.location.href = '/demenagement/recap/';
+    navigate('/demenagement/recap/');
   });
 
   validate();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

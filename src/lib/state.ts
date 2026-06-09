@@ -110,7 +110,11 @@ export function loadState<T extends AnyState>(service: ServiceKey): T {
   if (typeof window === 'undefined') return {} as T;
   try {
     const raw = sessionStorage.getItem(KEY_PREFIX + service);
-    return raw ? (JSON.parse(raw) as T) : ({} as T);
+    if (!raw) return {} as T;
+    const parsed = JSON.parse(raw);
+    // JSON valide mais pas un objet (ex: "null", "42", "[...]" via state corrompu /
+    // payload réinjecté) → on repart d'un state vide plutôt que de crasher au 1er accès.
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? (parsed as T) : ({} as T);
   } catch {
     return {} as T;
   }
@@ -130,5 +134,16 @@ export function clearState(service: ServiceKey): void {
   if (typeof window === 'undefined') return;
   try {
     sessionStorage.removeItem(KEY_PREFIX + service);
+  } catch {}
+}
+
+/**
+ * Remplace intégralement le state d'un service (utilisé par la re-réservation
+ * en 1 clic : on réinjecte le payload d'une résa passée dans le tunnel).
+ */
+export function replaceState<T extends AnyState>(service: ServiceKey, state: T): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(KEY_PREFIX + service, JSON.stringify(state));
   } catch {}
 }

@@ -4,12 +4,6 @@ import Stepper from '@components/Stepper.astro';
 import CtaFooter from '@components/CtaFooter.astro';
 import MapPicker from '@components/MapPicker.astro';
 import { ZONES } from '@lib/catalog';
-
-const minDate = (() => {
-  const d = new Date();
-  d.setDate(d.getDate() + 7);
-  return d.toISOString().slice(0, 10);
-})();
 ---
 <Layout
   title="Chef — Étape 5 : Démarrage et adresse | Bovo"
@@ -25,7 +19,7 @@ const minDate = (() => {
 
   <div class="field">
     <label class="field-label" for="start-date">Date de démarrage</label>
-    <input id="start-date" class="input" type="date" min={minDate} required />
+    <input id="start-date" class="input" type="date" required />
   </div>
 
   <div class="field" style="margin-top:18px;">
@@ -66,6 +60,12 @@ const minDate = (() => {
   const building = document.getElementById('building') as HTMLTextAreaElement;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
 
+  // date minimum = +7 jours (calculée au runtime, pas au build) pour caler le chef
+  const minDateObj = new Date();
+  minDateObj.setDate(minDateObj.getDate() + 7);
+  const minDate = minDateObj.toISOString().slice(0, 10);
+  startDate.min = minDate;
+
   const s = loadState<ChefState>('chef');
   if (s.startDate) startDate.value = s.startDate;
   if (s.address) {
@@ -85,6 +85,13 @@ const minDate = (() => {
   zone.addEventListener('change', validate);
 
   cta.addEventListener('click', () => {
+    if (startDate.value && startDate.value < minDate) {
+      startDate.value = '';
+      validate();
+      alert('Cette date n\'est plus disponible (délai minimum 7 jours). Merci de choisir une nouvelle date.');
+      return;
+    }
+
     const latRaw = (document.getElementById('map-lat') as HTMLInputElement)?.value;
     const lngRaw = (document.getElementById('map-lng') as HTMLInputElement)?.value;
     const lat = latRaw ? parseFloat(latRaw) : undefined;

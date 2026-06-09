@@ -9,6 +9,7 @@ import CtaFooter from '@components/CtaFooter.astro';
   backHref="/plombier/creneau/"
   pageTitle="Plombier à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={6} current={5} /></Fragment>
 
@@ -52,6 +53,10 @@ import CtaFooter from '@components/CtaFooter.astro';
 
 <script>
   import { loadState, saveState, type PlombierState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('name')) return;
 
   const name = document.getElementById('name') as HTMLInputElement;
   const phone = document.getElementById('phone') as HTMLInputElement;
@@ -100,8 +105,10 @@ import CtaFooter from '@components/CtaFooter.astro';
     });
     const wantAccount = createAccount.checked;
     sessionStorage.setItem('bovo:create-account', wantAccount ? '1' : '0');
-    window.location.href = '/plombier/recap/';
+    navigate('/plombier/recap/');
   });
 
   validate();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

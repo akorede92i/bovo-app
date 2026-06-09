@@ -11,6 +11,7 @@ import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
   backHref="/airbnb/mode/"
   pageTitle="Service Airbnb"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={4} /></Fragment>
 
@@ -35,7 +36,10 @@ import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
 
 <script>
   import { loadState, saveState, type AirbnbState } from '@lib/state';
-  import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
+  import { AIRBNB_TURNOVERS, AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
+
+  function init() {
+  if (!document.getElementById('opt-list')) return;
 
   const list = document.getElementById('opt-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
@@ -43,7 +47,9 @@ import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
 
   const s = loadState<AirbnbState>('airbnb');
   let options = new Set<string>(s.options ?? []);
-  const base = s.estimatedPerTurnover ?? 0;
+  // Base = prix du turnover depuis le catalogue (PAS estimatedPerTurnover, qui est
+  // le total déjà options-incluses : le relire ferait gonfler le prix à chaque retour).
+  const base = AIRBNB_TURNOVERS.find((t) => t.id === s.size)?.priceXof ?? 0;
 
   function compute() {
     const opts = [...options].reduce((sum, id) => {
@@ -75,4 +81,6 @@ import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>
