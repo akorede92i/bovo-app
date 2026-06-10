@@ -476,8 +476,8 @@ body[data-shell='dashboard'] {
   min-height: 60px;
 }
 .topbar-back {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -854,8 +854,8 @@ body[data-shell='dashboard'] {
   padding: 4px;
 }
 .qty-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--r-full);
   display: flex;
   align-items: center;
@@ -1015,3 +1015,17 @@ body[data-shell='dashboard'] {
   outline-offset: 2px;
   border-radius: 4px;
 }
+/* Lien d'évitement : hors écran jusqu'au focus clavier, puis visible en haut à gauche. */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -56px;
+  z-index: 1000;
+  background: var(--bovo-bleu);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: top var(--t-fast) var(--ease);
+}
+.skip-link:focus { top: 8px; }

@@ -103,6 +103,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
     <slot name="head" />
   </head>
   <body data-shell={shell}>
+    <a href="#main-content" class="skip-link">Aller au contenu</a>
     {shell === 'landing' ? (
       <!-- ====== LANDING SHELL : full-width responsive ====== -->
       <div class="landing-shell">
@@ -123,7 +124,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
             </button>
           </div>
         </header>
-        <main class="landing-main">
+        <main id="main-content" class="landing-main">
           <slot />
         </main>
         <slot name="cta-footer" />
@@ -144,7 +145,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
           <aside class="dash-sidebar" id="dash-sidebar">
             <slot name="sidebar" />
           </aside>
-          <main class="dash-main">
+          <main id="main-content" class="dash-main">
             <slot />
           </main>
         </div>
