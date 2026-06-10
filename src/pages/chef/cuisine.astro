@@ -18,9 +18,9 @@ import { CHEF_CUISINES } from '@lib/catalog';
   <h1 class="h-display" style="margin-bottom:8px;">Quel style de cuisine&nbsp;?</h1>
   <p class="text-lead" style="margin-bottom:24px;">Choisissez un ou plusieurs styles — votre chef adaptera ses menus.</p>
 
-  <div class="stack-sm" id="cuisine-list">
+  <div class="stack-sm" id="cuisine-list" role="group" aria-label="Styles de cuisine">
     {CHEF_CUISINES.map((c) => (
-      <button class="opt" data-value={c.id}>
+      <button class="opt" data-value={c.id} aria-pressed="false">
         <span class="opt-check"><Icon name="check" size={14} /></span>
         <span class="opt-body">
           <span class="opt-title">{c.label}</span>
@@ -48,7 +48,9 @@ import { CHEF_CUISINES } from '@lib/catalog';
 
   function render() {
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', cuisines.has(el.dataset.value!));
+      const on = cuisines.has(el.dataset.value!);
+      el.classList.toggle('is-active', on);
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     cta.disabled = cuisines.size === 0;
   }

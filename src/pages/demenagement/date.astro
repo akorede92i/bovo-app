@@ -29,9 +29,9 @@ const SLOTS = [
 
   <div class="field" style="margin-top:24px;">
     <span class="field-label">Créneau de démarrage</span>
-    <div class="stack-sm" id="slot-list">
+    <div class="stack-sm" id="slot-list" role="radiogroup" aria-label="Créneau de démarrage">
       {SLOTS.map((s) => (
-        <button class="opt" data-value={s.id}>
+        <button class="opt" data-value={s.id} role="radio" aria-checked="false">
           <span class="opt-radio"></span>
           <span class="opt-body">
             <span class="opt-title">{s.label}</span>
@@ -69,7 +69,9 @@ const SLOTS = [
 
   function render() {
     slotList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.value === slot);
+      const active = el.dataset.value === slot;
+      el.classList.toggle('is-active', active);
+      el.setAttribute('aria-checked', active ? 'true' : 'false');
     });
     cta.disabled = !(date && slot);
   }

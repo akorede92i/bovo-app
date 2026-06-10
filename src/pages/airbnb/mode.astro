@@ -17,8 +17,8 @@ import Icon from '@components/Icon.astro';
   <h1 class="h-display" style="margin-bottom:8px;">Un seul turnover ou récurrent&nbsp;?</h1>
   <p class="text-lead" style="margin-bottom:24px;">Le mode récurrent connecte votre iCal Airbnb pour automatiser le planning.</p>
 
-  <div class="stack-md" id="mode-list">
-    <button class="opt" data-value="ponctuel" style="align-items:flex-start; padding:18px;">
+  <div class="stack-md" id="mode-list" role="radiogroup" aria-label="Mode de service">
+    <button class="opt" data-value="ponctuel" style="align-items:flex-start; padding:18px;" role="radio" aria-checked="false">
       <span class="opt-radio" style="margin-top:4px;"></span>
       <span class="opt-body">
         <span class="opt-title" style="display:flex; align-items:center; gap:8px;">
@@ -31,7 +31,7 @@ import Icon from '@components/Icon.astro';
       </span>
     </button>
 
-    <button class="opt" data-value="recurrent" style="align-items:flex-start; padding:18px; position:relative;">
+    <button class="opt" data-value="recurrent" style="align-items:flex-start; padding:18px; position:relative;" role="radio" aria-checked="false">
       <span class="opt-radio" style="margin-top:4px;"></span>
       <span class="opt-body">
         <span class="opt-title" style="display:flex; align-items:center; gap:8px;">
@@ -61,7 +61,9 @@ import Icon from '@components/Icon.astro';
 
   function render() {
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.value === mode);
+      const isActive = el.dataset.value === mode;
+      el.classList.toggle('is-active', isActive);
+      el.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
     cta.disabled = !mode;
   }

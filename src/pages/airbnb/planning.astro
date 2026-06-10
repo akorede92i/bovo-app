@@ -37,9 +37,9 @@ const DURATIONS = [
     </div>
     <div class="field" style="margin-top:18px;">
       <span class="field-label">Créneau souhaité</span>
-      <div class="stack-sm" id="slot-list">
+      <div class="stack-sm" id="slot-list" role="radiogroup" aria-label="Créneau souhaité">
         {SLOTS.map((s) => (
-          <button class="opt" data-value={s.id}>
+          <button class="opt" data-value={s.id} role="radio" aria-checked="false">
             <span class="opt-radio"></span>
             <span class="opt-body">
               <span class="opt-title">{s.label}</span>
@@ -76,9 +76,9 @@ const DURATIONS = [
 
     <div class="field" style="margin-top:18px;">
       <span class="field-label">Durée d'engagement</span>
-      <div class="stack-sm" id="duration-list">
+      <div class="stack-sm" id="duration-list" role="radiogroup" aria-label="Durée d'engagement">
         {DURATIONS.map((d) => (
-          <button class="opt" data-value={d.id}>
+          <button class="opt" data-value={d.id} role="radio" aria-checked="false">
             <span class="opt-radio"></span>
             <span class="opt-body">
               <span class="opt-title">{d.label}</span>
@@ -131,7 +131,9 @@ const DURATIONS = [
   function renderSlot() {
     if (!slotList) return;
     slotList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.value === slot);
+      const isActive = el.dataset.value === slot;
+      el.classList.toggle('is-active', isActive);
+      el.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
   }
 
@@ -147,7 +149,9 @@ const DURATIONS = [
   function renderDuration() {
     if (!durationList) return;
     durationList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', Number(el.dataset.value) === duration);
+      const isActive = Number(el.dataset.value) === duration;
+      el.classList.toggle('is-active', isActive);
+      el.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
   }
 

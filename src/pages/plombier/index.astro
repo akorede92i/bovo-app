@@ -19,9 +19,9 @@ import { PLOMBIER_TYPES, fcfa } from '@lib/catalog';
   <h1 class="h-display" style="margin-bottom:8px;">De quel type d'intervention avez-vous besoin&nbsp;?</h1>
   <p class="text-lead" style="margin-bottom:24px;">Sélectionnez la situation la plus proche — vous pourrez préciser ensuite.</p>
 
-  <div class="stack-sm" id="type-list">
+  <div class="stack-sm" id="type-list" role="radiogroup" aria-label="Type d'intervention">
     {PLOMBIER_TYPES.map((t) => (
-      <button class="opt" data-value={t.id} data-price={t.priceXof} data-duration={t.durationMin}>
+      <button class="opt" data-value={t.id} data-price={t.priceXof} data-duration={t.durationMin} role="radio" aria-checked="false">
         <span class="opt-radio"></span>
         <span class="opt-body">
           <span class="opt-title">{t.label}</span>
@@ -62,7 +62,9 @@ import { PLOMBIER_TYPES, fcfa } from '@lib/catalog';
 
   function render() {
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.value === current);
+      const isActive = el.dataset.value === current;
+      el.classList.toggle('is-active', isActive);
+      el.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
     cta.disabled = !current;
   }

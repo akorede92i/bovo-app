@@ -17,9 +17,9 @@ import { CHEF_FREQUENCES, fcfa } from '@lib/catalog';
   <h1 class="h-display" style="margin-bottom:8px;">Combien de repas par semaine&nbsp;?</h1>
   <p class="text-lead" style="margin-bottom:24px;">Votre chef vient à domicile, cuisine sur place et laisse la cuisine propre.</p>
 
-  <div class="stack-sm" id="freq-list">
+  <div class="stack-sm" id="freq-list" role="radiogroup" aria-label="Fréquence">
     {CHEF_FREQUENCES.map((f) => (
-      <button class="opt" data-value={f.id} data-price={f.baseXof}>
+      <button class="opt" data-value={f.id} data-price={f.baseXof} role="radio" aria-checked="false">
         <span class="opt-radio"></span>
         <span class="opt-body">
           <span class="opt-title">{f.label}</span>
@@ -52,6 +52,7 @@ import { CHEF_FREQUENCES, fcfa } from '@lib/catalog';
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
       const active = el.dataset.value === current;
       el.classList.toggle('is-active', active);
+      el.setAttribute('aria-checked', active ? 'true' : 'false');
       if (active) price = Number(el.dataset.price);
     });
     cta.disabled = !current;

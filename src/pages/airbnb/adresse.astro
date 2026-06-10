@@ -45,9 +45,9 @@ const ACCESS_MODES = [
   <MapPicker />
 
   <h2 class="h-section" style="margin: 24px 0 12px;">Mode d'accès</h2>
-  <div class="stack-sm" id="access-list">
+  <div class="stack-sm" id="access-list" role="radiogroup" aria-label="Mode d'accès">
     {ACCESS_MODES.map((m) => (
-      <button class="opt" data-value={m.id}>
+      <button class="opt" data-value={m.id} role="radio" aria-checked="false">
         <span class="opt-radio"></span>
         <span class="opt-body">
           <span class="opt-title">{m.label}</span>
@@ -91,7 +91,9 @@ const ACCESS_MODES = [
 
   function renderAccess() {
     accessList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.value === accessMode);
+      const isActive = el.dataset.value === accessMode;
+      el.classList.toggle('is-active', isActive);
+      el.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
   }
 

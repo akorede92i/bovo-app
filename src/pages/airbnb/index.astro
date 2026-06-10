@@ -50,22 +50,22 @@ import Icon from '@components/Icon.astro';
 
   <!-- Combien de logements -->
   <h2 class="h-section" style="margin-bottom:14px;">Combien de logements gérez-vous&nbsp;?</h2>
-  <div class="stack-sm" id="count-list">
-    <button class="opt" data-value="1">
+  <div class="stack-sm" id="count-list" role="radiogroup" aria-label="Nombre de logements">
+    <button class="opt" data-value="1" role="radio" aria-checked="false">
       <span class="opt-radio"></span>
       <span class="opt-body">
         <span class="opt-title">1 logement</span>
         <span class="opt-meta">Je veux configurer mon logement</span>
       </span>
     </button>
-    <button class="opt" data-value="2-3">
+    <button class="opt" data-value="2-3" role="radio" aria-checked="false">
       <span class="opt-radio"></span>
       <span class="opt-body">
         <span class="opt-title">2 à 3 logements</span>
         <span class="opt-meta">On configure le premier, puis on ajoute les autres après</span>
       </span>
     </button>
-    <button class="opt" data-value="4+">
+    <button class="opt" data-value="4+" role="radio" aria-checked="false">
       <span class="opt-radio"></span>
       <span class="opt-body">
         <span class="opt-title">4 logements ou plus</span>
@@ -91,7 +91,9 @@ import Icon from '@components/Icon.astro';
 
   function render() {
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.value === selected);
+      const isActive = el.dataset.value === selected;
+      el.classList.toggle('is-active', isActive);
+      el.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
     cta.disabled = !selected;
     // Si "4+" sélectionné → on change le CTA pour aller vers WhatsApp

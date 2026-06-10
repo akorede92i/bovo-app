@@ -18,9 +18,9 @@ import { MENAGE_OPTIONS, fcfa } from '@lib/catalog';
   <h1 class="h-display" style="margin-bottom:8px;">Des options en plus&nbsp;?</h1>
   <p class="text-lead" style="margin-bottom:24px;">Tout est facultatif — sélectionnez ce dont vous avez besoin.</p>
 
-  <div class="stack-sm" id="opt-list">
+  <div class="stack-sm" id="opt-list" role="group" aria-label="Options de ménage">
     {MENAGE_OPTIONS.map((o) => (
-      <button class="opt" data-value={o.id} data-price={o.priceXof}>
+      <button class="opt" data-value={o.id} data-price={o.priceXof} aria-pressed="false">
         <span class="opt-check"><Icon name="check" size={14} /></span>
         <span class="opt-body">
           <span class="opt-title">{o.label}</span>
@@ -68,7 +68,9 @@ import { MENAGE_OPTIONS, fcfa } from '@lib/catalog';
 
   function render() {
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', options.has(el.dataset.value!));
+      const on = options.has(el.dataset.value!);
+      el.classList.toggle('is-active', on);
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     priceEl.textContent = fcfa(compute());
   }

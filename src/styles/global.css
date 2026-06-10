@@ -1007,3 +1007,11 @@ body[data-shell='dashboard'] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============ ACCESSIBILITÉ ============ */
+/* Anneau de focus visible UNIQUEMENT au clavier (invisible à la souris/tactile). */
+:focus-visible {
+  outline: 2px solid var(--bovo-bleu);
+  outline-offset: 2px;
+  border-radius: 4px;
+}

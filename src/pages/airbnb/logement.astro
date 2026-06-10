@@ -17,9 +17,9 @@ import { AIRBNB_TURNOVERS, fcfa } from '@lib/catalog';
   <h1 class="h-display" style="margin-bottom:8px;">Quelle est la taille du logement&nbsp;?</h1>
   <p class="text-lead" style="margin-bottom:24px;">Le tarif est un forfait par turnover, tout compris (sauf options).</p>
 
-  <div class="stack-sm" id="size-list">
+  <div class="stack-sm" id="size-list" role="radiogroup" aria-label="Taille du logement">
     {AIRBNB_TURNOVERS.map((t) => (
-      <button class="opt" data-value={t.id} data-price={t.priceXof} data-duration={t.durationMin}>
+      <button class="opt" data-value={t.id} data-price={t.priceXof} data-duration={t.durationMin} role="radio" aria-checked="false">
         <span class="opt-radio"></span>
         <span class="opt-body">
           <span class="opt-title">{t.label}</span>
@@ -59,6 +59,7 @@ import { AIRBNB_TURNOVERS, fcfa } from '@lib/catalog';
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
       const active = el.dataset.value === current;
       el.classList.toggle('is-active', active);
+      el.setAttribute('aria-checked', active ? 'true' : 'false');
       if (active) price = Number(el.dataset.price);
     });
     cta.disabled = !current;
