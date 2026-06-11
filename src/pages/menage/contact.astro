@@ -10,12 +10,14 @@ import Icon from '@components/Icon.astro';
   backHref="/menage/creneau/"
   pageTitle="Ménage à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={6} /></Fragment>
 
   <h1 class="h-display" style="margin-bottom:8px;">Vos coordonnées</h1>
   <p class="text-lead" style="margin-bottom:24px;">Nous vous confirmons par WhatsApp en moins d'1h.</p>
 
+  <form id="contact-form">
   <div class="field">
     <label class="field-label" for="name">Nom complet</label>
     <input id="name" class="input" type="text" placeholder="Prénom Nom" autocomplete="name" required />
@@ -47,19 +49,27 @@ import Icon from '@components/Icon.astro';
       </span>
     </label>
   </div>
+  <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
+  </form>
 
   <CtaFooter buttonLabel="Voir le récapitulatif" buttonType="button" buttonId="cta-next" disabled={true} />
 </Layout>
 
 <script>
   import { loadState, saveState, type MenageState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
 
+  function init() {
+  if (!document.getElementById('create-account')) return;
   const name = document.getElementById('name') as HTMLInputElement;
   const phone = document.getElementById('phone') as HTMLInputElement;
   const email = document.getElementById('email') as HTMLInputElement;
   const notes = document.getElementById('notes') as HTMLTextAreaElement;
   const createAccount = document.getElementById('create-account') as HTMLInputElement;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  const form = document.getElementById('contact-form') as HTMLFormElement | null;
+  // Entrée dans un champ → soumet le formulaire → déclenche le CTA (si valide).
+  form?.addEventListener('submit', (e) => { e.preventDefault(); if (!cta.disabled) cta.click(); });
 
   const s = loadState<MenageState>('menage');
   if (s.customer) {
@@ -102,8 +112,10 @@ import Icon from '@components/Icon.astro';
     });
     const wantAccount = createAccount.checked;
     sessionStorage.setItem('bovo:create-account', wantAccount ? '1' : '0');
-    window.location.href = '/menage/recap/';
+    navigate('/menage/recap/');
   });
 
   validate();
+  }
+  document.addEventListener('astro:page-load', init);
 </script>

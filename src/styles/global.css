@@ -217,6 +217,8 @@ body[data-shell='landing'] {
   backdrop-filter: saturate(180%) blur(14px);
   -webkit-backdrop-filter: saturate(180%) blur(14px);
   border-bottom: 1px solid var(--bovo-line-soft);
+  /* Pousse le contenu sous la status bar / notch / Dynamic Island (iOS natif). */
+  padding-top: var(--safe-top);
 }
 .landing-header-inner {
   max-width: 1200px;
@@ -352,6 +354,7 @@ body[data-shell='dashboard'] {
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
+  padding-top: calc(12px + var(--safe-top));
   min-height: 60px;
 }
 .dash-burger {
@@ -473,8 +476,8 @@ body[data-shell='dashboard'] {
   min-height: 60px;
 }
 .topbar-back {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -851,8 +854,8 @@ body[data-shell='dashboard'] {
   padding: 4px;
 }
 .qty-btn {
-  width: 36px;
-  height: 36px;
+  width: 44px;
+  height: 44px;
   border-radius: var(--r-full);
   display: flex;
   align-items: center;
@@ -1004,3 +1007,25 @@ body[data-shell='dashboard'] {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ============ ACCESSIBILITÉ ============ */
+/* Anneau de focus visible UNIQUEMENT au clavier (invisible à la souris/tactile). */
+:focus-visible {
+  outline: 2px solid var(--bovo-bleu);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+/* Lien d'évitement : hors écran jusqu'au focus clavier, puis visible en haut à gauche. */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -56px;
+  z-index: 1000;
+  background: var(--bovo-bleu);
+  color: #fff;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  transition: top var(--t-fast) var(--ease);
+}
+.skip-link:focus { top: 8px; }

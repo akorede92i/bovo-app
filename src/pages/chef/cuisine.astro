@@ -11,15 +11,16 @@ import { CHEF_CUISINES } from '@lib/catalog';
   backHref="/chef/duree/"
   pageTitle="Chef à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={3} /></Fragment>
 
   <h1 class="h-display" style="margin-bottom:8px;">Quel style de cuisine&nbsp;?</h1>
   <p class="text-lead" style="margin-bottom:24px;">Choisissez un ou plusieurs styles — votre chef adaptera ses menus.</p>
 
-  <div class="stack-sm" id="cuisine-list">
+  <div class="stack-sm" id="cuisine-list" role="group" aria-label="Styles de cuisine">
     {CHEF_CUISINES.map((c) => (
-      <button class="opt" data-value={c.id}>
+      <button class="opt" data-value={c.id} aria-pressed="false">
         <span class="opt-check"><Icon name="check" size={14} /></span>
         <span class="opt-body">
           <span class="opt-title">{c.label}</span>
@@ -34,6 +35,10 @@ import { CHEF_CUISINES } from '@lib/catalog';
 
 <script>
   import { loadState, saveState, type ChefState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('cuisine-list')) return;
 
   const list = document.getElementById('cuisine-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
@@ -43,7 +48,9 @@ import { CHEF_CUISINES } from '@lib/catalog';
 
   function render() {
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', cuisines.has(el.dataset.value!));
+      const on = cuisines.has(el.dataset.value!);
+      el.classList.toggle('is-active', on);
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     cta.disabled = cuisines.size === 0;
   }
@@ -59,8 +66,10 @@ import { CHEF_CUISINES } from '@lib/catalog';
 
   cta.addEventListener('click', () => {
     if (cuisines.size === 0) return;
-    window.location.href = '/chef/preferences/';
+    navigate('/chef/preferences/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

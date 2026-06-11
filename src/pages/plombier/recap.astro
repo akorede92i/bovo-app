@@ -10,6 +10,7 @@ import Icon from '@components/Icon.astro';
   backHref="/plombier/contact/"
   pageTitle="Plombier à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={6} current={6} /></Fragment>
 
@@ -32,11 +33,17 @@ import Icon from '@components/Icon.astro';
 </Layout>
 
 <script>
-  import { loadState, clearState, type PlombierState } from '@lib/state';
-  import { getSupabase } from '@lib/supabase';
+  import { loadState, type PlombierState } from '@lib/state';
+  import { submitAndRedirect } from '@lib/tunnel';
   import { PLOMBIER_TYPES, PLOMBIER_OPTIONS, fcfa } from '@lib/catalog';
 
+  function init() {
+  if (!document.getElementById('recap-cards')) return;
+
   const s = loadState<PlombierState>('plombier');
+
+  // Garde d'étapes : recap atteint sans données → retour au début du tunnel.
+  if (!s.type || !s.customer?.phone) { window.location.href = '/plombier/'; return; }
 
   // calcul final
   const t = PLOMBIER_TYPES.find((x) => x.id === s.type);
@@ -118,55 +125,32 @@ import Icon from '@components/Icon.astro';
     return lines.join('\n');
   }
 
-  cta.addEventListener('click', async () => {
-    cta.disabled = true;
-    cta.textContent = 'Envoi en cours…';
-
-    const payload = {
-      service_type: 'plombier' as const,
+  cta.addEventListener('click', () => {
+    void submitAndRedirect({
+      service: 'plombier',
       payload: {
-        type: s.type,
-        description: s.description,
-        options: s.options ?? [],
-        date: s.date,
-        slot: s.slot,
-        address: s.address,
+        service_type: 'plombier',
+        payload: {
+          type: s.type,
+          description: s.description,
+          options: s.options ?? [],
+          date: s.date,
+          slot: s.slot,
+          address: s.address,
+        },
+        estimated_total_xof: total,
+        duration_min: t?.durationMin ?? 60,
+        guest_name: cust?.fullName,
+        guest_phone: cust?.phone,
+        guest_email: cust?.email,
+        scheduled_at: s.date ? new Date(`${s.date}T${(s.slot ?? '08-10').split('-')[0]}:00:00`).toISOString() : null,
+        status: 'pending',
       },
-      estimated_total_xof: total,
-      duration_min: t?.durationMin ?? 60,
-      guest_name: cust?.fullName,
-      guest_phone: cust?.phone,
-      guest_email: cust?.email,
-      scheduled_at: s.date ? new Date(`${s.date}T${(s.slot ?? '08-10').split('-')[0]}:00:00`).toISOString() : null,
-      status: 'pending' as const,
-    };
-
-    let saved = false;
-    const supa = getSupabase();
-    if (supa) {
-      const { error } = await supa.from('reservations').insert(payload);
-      if (!error) saved = true;
-      else console.warn('[Bovo] Supabase insert failed, fallback to WhatsApp:', error.message);
-    }
-
-    const msg   = encodeURIComponent(buildWhatsappMessage());
-    const waUrl = `https://wa.me/2290196677743?text=${msg}`;
-    const wantAccount = sessionStorage.getItem('bovo:create-account') === '1';
-    const guestEmail  = cust?.email;
-
-    clearState('plombier');
-    sessionStorage.removeItem('bovo:create-account');
-
-    if (wantAccount && guestEmail) {
-      window.open(waUrl, '_blank', 'noopener');
-      const iParams = new URLSearchParams({
-        email: guestEmail,
-        name:  cust?.fullName ?? '',
-        phone: cust?.phone   ?? '',
-      });
-      setTimeout(() => { window.location.href = `/compte/inscription/?${iParams}`; }, 300);
-    } else {
-      setTimeout(() => { window.location.href = waUrl; }, 400);
-    }
+      message: buildWhatsappMessage(),
+      customer: cust,
+      cta,
+    });
   });
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

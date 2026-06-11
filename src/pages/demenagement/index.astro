@@ -10,15 +10,16 @@ import { DEM_VOLUMES, fcfa } from '@lib/catalog';
   backHref="/"
   pageTitle="Déménagement"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={1} /></Fragment>
 
   <h1 class="h-display" style="margin-bottom:8px;">Quel volume à déménager&nbsp;?</h1>
   <p class="text-lead" style="margin-bottom:24px;">Le forfait inclut équipe + camion. Les options arrivent à l'étape 4.</p>
 
-  <div class="stack-sm" id="vol-list">
+  <div class="stack-sm" id="vol-list" role="radiogroup" aria-label="Volume à déménager">
     {DEM_VOLUMES.map((v) => (
-      <button class="opt" data-value={v.id} data-price={v.priceXof}>
+      <button class="opt" data-value={v.id} data-price={v.priceXof} role="radio" aria-checked="false">
         <span class="opt-radio"></span>
         <span class="opt-body">
           <span class="opt-title">{v.label}</span>
@@ -36,6 +37,9 @@ import { DEM_VOLUMES, fcfa } from '@lib/catalog';
   import { loadState, saveState, type DemenagementState } from '@lib/state';
   import { DEM_VOLUMES, fcfa } from '@lib/catalog';
 
+  function init() {
+  if (!document.getElementById('vol-list')) return;
+
   const list = document.getElementById('vol-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
   const priceEl = document.querySelector('.cta-footer .price-line strong')!;
@@ -47,6 +51,7 @@ import { DEM_VOLUMES, fcfa } from '@lib/catalog';
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
       const active = el.dataset.value === current;
       el.classList.toggle('is-active', active);
+      el.setAttribute('aria-checked', active ? 'true' : 'false');
       if (active) price = Number(el.dataset.price);
     });
     cta.disabled = !current;
@@ -68,4 +73,6 @@ import { DEM_VOLUMES, fcfa } from '@lib/catalog';
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

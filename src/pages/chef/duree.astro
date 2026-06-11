@@ -10,17 +10,18 @@ import { CHEF_DUREES, CHEF_FREQUENCES, fcfa } from '@lib/catalog';
   backHref="/chef/"
   pageTitle="Chef à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={2} /></Fragment>
 
   <h1 class="h-display" style="margin-bottom:8px;">Durée d'engagement</h1>
   <p class="text-lead" style="margin-bottom:24px;">Engagement minimum 1 mois. Plus c'est long, plus le tarif baisse.</p>
 
-  <div class="stack-sm" id="duree-list">
+  <div class="stack-sm" id="duree-list" role="radiogroup" aria-label="Durée d'engagement">
     {CHEF_DUREES.map((d) => {
       const discountPct = Math.round((1 - d.multiplier) * 100);
       return (
-        <button class="opt" data-value={d.id} data-mult={d.multiplier}>
+        <button class="opt" data-value={d.id} data-mult={d.multiplier} role="radio" aria-checked="false">
           <span class="opt-radio"></span>
           <span class="opt-body">
             <span class="opt-title">{d.label}</span>
@@ -38,6 +39,10 @@ import { CHEF_DUREES, CHEF_FREQUENCES, fcfa } from '@lib/catalog';
 <script>
   import { loadState, saveState, type ChefState } from '@lib/state';
   import { CHEF_FREQUENCES, CHEF_DUREES, fcfa } from '@lib/catalog';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('duree-list')) return;
 
   const list = document.getElementById('duree-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
@@ -56,6 +61,7 @@ import { CHEF_DUREES, CHEF_FREQUENCES, fcfa } from '@lib/catalog';
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
       const active = el.dataset.value === current;
       el.classList.toggle('is-active', active);
+      el.setAttribute('aria-checked', active ? 'true' : 'false');
       if (active) mult = Number(el.dataset.mult);
     });
     cta.disabled = !current;
@@ -73,8 +79,10 @@ import { CHEF_DUREES, CHEF_FREQUENCES, fcfa } from '@lib/catalog';
 
   cta.addEventListener('click', () => {
     if (!current) return;
-    window.location.href = '/chef/cuisine/';
+    navigate('/chef/cuisine/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

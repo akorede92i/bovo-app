@@ -48,7 +48,11 @@ import { ZONES } from '@lib/catalog';
 <script>
   import { loadState, saveState, type MenageState } from '@lib/state';
 
-  const zone = document.getElementById('zone') as HTMLSelectElement;
+  function init() {
+  const zoneEl = document.getElementById('zone') as (HTMLSelectElement & { _bovoInit?: boolean }) | null;
+  if (!zoneEl || zoneEl._bovoInit) return; // idempotent : ne (re)bind qu'une fois par DOM
+  zoneEl._bovoInit = true;
+  const zone = zoneEl;
   const quartier = document.getElementById('quartier') as HTMLInputElement;
   const street = document.getElementById('street') as HTMLInputElement;
   const building = document.getElementById('building') as HTMLTextAreaElement;
@@ -91,4 +95,9 @@ import { ZONES } from '@lib/catalog';
   });
 
   validate();
+  }
+  // Robuste avec ET sans View Transitions, sans dépendre d'un artefact de bundling :
+  // init direct au chargement du module (≈ DOMContentLoaded) + ré-init sur navigation VT.
+  init();
+  document.addEventListener('astro:page-load', init);
 </script>

@@ -656,7 +656,7 @@ import { ZONES } from '@lib/catalog';
 <script>
   import { getSupabase } from '@lib/supabase';
   import { createClient } from '@supabase/supabase-js';
-  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS } from '@lib/admin';
+  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS, escapeHtml } from '@lib/admin';
   import { fcfa } from '@lib/catalog';
 
   const supa = getSupabase();
@@ -710,11 +710,6 @@ import { ZONES } from '@lib/catalog';
       if (diff < 86400) return `il y a ${Math.floor(diff / 3600)} h`;
       if (diff < 86400 * 7) return `il y a ${Math.floor(diff / 86400)} j`;
       return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
-    }
-
-    function escapeHtml(s: string | null | undefined): string {
-      if (!s) return '';
-      return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
     }
 
     function workerName(workerId: string | null): string | null {

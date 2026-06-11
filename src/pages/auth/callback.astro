@@ -56,7 +56,7 @@
 
       // next= est dans les query params (?next=/compte/reservations/), pas dans le hash
       const next = new URLSearchParams(window.location.search).get('next');
-      const redirectTo = next && next.startsWith('/') ? next : '/compte/';
+      const redirectTo = next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/compte/';
 
       supa.auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' && session) {

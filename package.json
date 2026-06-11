@@ -18,10 +18,22 @@
   },
   "dependencies": {
     "@astrojs/sitemap": "~3.2.1",
+    "@capacitor-firebase/app": "^8.3.0",
+    "@capacitor-firebase/messaging": "^8.3.0",
+    "@capacitor/android": "^8.4.0",
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/core": "^8.4.0",
+    "@capacitor/ios": "^8.4.0",
+    "@capacitor/keyboard": "^8.0.3",
+    "@capacitor/splash-screen": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
     "@supabase/supabase-js": "^2.45.4",
-    "astro": "^4.16.0"
+    "astro": "^4.16.0",
+    "firebase": "^12.14.0"
   },
   "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.4.0",
     "@playwright/test": "^1.60.0",
     "@types/node": "^25.9.1",
     "@vitest/coverage-v8": "^2.1.9",

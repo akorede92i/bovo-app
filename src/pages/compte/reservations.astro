@@ -50,6 +50,7 @@ import CompteSidebar from '@components/CompteSidebar.astro';
 <script>
   import { requireAuth } from '@lib/auth';
   import { getSupabase, type Reservation } from '@lib/supabase';
+  import { replaceState, type ServiceKey } from '@lib/state';
   import { fcfa } from '@lib/catalog';
 
   const user = await requireAuth();
@@ -133,7 +134,10 @@ import CompteSidebar from '@components/CompteSidebar.astro';
               <div class="text-muted" style="font-size:0.86rem; margin-bottom:6px;">${dateStr}</div>
               ${r.estimated_total_xof ? `<div style="font-family:'Jost'; font-weight:700; color: var(--bovo-bleu);">${fcfa(r.estimated_total_xof)}</div>` : ''}
               ${r.deposit_status === 'paid' ? '<div style="font-size:0.74rem; color: var(--bovo-success); margin-top:4px;">✓ Acompte payé</div>' : ''}
-              ${canReview ? `<a href="/compte/avis/?id=${r.id}" class="btn btn-primary btn-sm" style="margin-top:12px;">★ Laisser un avis</a>` : ''}
+              <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:12px;">
+                ${canReview ? `<a href="/compte/avis/?id=${r.id}" class="btn btn-primary btn-sm">★ Laisser un avis</a>` : ''}
+                <button class="btn btn-ghost btn-sm" data-rebook="${r.id}" type="button">↻ Re-réserver</button>
+              </div>
               ${wasReviewed ? '<div style="font-size:0.78rem; color: var(--bovo-muted); margin-top:10px; display:flex; align-items:center; gap:4px;"><span style="color:#f5b400;">★</span> Avis déposé</div>' : ''}
             </div>
           </div>
@@ -158,6 +162,44 @@ import CompteSidebar from '@components/CompteSidebar.astro';
         currentFilter = chip.dataset.filter as any;
         render();
       });
+    });
+
+    // ============= RE-RÉSERVER EN 1 CLIC =============
+    // Étape "date" de chaque tunnel : on y atterrit avec tout pré-rempli,
+    // le client n'a plus qu'à choisir une nouvelle date.
+    const rebookStep: Record<ServiceKey, string> = {
+      menage: '/menage/creneau/',
+      airbnb: '/airbnb/planning/',
+      demenagement: '/demenagement/date/',
+      chef: '/chef/planning/',
+      plombier: '/plombier/creneau/',
+    };
+
+    listEl.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-rebook]');
+      if (!btn) return;
+      const r = allReservations.find((x) => x.id === btn.dataset.rebook);
+      if (!r) return;
+      const svc = r.service_type as ServiceKey;
+
+      // Reconstitue le state du tunnel depuis le payload sauvegardé + coordonnées.
+      const state: Record<string, unknown> = { ...(r.payload ?? {}) };
+      state.customer = {
+        fullName: r.guest_name ?? undefined,
+        phone: r.guest_phone ?? undefined,
+        email: r.guest_email ?? undefined,
+      };
+      // L'ancienne date est passée : on la vide pour forcer un nouveau choix.
+      delete state.date;
+      delete state.slot;
+      delete state.startDate;
+      delete state.ponctuelDate;
+      delete state.ponctuelSlot;
+
+      btn.disabled = true;
+      btn.textContent = 'Préparation…';
+      replaceState(svc, state as any);
+      window.location.href = rebookStep[svc] ?? `/${svc}/`;
     });
 
     const [{ data, error }, { data: reviews }] = await Promise.all([
