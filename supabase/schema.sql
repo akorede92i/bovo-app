@@ -236,14 +236,53 @@ create policy "admin sees all addresses" on public.addresses for select using (p
 -- reservations
 create policy "users see own reservations" on public.reservations for select
   using (auth.uid() = user_id or public.is_admin() or (public.is_worker() and assigned_worker_id = auth.uid()));
-create policy "users insert reservations" on public.reservations for insert with check (true); -- résa invité autorisée
+-- résa invité autorisée, mais colonnes sensibles verrouillées (cf. migration 20260610) :
+-- pas d'usurpation de user_id, pas de status/deposit_status/worker/tx forgés.
+-- Le passage à deposit_status='paid' relève du service_role (vérif Kkiapay serveur).
+create policy "users insert reservations" on public.reservations for insert
+  with check (
+    (user_id is null or user_id = auth.uid())
+    and status = 'pending'
+    and deposit_status in ('none', 'pending')
+    and assigned_worker_id is null
+    and deposit_kkiapay_tx is null
+  );
 create policy "users update own reservation status" on public.reservations for update using (auth.uid() = user_id or public.is_admin());
 create policy "admin manages reservations" on public.reservations for all using (public.is_admin());
 
--- worker tables (lecture publique pour matching, écriture admin uniquement)
-create policy "anyone can read worker skills/zones/avail" on public.worker_skills for select using (true);
-create policy "anyone can read worker zones" on public.worker_zones for select using (true);
-create policy "anyone can read worker avail" on public.worker_availability for select using (true);
+-- Verrou des champs sensibles sur UPDATE (cf. migration 20260610) : un non-admin
+-- ne peut qu'annuler sa résa, jamais forger deposit_status/worker/montant/user_id.
+create or replace function public.lock_reservation_sensitive_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.is_admin() or auth.role() = 'service_role' then
+    return new;
+  end if;
+  new.user_id             := old.user_id;
+  new.service_type        := old.service_type;
+  new.estimated_total_xof := old.estimated_total_xof;
+  new.deposit_status      := old.deposit_status;
+  new.deposit_kkiapay_tx  := old.deposit_kkiapay_tx;
+  new.assigned_worker_id  := old.assigned_worker_id;
+  if new.status is distinct from old.status and new.status <> 'cancelled' then
+    new.status := old.status;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists reservations_lock_sensitive on public.reservations;
+create trigger reservations_lock_sensitive
+  before update on public.reservations
+  for each row execute function public.lock_reservation_sensitive_fields();
+
+-- worker tables (lecture réservée aux utilisateurs connectés — matching admin ; écriture admin)
+create policy "auth reads worker skills" on public.worker_skills for select using (auth.uid() is not null);
+create policy "auth reads worker zones" on public.worker_zones for select using (auth.uid() is not null);
+create policy "auth reads worker avail" on public.worker_availability for select using (auth.uid() is not null);
 create policy "worker reads own blackouts" on public.worker_blackouts for select using (auth.uid() = worker_id or public.is_admin());
 create policy "admin manages worker data" on public.worker_skills for all using (public.is_admin());
 create policy "admin manages worker zones" on public.worker_zones for all using (public.is_admin());

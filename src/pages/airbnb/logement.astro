@@ -10,15 +10,16 @@ import { AIRBNB_TURNOVERS, fcfa } from '@lib/catalog';
   backHref="/airbnb/"
   pageTitle="Service Airbnb"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={2} /></Fragment>
 
   <h1 class="h-display" style="margin-bottom:8px;">Quelle est la taille du logement&nbsp;?</h1>
   <p class="text-lead" style="margin-bottom:24px;">Le tarif est un forfait par turnover, tout compris (sauf options).</p>
 
-  <div class="stack-sm" id="size-list">
+  <div class="stack-sm" id="size-list" role="radiogroup" aria-label="Taille du logement">
     {AIRBNB_TURNOVERS.map((t) => (
-      <button class="opt" data-value={t.id} data-price={t.priceXof} data-duration={t.durationMin}>
+      <button class="opt" data-value={t.id} data-price={t.priceXof} data-duration={t.durationMin} role="radio" aria-checked="false">
         <span class="opt-radio"></span>
         <span class="opt-body">
           <span class="opt-title">{t.label}</span>
@@ -42,6 +43,10 @@ import { AIRBNB_TURNOVERS, fcfa } from '@lib/catalog';
 <script>
   import { loadState, saveState, type AirbnbState } from '@lib/state';
   import { AIRBNB_TURNOVERS, fcfa } from '@lib/catalog';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('size-list')) return;
 
   const list = document.getElementById('size-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
@@ -54,6 +59,7 @@ import { AIRBNB_TURNOVERS, fcfa } from '@lib/catalog';
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
       const active = el.dataset.value === current;
       el.classList.toggle('is-active', active);
+      el.setAttribute('aria-checked', active ? 'true' : 'false');
       if (active) price = Number(el.dataset.price);
     });
     cta.disabled = !current;
@@ -71,8 +77,10 @@ import { AIRBNB_TURNOVERS, fcfa } from '@lib/catalog';
 
   cta.addEventListener('click', () => {
     if (!current) return;
-    window.location.href = '/airbnb/mode/';
+    navigate('/airbnb/mode/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

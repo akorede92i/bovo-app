@@ -9,12 +9,14 @@ import CtaFooter from '@components/CtaFooter.astro';
   backHref="/airbnb/planning/"
   pageTitle="Service Airbnb"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={7} /></Fragment>
 
   <h1 class="h-display" style="margin-bottom:8px;">Vos coordonnées host</h1>
   <p class="text-lead" style="margin-bottom:24px;">Notre équipe vous appelle dans la journée pour valider votre setup.</p>
 
+  <form id="contact-form">
   <div class="field">
     <label class="field-label" for="name">Nom complet</label>
     <input id="name" class="input" type="text" autocomplete="name" required />
@@ -39,19 +41,25 @@ import CtaFooter from '@components/CtaFooter.astro';
   <!-- Offre compte client -->
   <div class="card card-elevated" style="margin-top:24px; background: linear-gradient(135deg, var(--bovo-bleu-light), #fff); border-color: transparent;">
     <label style="display:flex; align-items:flex-start; gap:12px; cursor:pointer;">
-      <input type="checkbox" id="create-account" checked style="margin-top:3px; transform: scale(1.2); accent-color: var(--bovo-bleu);" />
+      <input type="checkbox" id="create-account" style="margin-top:3px; transform: scale(1.2); accent-color: var(--bovo-bleu);" />
       <span>
         <span style="font-weight:600; display:block; margin-bottom:4px;">Créer mon espace host Bovo</span>
         <span class="text-muted">Ajoutez d'autres logements, consultez les rapports après chaque turnover, suivez votre planning iCal en temps réel.</span>
       </span>
     </label>
   </div>
+  <button type="submit" hidden aria-hidden="true" tabindex="-1"></button>
+  </form>
 
   <CtaFooter buttonLabel="Voir le récapitulatif" buttonType="button" buttonId="cta-next" disabled={true} />
 </Layout>
 
 <script>
   import { loadState, saveState, type AirbnbState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('name')) return;
 
   const name = document.getElementById('name') as HTMLInputElement;
   const phone = document.getElementById('phone') as HTMLInputElement;
@@ -59,6 +67,9 @@ import CtaFooter from '@components/CtaFooter.astro';
   const notes = document.getElementById('notes') as HTMLTextAreaElement;
   const createAccount = document.getElementById('create-account') as HTMLInputElement;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
+  const form = document.getElementById('contact-form') as HTMLFormElement | null;
+  // Entrée dans un champ → soumet le formulaire → déclenche le CTA (si valide).
+  form?.addEventListener('submit', (e) => { e.preventDefault(); if (!cta.disabled) cta.click(); });
 
   const s = loadState<AirbnbState>('airbnb');
   if (s.customer) {
@@ -83,8 +94,10 @@ import CtaFooter from '@components/CtaFooter.astro';
       },
     });
     sessionStorage.setItem('bovo:create-account', createAccount.checked ? '1' : '0');
-    window.location.href = '/airbnb/recap/';
+    navigate('/airbnb/recap/');
   });
 
   validate();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

@@ -11,6 +11,7 @@ import { MENAGE_FREQUENCES, MENAGE_MIN_HOURS, MENAGE_MAX_HOURS } from '@lib/cata
   backHref="/menage/"
   pageTitle="Ménage à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={2} /></Fragment>
 
@@ -39,9 +40,9 @@ import { MENAGE_FREQUENCES, MENAGE_MIN_HOURS, MENAGE_MAX_HOURS } from '@lib/cata
 
   <div class="field" style="margin-top:28px;">
     <span class="field-label">Fréquence</span>
-    <div class="stack-sm" id="freq-list">
+    <div class="stack-sm" id="freq-list" role="radiogroup" aria-label="Fréquence">
       {MENAGE_FREQUENCES.map((f) => (
-        <button class="opt" data-value={f.id} data-discount={f.discount}>
+        <button class="opt" data-value={f.id} data-discount={f.discount} role="radio" aria-checked="false">
           <span class="opt-radio"></span>
           <span class="opt-body">
             <span class="opt-title">{f.label}</span>
@@ -66,7 +67,10 @@ import { MENAGE_FREQUENCES, MENAGE_MIN_HOURS, MENAGE_MAX_HOURS } from '@lib/cata
 <script>
   import { loadState, saveState, type MenageState } from '@lib/state';
   import { MENAGE_HOURLY_XOF, MENAGE_MIN_HOURS, MENAGE_MAX_HOURS, fcfa } from '@lib/catalog';
+  import { navigate } from 'astro:transitions/client';
 
+  function init() {
+  if (!document.getElementById('freq-list')) return;
   const hoursVal = document.getElementById('hours-val')!;
   const hoursLabel = document.getElementById('hours-label')!;
   const minus = document.getElementById('hours-minus') as HTMLButtonElement;
@@ -86,7 +90,9 @@ import { MENAGE_FREQUENCES, MENAGE_MIN_HOURS, MENAGE_MAX_HOURS } from '@lib/cata
     plus.disabled = hours >= MENAGE_MAX_HOURS;
 
     freqList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.value === freq);
+      const isActive = el.dataset.value === freq;
+      el.classList.toggle('is-active', isActive);
+      el.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
 
     // estimation
@@ -114,8 +120,10 @@ import { MENAGE_FREQUENCES, MENAGE_MIN_HOURS, MENAGE_MAX_HOURS } from '@lib/cata
 
   cta.addEventListener('click', () => {
     if (!freq) return;
-    window.location.href = '/menage/options/';
+    navigate('/menage/options/');
   });
 
   render();
+  }
+  document.addEventListener('astro:page-load', init);
 </script>

@@ -11,15 +11,16 @@ import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
   backHref="/airbnb/mode/"
   pageTitle="Service Airbnb"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={4} /></Fragment>
 
   <h1 class="h-display" style="margin-bottom:8px;">Vos options par turnover</h1>
   <p class="text-lead" style="margin-bottom:24px;">Sélectionnez ce que Bovo doit gérer entre chaque voyageur.</p>
 
-  <div class="stack-sm" id="opt-list">
+  <div class="stack-sm" id="opt-list" role="group" aria-label="Options par turnover">
     {AIRBNB_OPTIONS.map((o) => (
-      <button class="opt" data-value={o.id} data-price={o.priceXof}>
+      <button class="opt" data-value={o.id} data-price={o.priceXof} aria-pressed="false">
         <span class="opt-check"><Icon name="check" size={14} /></span>
         <span class="opt-body">
           <span class="opt-title">{o.label}</span>
@@ -35,7 +36,10 @@ import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
 
 <script>
   import { loadState, saveState, type AirbnbState } from '@lib/state';
-  import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
+  import { AIRBNB_TURNOVERS, AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
+
+  function init() {
+  if (!document.getElementById('opt-list')) return;
 
   const list = document.getElementById('opt-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
@@ -43,7 +47,9 @@ import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
 
   const s = loadState<AirbnbState>('airbnb');
   let options = new Set<string>(s.options ?? []);
-  const base = s.estimatedPerTurnover ?? 0;
+  // Base = prix du turnover depuis le catalogue (PAS estimatedPerTurnover, qui est
+  // le total déjà options-incluses : le relire ferait gonfler le prix à chaque retour).
+  const base = AIRBNB_TURNOVERS.find((t) => t.id === s.size)?.priceXof ?? 0;
 
   function compute() {
     const opts = [...options].reduce((sum, id) => {
@@ -55,7 +61,9 @@ import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
 
   function render() {
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', options.has(el.dataset.value!));
+      const on = options.has(el.dataset.value!);
+      el.classList.toggle('is-active', on);
+      el.setAttribute('aria-pressed', on ? 'true' : 'false');
     });
     priceEl.textContent = fcfa(compute());
   }
@@ -75,4 +83,6 @@ import { AIRBNB_OPTIONS, fcfa } from '@lib/catalog';
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

@@ -10,6 +10,7 @@ import { MENAGE_LOGEMENTS } from '@lib/catalog';
   backHref="/"
   pageTitle="Ménage à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra">
     <Stepper total={7} current={1} />
@@ -18,9 +19,9 @@ import { MENAGE_LOGEMENTS } from '@lib/catalog';
   <h1 class="h-display" style="margin-bottom:8px;">Quelle est la taille de votre logement&nbsp;?</h1>
   <p class="text-lead" style="margin-bottom:24px;">Ça nous aide à estimer la durée idéale pour un ménage soigné.</p>
 
-  <div class="stack-sm" id="logement-list">
+  <div class="stack-sm" id="logement-list" role="radiogroup" aria-label="Taille du logement">
     {MENAGE_LOGEMENTS.map((l) => (
-      <button class="opt" data-value={l.id} data-base-hours={l.baseHours}>
+      <button class="opt" data-value={l.id} data-base-hours={l.baseHours} role="radio" aria-checked="false">
         <span class="opt-radio"></span>
         <span class="opt-body">
           <span class="opt-title">{l.label}</span>
@@ -41,7 +42,10 @@ import { MENAGE_LOGEMENTS } from '@lib/catalog';
 
 <script>
   import { loadState, saveState, type MenageState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
 
+  function init() {
+  if (!document.getElementById('logement-list')) return;
   const list = document.getElementById('logement-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
   let current = loadState<MenageState>('menage').logement ?? '';
@@ -50,6 +54,7 @@ import { MENAGE_LOGEMENTS } from '@lib/catalog';
     list.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
       const isActive = el.dataset.value === current;
       el.classList.toggle('is-active', isActive);
+      el.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
     cta.disabled = !current;
   }
@@ -65,8 +70,10 @@ import { MENAGE_LOGEMENTS } from '@lib/catalog';
 
   cta.addEventListener('click', () => {
     if (!current) return;
-    window.location.href = '/menage/duree/';
+    navigate('/menage/duree/');
   });
 
   render();
+  }
+  document.addEventListener('astro:page-load', init);
 </script>

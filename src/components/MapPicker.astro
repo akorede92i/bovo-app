@@ -65,10 +65,11 @@ const initialLng = typeof lng === 'number' ? lng : '';
 
 <script is:inline src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script is:inline>
-  (function () {
+  function initBovoMap() {
     if (typeof L === 'undefined') return;
     var container = document.getElementById('map-container');
-    if (!container) return;
+    if (!container || container.__bovoInit) return;
+    container.__bovoInit = true;
 
     var COTONOU = [6.3703, 2.3912];
     var latInput = document.getElementById('map-lat');
@@ -158,5 +159,14 @@ const initialLng = typeof lng === 'number' ? lng : '';
       marker.setLatLng([lat, lng]);
       setCoords(lat, lng);
     };
-  })();
+  }
+
+  // Init immédiate (chargement classique) + ré-init sur navigation View
+  // Transitions (le listener n'est posé qu'une fois ; le flag __bovoInit par
+  // conteneur évite toute double initialisation Leaflet).
+  if (!window.__bovoMapWired) {
+    window.__bovoMapWired = true;
+    document.addEventListener('astro:page-load', initBovoMap);
+  }
+  initBovoMap();
 </script>

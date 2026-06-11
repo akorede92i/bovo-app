@@ -3,12 +3,6 @@ import Layout from '@layouts/Layout.astro';
 import Stepper from '@components/Stepper.astro';
 import CtaFooter from '@components/CtaFooter.astro';
 
-const minDate = (() => {
-  const d = new Date();
-  d.setDate(d.getDate() + 3);
-  return d.toISOString().slice(0, 10);
-})();
-
 const SLOTS = [
   { id: '07-12', label: 'Matin (7h-12h)',      meta: 'Démarrage tôt, recommandé' },
   { id: '08-13', label: 'Matinée (8h-13h)',     meta: 'Démarrage standard' },
@@ -21,6 +15,7 @@ const SLOTS = [
   backHref="/demenagement/options/"
   pageTitle="Déménagement"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={5} /></Fragment>
 
@@ -29,14 +24,14 @@ const SLOTS = [
 
   <div class="field">
     <label class="field-label" for="date">Date du déménagement</label>
-    <input id="date" class="input" type="date" min={minDate} required />
+    <input id="date" class="input" type="date" required />
   </div>
 
   <div class="field" style="margin-top:24px;">
     <span class="field-label">Créneau de démarrage</span>
-    <div class="stack-sm" id="slot-list">
+    <div class="stack-sm" id="slot-list" role="radiogroup" aria-label="Créneau de démarrage">
       {SLOTS.map((s) => (
-        <button class="opt" data-value={s.id}>
+        <button class="opt" data-value={s.id} role="radio" aria-checked="false">
           <span class="opt-radio"></span>
           <span class="opt-body">
             <span class="opt-title">{s.label}</span>
@@ -52,10 +47,20 @@ const SLOTS = [
 
 <script>
   import { loadState, saveState, type DemenagementState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('slot-list')) return;
 
   const dateInput = document.getElementById('date') as HTMLInputElement;
   const slotList = document.getElementById('slot-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  // date minimum = +3 jours (calculée au runtime, pas au build) pour caler l'équipe et le camion
+  const minDateObj = new Date();
+  minDateObj.setDate(minDateObj.getDate() + 3);
+  const minDate = minDateObj.toISOString().slice(0, 10);
+  dateInput.min = minDate;
 
   const s = loadState<DemenagementState>('demenagement');
   let date = s.date ?? '';
@@ -64,7 +69,9 @@ const SLOTS = [
 
   function render() {
     slotList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.value === slot);
+      const active = el.dataset.value === slot;
+      el.classList.toggle('is-active', active);
+      el.setAttribute('aria-checked', active ? 'true' : 'false');
     });
     cta.disabled = !(date && slot);
   }
@@ -80,8 +87,17 @@ const SLOTS = [
 
   cta.addEventListener('click', () => {
     if (!date || !slot) return;
-    window.location.href = '/demenagement/contact/';
+    if (date < minDate) {
+      dateInput.value = '';
+      date = '';
+      render();
+      alert('Cette date n\'est plus disponible (délai minimum 3 jours). Merci de choisir une nouvelle date.');
+      return;
+    }
+    navigate('/demenagement/contact/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

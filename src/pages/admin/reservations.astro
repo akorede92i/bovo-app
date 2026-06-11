@@ -12,6 +12,7 @@ import AdminLayout from '@layouts/AdminLayout.astro';
       <option value="airbnb">Airbnb</option>
       <option value="demenagement">Déménagement</option>
       <option value="chef">Chef</option>
+      <option value="plombier">Plombier</option>
     </select>
     <select id="filter-status" class="select" style="max-width:180px;">
       <option value="all">Tous les statuts</option>
@@ -64,7 +65,8 @@ import AdminLayout from '@layouts/AdminLayout.astro';
 
 <script>
   import { getSupabase } from '@lib/supabase';
-  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS } from '@lib/admin';
+  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS, escapeHtml } from '@lib/admin';
+  import { suggestWorkers } from '@lib/matching';
   import { fcfa } from '@lib/catalog';
 
   const supa = getSupabase();
@@ -117,14 +119,14 @@ import AdminLayout from '@layouts/AdminLayout.astro';
           <tr data-id="${r.id}">
             <td style="font-size:1.4rem;">${SERVICE_ICONS[r.service_type] ?? '✦'}</td>
             <td>
-              <div style="font-weight:600;">${r.guest_name ?? 'Anonyme'}</div>
-              <div style="font-size:0.8rem; color:var(--bovo-muted);">${r.guest_phone ?? '—'}</div>
+              <div style="font-weight:600;">${escapeHtml(r.guest_name) || 'Anonyme'}</div>
+              <div style="font-size:0.8rem; color:var(--bovo-muted);">${escapeHtml(r.guest_phone) || '—'}</div>
             </td>
-            <td>${SERVICE_LABELS[r.service_type] ?? r.service_type}</td>
+            <td>${SERVICE_LABELS[r.service_type] ?? escapeHtml(r.service_type)}</td>
             <td style="white-space:nowrap;">${dateStr}</td>
             <td style="font-family:'Jost'; font-weight:700;">${r.estimated_total_xof ? fcfa(r.estimated_total_xof) : '—'}</td>
-            <td><span class="status-badge" style="background:${STATUS_COLORS[r.status] ?? '#6B7280'};">${STATUS_LABELS[r.status] ?? r.status}</span></td>
-            <td style="font-size:0.86rem;">${worker?.full_name ?? '<span style="color:var(--bovo-muted);">non assigné</span>'}</td>
+            <td><span class="status-badge" style="background:${STATUS_COLORS[r.status] ?? '#6B7280'};">${STATUS_LABELS[r.status] ?? escapeHtml(r.status)}</span></td>
+            <td style="font-size:0.86rem;">${worker ? escapeHtml(worker.full_name) || 'Sans nom' : '<span style="color:var(--bovo-muted);">non assigné</span>'}</td>
           </tr>
         `;
       }).join('');
@@ -138,8 +140,8 @@ import AdminLayout from '@layouts/AdminLayout.astro';
             <div style="display:flex; gap:12px; align-items:flex-start;">
               <div style="font-size:1.6rem;">${SERVICE_ICONS[r.service_type] ?? '✦'}</div>
               <div style="flex:1; min-width:0;">
-                <div style="font-weight:600;">${r.guest_name ?? 'Anonyme'} — ${SERVICE_LABELS[r.service_type] ?? r.service_type}</div>
-                <div style="font-size:0.84rem; color:var(--bovo-muted); margin-top:2px;">${dateStr} · ${r.guest_phone ?? '—'}</div>
+                <div style="font-weight:600;">${escapeHtml(r.guest_name) || 'Anonyme'} — ${SERVICE_LABELS[r.service_type] ?? escapeHtml(r.service_type)}</div>
+                <div style="font-size:0.84rem; color:var(--bovo-muted); margin-top:2px;">${dateStr} · ${escapeHtml(r.guest_phone) || '—'}</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                   <span class="status-badge" style="background:${STATUS_COLORS[r.status] ?? '#6B7280'};">${STATUS_LABELS[r.status] ?? r.status}</span>
                   <span style="font-family:'Jost'; font-weight:700;">${r.estimated_total_xof ? fcfa(r.estimated_total_xof) : '—'}</span>
@@ -175,9 +177,9 @@ import AdminLayout from '@layouts/AdminLayout.astro';
       const dateStr = r.scheduled_at ? new Date(r.scheduled_at).toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' }) : '—';
       const payload = r.payload ?? {};
       const addr = payload.address ?? payload.from ?? {};
-      const addressLine = addr.street ? `${addr.street}${addr.quartier ? ', ' + addr.quartier : ''}, ${addr.zone ?? ''}` : '—';
+      const addressLine = addr.street ? escapeHtml(`${addr.street}${addr.quartier ? ', ' + addr.quartier : ''}, ${addr.zone ?? ''}`) : '—';
 
-      const workerOptions = workers.map((w: any) => `<option value="${w.id}" ${w.id === r.assigned_worker_id ? 'selected' : ''}>${w.full_name || 'Worker sans nom'}</option>`).join('');
+      const workerOptions = workers.map((w: any) => `<option value="${escapeHtml(w.id)}" ${w.id === r.assigned_worker_id ? 'selected' : ''}>${escapeHtml(w.full_name) || 'Worker sans nom'}</option>`).join('');
 
       modalBody.innerHTML = `
         <div style="margin-bottom:20px;">
@@ -189,9 +191,9 @@ import AdminLayout from '@layouts/AdminLayout.astro';
         </div>
 
         <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Client</h3>
-        ${row('Nom', r.guest_name ?? '—')}
-        ${row('Téléphone', r.guest_phone ? `<a href="https://wa.me/${r.guest_phone.replace(/\D/g, '')}" style="color:var(--bovo-bleu);">${r.guest_phone}</a>` : '—')}
-        ${row('Email', r.guest_email ?? '—')}
+        ${row('Nom', escapeHtml(r.guest_name) || '—')}
+        ${row('Téléphone', r.guest_phone ? `<a href="https://wa.me/${r.guest_phone.replace(/\D/g, '')}" style="color:var(--bovo-bleu);">${escapeHtml(r.guest_phone)}</a>` : '—')}
+        ${row('Email', escapeHtml(r.guest_email) || '—')}
 
         <h3 style="font-family:'Jost'; font-weight:700; margin: 20px 0 10px;">Prestation</h3>
         ${row('Date prévue', dateStr)}
@@ -199,9 +201,10 @@ import AdminLayout from '@layouts/AdminLayout.astro';
         ${row('Adresse', addressLine)}
 
         <h3 style="font-family:'Jost'; font-weight:700; margin: 20px 0 10px;">Détail tunnel</h3>
-        <pre style="background:var(--bovo-bg-soft); padding:14px; border-radius: var(--r-md); font-size:0.78rem; overflow-x:auto; white-space:pre-wrap;">${JSON.stringify(payload, null, 2)}</pre>
+        <pre style="background:var(--bovo-bg-soft); padding:14px; border-radius: var(--r-md); font-size:0.78rem; overflow-x:auto; white-space:pre-wrap;">${escapeHtml(JSON.stringify(payload, null, 2))}</pre>
 
         <h3 style="font-family:'Jost'; font-weight:700; margin: 20px 0 10px;">Actions admin</h3>
+        <div id="suggestions" style="margin-bottom:16px;"></div>
         <div class="field" style="margin-bottom:14px;">
           <label class="field-label">Assigner un worker</label>
           <select id="worker-select" class="select">
@@ -243,6 +246,54 @@ import AdminLayout from '@layouts/AdminLayout.astro';
         okEl.style.display = 'block';
         setTimeout(() => { modal.hidden = true; load(); }, 800);
       });
+
+      // ===== SUGGESTIONS D'ASSIGNATION AUTO =====
+      const sugEl = document.getElementById('suggestions')!;
+      if (!r.scheduled_at) {
+        sugEl.innerHTML = '<div style="font-size:0.82rem; color:var(--bovo-muted);">Pas de créneau planifié — assignation manuelle.</div>';
+      } else {
+        sugEl.innerHTML = '<div style="font-size:0.82rem; color:var(--bovo-muted);">Calcul des suggestions…</div>';
+        try {
+          const cands = await suggestWorkers(supa, {
+            id: r.id,
+            service_type: r.service_type,
+            zone: addr.zone ?? null,
+            scheduled_at: r.scheduled_at,
+            duration_min: r.duration_min,
+          });
+          if (!cands.length) {
+            sugEl.innerHTML = '<div style="font-size:0.82rem; color:var(--bovo-muted);">Aucun worker compétent et disponible. Vérifie compétences / zones / dispos des workers.</div>';
+          } else {
+            const top = cands.slice(0, 4);
+            sugEl.innerHTML = `
+              <div style="font-weight:600; font-size:0.86rem; margin-bottom:8px;">Suggestions auto
+                <span style="color:var(--bovo-muted); font-weight:400; font-size:0.78rem;">compétence · zone · dispo · note · charge</span>
+              </div>
+              ${top.map((c, i) => `
+                <button type="button" class="sug-item" data-worker="${c.worker_id}"
+                  style="display:block; width:100%; text-align:left; border:1.5px solid ${i === 0 ? 'var(--bovo-bleu)' : 'var(--bovo-line)'}; background:${i === 0 ? 'var(--bovo-bleu-light)' : '#fff'}; border-radius:var(--r-md); padding:10px 12px; margin-bottom:8px; cursor:pointer;">
+                  <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:600;">${i === 0 ? '⚡ ' : ''}${escapeHtml(c.full_name)}</span>
+                    <span style="font-size:0.74rem; color:var(--bovo-muted);">score ${c.score}</span>
+                  </div>
+                  ${c.reasons.length ? `<div style="font-size:0.74rem; color:var(--bovo-success); margin-top:3px;">${escapeHtml(c.reasons.join(' · '))}</div>` : ''}
+                  ${c.warnings.length ? `<div style="font-size:0.74rem; color:var(--bovo-warning); margin-top:2px;">⚠ ${escapeHtml(c.warnings.join(' · '))}</div>` : ''}
+                </button>
+              `).join('')}
+            `;
+            sugEl.querySelectorAll('.sug-item').forEach((btn) => btn.addEventListener('click', () => {
+              const wid = (btn as HTMLElement).dataset.worker!;
+              (document.getElementById('worker-select') as HTMLSelectElement).value = wid;
+              const ss = document.getElementById('status-select') as HTMLSelectElement;
+              if (ss.value === 'pending' || ss.value === 'confirmed') ss.value = 'assigned';
+              sugEl.querySelectorAll('.sug-item').forEach((b) => ((b as HTMLElement).style.boxShadow = ''));
+              (btn as HTMLElement).style.boxShadow = '0 0 0 2px var(--bovo-bleu)';
+            }));
+          }
+        } catch (e: any) {
+          sugEl.innerHTML = `<div style="font-size:0.82rem; color:var(--bovo-muted);">Suggestions indisponibles (${e?.message ?? 'erreur'}).</div>`;
+        }
+      }
     }
 
     document.getElementById('modal-close')!.addEventListener('click', () => modal.hidden = true);

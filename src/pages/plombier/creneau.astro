@@ -10,9 +10,6 @@ const SLOTS = [
   { id: '15-17', label: '15:00 — 17:00', meta: 'Après-midi' },
   { id: '17-19', label: '17:00 — 19:00', meta: 'Fin d\'après-midi' },
 ];
-
-// date minimum = aujourd'hui (utile pour les urgences plomberie)
-const today = new Date().toISOString().slice(0, 10);
 ---
 <Layout
   title="Plombier — Étape 4 : Date et créneau | Bovo"
@@ -20,6 +17,7 @@ const today = new Date().toISOString().slice(0, 10);
   backHref="/plombier/adresse/"
   pageTitle="Plombier à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={6} current={4} /></Fragment>
 
@@ -28,14 +26,14 @@ const today = new Date().toISOString().slice(0, 10);
 
   <div class="field">
     <label class="field-label" for="date">Date</label>
-    <input id="date" class="input" type="date" min={today} required />
+    <input id="date" class="input" type="date" required />
   </div>
 
   <div class="field" style="margin-top:24px;">
     <span class="field-label">Créneau</span>
-    <div class="stack-sm" id="slot-list">
+    <div class="stack-sm" id="slot-list" role="radiogroup" aria-label="Créneau">
       {SLOTS.map((s) => (
-        <button class="opt" data-value={s.id}>
+        <button class="opt" data-value={s.id} role="radio" aria-checked="false">
           <span class="opt-radio"></span>
           <span class="opt-body">
             <span class="opt-title">{s.label}</span>
@@ -51,10 +49,18 @@ const today = new Date().toISOString().slice(0, 10);
 
 <script>
   import { loadState, saveState, type PlombierState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
+
+  function init() {
+  if (!document.getElementById('slot-list')) return;
 
   const dateInput = document.getElementById('date') as HTMLInputElement;
   const slotList = document.getElementById('slot-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  // date minimum = aujourd'hui (calculée au runtime, utile pour les urgences plomberie)
+  const minDate = new Date().toISOString().slice(0, 10);
+  dateInput.min = minDate;
 
   const s = loadState<PlombierState>('plombier');
   let date = s.date ?? '';
@@ -63,7 +69,9 @@ const today = new Date().toISOString().slice(0, 10);
 
   function render() {
     slotList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.value === slot);
+      const isActive = el.dataset.value === slot;
+      el.classList.toggle('is-active', isActive);
+      el.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
     cta.disabled = !(date && slot);
   }
@@ -84,8 +92,17 @@ const today = new Date().toISOString().slice(0, 10);
 
   cta.addEventListener('click', () => {
     if (!date || !slot) return;
-    window.location.href = '/plombier/contact/';
+    if (date < minDate) {
+      dateInput.value = '';
+      date = '';
+      render();
+      alert('Cette date n\'est plus disponible. Merci de choisir une nouvelle date.');
+      return;
+    }
+    navigate('/plombier/contact/');
   });
 
   render();
-</script>
+
+  }
+  document.addEventListener('astro:page-load', init);</script>

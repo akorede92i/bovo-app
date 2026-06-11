@@ -10,11 +10,6 @@ const SLOTS = [
   { id: '15-17', label: '15:00 — 17:00', meta: 'Après-midi' },
   { id: '17-19', label: '17:00 — 19:00', meta: 'Fin d\'après-midi' },
 ];
-
-// date minimum = demain
-const tomorrow = new Date();
-tomorrow.setDate(tomorrow.getDate() + 1);
-const minDate = tomorrow.toISOString().slice(0, 10);
 ---
 <Layout
   title="Ménage — Étape 5 : Date et créneau | Bovo"
@@ -22,6 +17,7 @@ const minDate = tomorrow.toISOString().slice(0, 10);
   backHref="/menage/adresse/"
   pageTitle="Ménage à domicile"
   noindex
+  transitions
 >
   <Fragment slot="topbar-extra"><Stepper total={7} current={5} /></Fragment>
 
@@ -30,14 +26,14 @@ const minDate = tomorrow.toISOString().slice(0, 10);
 
   <div class="field">
     <label class="field-label" for="date">Date</label>
-    <input id="date" class="input" type="date" min={minDate} required />
+    <input id="date" class="input" type="date" required />
   </div>
 
   <div class="field" style="margin-top:24px;">
     <span class="field-label">Créneau</span>
-    <div class="stack-sm" id="slot-list">
+    <div class="stack-sm" id="slot-list" role="radiogroup" aria-label="Créneau">
       {SLOTS.map((s) => (
-        <button class="opt" data-value={s.id}>
+        <button class="opt" data-value={s.id} role="radio" aria-checked="false">
           <span class="opt-radio"></span>
           <span class="opt-body">
             <span class="opt-title">{s.label}</span>
@@ -53,10 +49,19 @@ const minDate = tomorrow.toISOString().slice(0, 10);
 
 <script>
   import { loadState, saveState, type MenageState } from '@lib/state';
+  import { navigate } from 'astro:transitions/client';
 
+  function init() {
+  if (!document.getElementById('slot-list')) return;
   const dateInput = document.getElementById('date') as HTMLInputElement;
   const slotList = document.getElementById('slot-list')!;
   const cta = document.getElementById('cta-next') as HTMLButtonElement;
+
+  // date minimum = demain (calculée au runtime, pas au build)
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const minDate = tomorrow.toISOString().slice(0, 10);
+  dateInput.min = minDate;
 
   const s = loadState<MenageState>('menage');
   let date = s.date ?? '';
@@ -65,7 +70,9 @@ const minDate = tomorrow.toISOString().slice(0, 10);
 
   function render() {
     slotList.querySelectorAll<HTMLButtonElement>('.opt').forEach((el) => {
-      el.classList.toggle('is-active', el.dataset.value === slot);
+      const isActive = el.dataset.value === slot;
+      el.classList.toggle('is-active', isActive);
+      el.setAttribute('aria-checked', isActive ? 'true' : 'false');
     });
     cta.disabled = !(date && slot);
   }
@@ -86,8 +93,17 @@ const minDate = tomorrow.toISOString().slice(0, 10);
 
   cta.addEventListener('click', () => {
     if (!date || !slot) return;
-    window.location.href = '/menage/contact/';
+    if (date < minDate) {
+      dateInput.value = '';
+      date = '';
+      render();
+      alert('Cette date n\'est plus disponible. Merci de choisir une nouvelle date.');
+      return;
+    }
+    navigate('/menage/contact/');
   });
 
   render();
+  }
+  document.addEventListener('astro:page-load', init);
 </script>
