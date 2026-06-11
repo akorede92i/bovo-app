@@ -2,20 +2,17 @@
 import Layout from '@layouts/Layout.astro';
 import ServiceCard from '@components/ServiceCard.astro';
 import Icon from '@components/Icon.astro';
-import { fcfa, MENAGE_HOURLY_XOF, MENAGE_MIN_HOURS, AIRBNB_TURNOVERS, DEM_VOLUMES, CHEF_FREQUENCES } from '@lib/catalog';
+import { fcfa, MENAGE_HOURLY_XOF, MENAGE_MIN_HOURS, AIRBNB_TURNOVERS, DEM_VOLUMES, CHEF_FREQUENCES, PLOMBIER_TYPES } from '@lib/catalog';
 
 const menagePriceFrom = MENAGE_HOURLY_XOF * MENAGE_MIN_HOURS;
 const airbnbPriceFrom = AIRBNB_TURNOVERS[0].priceXof;
 const demPriceFrom = DEM_VOLUMES[0].priceXof;
 const chefPriceFrom = CHEF_FREQUENCES[0].baseXof;
-// NB : service Plombier en attente — caché de la home tant que la migration
-// supabase 20260522_plombier_and_reviews.sql n'est pas appliquée (sinon les
-// résas plombier sont rejetées par la CHECK constraint service_type).
-// Les pages /plombier/* restent en place et indexables si on a un lien direct.
+const plombierPriceFrom = Math.min(...PLOMBIER_TYPES.map((t) => t.priceXof));
 ---
 <Layout
   title="Bovo — Réservez votre prestation à Cotonou en 2 minutes"
-  description="Ménage, déménagement, chef à domicile et service Airbnb à Cotonou, Calavi, Porto-Novo. Réservez en ligne, prestataires vérifiés, paiement Mobile Money."
+  description="Ménage, plomberie, déménagement, chef à domicile et service Airbnb à Cotonou, Calavi, Porto-Novo. Réservez en ligne, prestataires vérifiés, paiement Mobile Money."
   shell="landing"
 >
   <!-- ============ HERO ============ -->
@@ -26,7 +23,7 @@ const chefPriceFrom = CHEF_FREQUENCES[0].baseXof;
         <h1 class="home-hero-title">Votre prestation,<br><span class="accent">réservée en 2 min.</span></h1>
         <p class="home-hero-sub">Votre maison propre, votre repas prêt.</p>
         <p class="home-hero-desc">
-          Ménage, déménagement, chef à domicile et turnover Airbnb. Prestataires Bovo vérifiés,
+          Ménage, plomberie, déménagement, chef à domicile et turnover Airbnb. Prestataires Bovo vérifiés,
           tarifs clairs, intervention 7j/7.
         </p>
         <div class="home-hero-actions">
@@ -75,7 +72,7 @@ const chefPriceFrom = CHEF_FREQUENCES[0].baseXof;
     <div class="l-container">
       <div class="home-section-head">
         <h2 class="home-section-title">Que peut-on faire pour vous&nbsp;?</h2>
-        <p class="home-section-sub">4 services pour faire tourner votre maison et votre activité, sans stress.</p>
+        <p class="home-section-sub">5 services pour faire tourner votre maison et votre activité, sans stress.</p>
       </div>
       <div class="home-services">
         <ServiceCard
@@ -107,8 +104,13 @@ const chefPriceFrom = CHEF_FREQUENCES[0].baseXof;
           title="Chef à domicile"
           meta={`Dès <strong>${fcfa(chefPriceFrom)}</strong>/mois · engagement 1 mois min`}
         />
-        {/* Plombier caché jusqu'à application de la migration Supabase
-            20260522_plombier_and_reviews.sql (CHECK constraint sur service_type) */}
+        <ServiceCard
+          href="/plombier/"
+          icon="wrench"
+          iconColor="bleu"
+          title="Plombier à domicile"
+          meta={`Dès <strong>${fcfa(plombierPriceFrom)}</strong> · urgence et réparation 7j/7`}
+        />
       </div>
     </div>
   </section>
@@ -124,7 +126,7 @@ const chefPriceFrom = CHEF_FREQUENCES[0].baseXof;
         <div class="home-step">
           <div class="home-step-num">1</div>
           <div class="home-step-title">Choisissez votre service</div>
-          <div class="home-step-desc">Ménage, Airbnb, déménagement ou chef à domicile. Tarif affiché en direct, sans surprise.</div>
+          <div class="home-step-desc">Ménage, Airbnb, déménagement, chef ou plombier. Tarif affiché en direct, sans surprise.</div>
         </div>
         <div class="home-step">
           <div class="home-step-num">2</div>
@@ -190,6 +192,7 @@ const chefPriceFrom = CHEF_FREQUENCES[0].baseXof;
         <a href="/airbnb/">Service Airbnb</a>
         <a href="/demenagement/">Déménagement</a>
         <a href="/chef/">Chef à domicile</a>
+        <a href="/plombier/">Plombier à domicile</a>
       </div>
       <div class="home-footer-col">
         <div class="home-footer-h">Compte</div>
@@ -209,6 +212,31 @@ const chefPriceFrom = CHEF_FREQUENCES[0].baseXof;
     </div>
   </footer>
 </Layout>
+
+<script>
+  // Note moyenne globale chargée dynamiquement depuis Supabase.
+  // Requiert la migration 20260522_plombier_and_reviews.sql qui définit
+  // la fonction RPC public.global_review_stats() — sans elle, l'appel renvoie
+  // un 404 silencieusement intercepté (fallback statique "4,8/5 satisfaction").
+  import { getSupabase } from '@lib/supabase';
+
+  const supa = getSupabase();
+  if (supa) {
+    const { data, error } = await supa.rpc('global_review_stats');
+    if (!error && Array.isArray(data) && data.length > 0) {
+      const row = data[0] as { review_count: number; avg_rating: number };
+      const count = Number(row.review_count ?? 0);
+      const avg = Number(row.avg_rating ?? 0);
+      if (count > 0 && avg > 0) {
+        const target = document.querySelector('#trust-rating [data-rating-text]');
+        if (target) {
+          const formatted = avg.toFixed(1).replace('.', ',');
+          target.textContent = `${formatted}/5 · ${count} avis`;
+        }
+      }
+    }
+  }
+</script>
 
 <style>
   /* ============ HERO ============ */
