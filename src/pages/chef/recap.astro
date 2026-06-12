@@ -32,7 +32,10 @@ import Icon from '@components/Icon.astro';
   <CtaFooter buttonLabel="Envoyer ma demande" buttonType="button" buttonId="cta-submit" priceLabel="Forfait mensuel" priceValue="—" variant="rouge" />
 </Layout>
 
-<script src="https://cdn.kkiapay.me/k.js"></script>
+<!-- is:inline obligatoire : sans ça Astro transforme ce script externe en
+     `import "https://cdn.kkiapay.me/k.js"` (module ES cross-origin) qui échoue,
+     donc window.openKkiapayWidget n'est jamais défini → acompte mort. -->
+<script is:inline src="https://cdn.kkiapay.me/k.js"></script>
 
 <script>
   import { loadState, type ChefState } from '@lib/state';

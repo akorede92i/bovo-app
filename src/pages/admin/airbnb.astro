@@ -75,7 +75,7 @@ import AdminLayout from '@layouts/AdminLayout.astro';
 
 <script>
   import { getSupabase } from '@lib/supabase';
-  import { STATUS_LABELS, STATUS_COLORS } from '@lib/admin';
+  import { STATUS_LABELS, STATUS_COLORS, escapeHtml } from '@lib/admin';
 
   const supa = getSupabase();
   if (!supa) {
@@ -121,15 +121,15 @@ import AdminLayout from '@layouts/AdminLayout.astro';
         return `
           <tr>
             <td>
-              <div style="font-weight:600;">${p.label}</div>
-              <div style="font-size:0.8rem; color:var(--bovo-muted);">${p.street}${p.quartier ? `, ${p.quartier}` : ''}</div>
+              <div style="font-weight:600;">${escapeHtml(p.label)}</div>
+              <div style="font-size:0.8rem; color:var(--bovo-muted);">${escapeHtml(p.street)}${p.quartier ? `, ${escapeHtml(p.quartier)}` : ''}</div>
             </td>
             <td>
-              <div>${host?.full_name ?? '—'}</div>
-              <div style="font-size:0.8rem; color:var(--bovo-muted);">${host?.phone ?? ''}</div>
+              <div>${escapeHtml(host?.full_name ?? '—')}</div>
+              <div style="font-size:0.8rem; color:var(--bovo-muted);">${escapeHtml(host?.phone ?? '')}</div>
             </td>
-            <td>${p.zone}</td>
-            <td>${SIZE_LABELS[p.size_type] ?? p.size_type}</td>
+            <td>${escapeHtml(p.zone)}</td>
+            <td>${escapeHtml(SIZE_LABELS[p.size_type] ?? p.size_type)}</td>
             <td>${p.ical_url ? '<span class="status-badge" style="background:var(--bovo-success);">Connecté</span>' : '<span class="status-badge" style="background:var(--bovo-warning);">Sans iCal</span>'}</td>
             <td style="font-size:0.84rem;">${synced}</td>
           </tr>
@@ -142,12 +142,12 @@ import AdminLayout from '@layouts/AdminLayout.astro';
         return `
           <div style="background:#fff; border:1px solid var(--bovo-line-soft); border-radius:var(--r-lg); padding:14px; margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-              <strong>${p.label}</strong>
+              <strong>${escapeHtml(p.label)}</strong>
               ${p.ical_url ? '<span class="status-badge" style="background:var(--bovo-success);">iCal</span>' : '<span class="status-badge" style="background:var(--bovo-warning);">Sans iCal</span>'}
             </div>
             <div style="font-size:0.84rem; color:var(--bovo-muted); line-height:1.5;">
-              ${SIZE_LABELS[p.size_type] ?? p.size_type} · ${p.zone}<br>
-              Host : ${host?.full_name ?? '—'}
+              ${escapeHtml(SIZE_LABELS[p.size_type] ?? p.size_type)} · ${escapeHtml(p.zone)}<br>
+              Host : ${escapeHtml(host?.full_name ?? '—')}
             </div>
           </div>
         `;
@@ -187,9 +187,9 @@ import AdminLayout from '@layouts/AdminLayout.astro';
               <div style="font-weight:600;">${new Date(t.check_out_at).toLocaleDateString('fr-FR')}</div>
               <div style="font-size:0.8rem; color:var(--bovo-muted);">${new Date(t.check_out_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} → ${new Date(t.check_in_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</div>
             </td>
-            <td>${prop?.label ?? '—'}</td>
-            <td><span class="status-badge" style="background:${STATUS_COLORS[t.status] ?? '#6B7280'};">${STATUS_LABELS[t.status] ?? t.status}</span></td>
-            <td>${worker?.full_name ?? '<span style="color:var(--bovo-muted);">non assigné</span>'}</td>
+            <td>${escapeHtml(prop?.label ?? '—')}</td>
+            <td><span class="status-badge" style="background:${STATUS_COLORS[t.status] ?? '#6B7280'};">${escapeHtml(STATUS_LABELS[t.status] ?? t.status)}</span></td>
+            <td>${worker?.full_name ? escapeHtml(worker.full_name) : '<span style="color:var(--bovo-muted);">non assigné</span>'}</td>
           </tr>
         `;
       }).join('');

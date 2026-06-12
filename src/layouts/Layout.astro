@@ -175,7 +175,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
 
         {shell === 'tunnel' ? (
           <div class="tunnel-grid">
-            <main class="page tunnel-main">
+            <main id="main-content" class="page tunnel-main">
               <slot />
             </main>
             <aside class="tunnel-aside">
@@ -183,7 +183,7 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
             </aside>
           </div>
         ) : (
-          <main class="page">
+          <main id="main-content" class="page">
             <slot />
           </main>
         )}
@@ -213,24 +213,48 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
 
     <!-- Mobile drawer toggle (landing + dashboard shells) -->
     <script>
-      const landingBurger = document.getElementById('landing-burger');
-      if (landingBurger) {
-        landingBurger.addEventListener('click', () => {
-          document.body.classList.toggle('landing-drawer-open');
-        });
-        document.querySelectorAll('.landing-nav a, .landing-cta a').forEach((a) => {
-          a.addEventListener('click', () => document.body.classList.remove('landing-drawer-open'));
-        });
+      const DRAWERS = [
+        { burgerId: 'landing-burger', openClass: 'landing-drawer-open', linksSel: '.landing-nav a, .landing-cta a' },
+        { burgerId: 'dash-burger', openClass: 'dash-drawer-open', linksSel: '.dash-sidebar a' },
+      ];
+
+      function closeDrawers() {
+        for (const { burgerId, openClass } of DRAWERS) {
+          document.body.classList.remove(openClass);
+          document.getElementById(burgerId)?.setAttribute('aria-expanded', 'false');
+        }
       }
-      const dashBurger = document.getElementById('dash-burger');
-      if (dashBurger) {
-        dashBurger.addEventListener('click', () => {
-          document.body.classList.toggle('dash-drawer-open');
-        });
-        document.querySelectorAll('.dash-sidebar a').forEach((a) => {
-          a.addEventListener('click', () => document.body.classList.remove('dash-drawer-open'));
-        });
+
+      function initDrawers() {
+        for (const { burgerId, openClass, linksSel } of DRAWERS) {
+          const burger = document.getElementById(burgerId);
+          // Garde anti-double-bind : astro:page-load se déclenche aussi au premier
+          // chargement quand le routeur View Transitions est présent.
+          if (!burger || burger.dataset.bound) continue;
+          burger.dataset.bound = 'true';
+          burger.setAttribute('aria-expanded', 'false');
+          burger.addEventListener('click', () => {
+            const open = document.body.classList.toggle(openClass);
+            burger.setAttribute('aria-expanded', String(open));
+          });
+          document.querySelectorAll(linksSel).forEach((a) => {
+            a.addEventListener('click', closeDrawers);
+          });
+        }
       }
+
+      initDrawers();
+      // Ré-initialisation après une navigation View Transitions (le DOM est
+      // remplacé, les listeners des anciens éléments sont perdus).
+      document.addEventListener('astro:page-load', initDrawers);
+
+      // L'overlay est un ::before du body : un clic dessus cible <body> → fermeture.
+      document.addEventListener('click', (e) => {
+        if (e.target === document.body) closeDrawers();
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeDrawers();
+      });
     </script>
   </body>
 </html>

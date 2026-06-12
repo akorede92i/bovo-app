@@ -56,6 +56,13 @@ input, textarea, select { font-family: inherit; font-size: 16px; /* évite zoom 
 a { color: inherit; text-decoration: none; }
 img, svg { display: block; max-width: 100%; }
 
+/* L'attribut [hidden] DOIT l'emporter sur un display de l'auteur. Sans ce
+   !important, un élément `<div hidden style="display:flex">` (nos modales,
+   togglées en JS via `el.hidden = true/false`) reste affiché car le style
+   inline bat la règle [hidden]{display:none} du UA stylesheet → modale figée
+   visible et non fermable. */
+[hidden] { display: none !important; }
+
 /* ===== DESIGN TOKENS ===== */
 :root {
   /* couleurs marque */
@@ -264,6 +271,10 @@ body[data-shell='landing'] {
 }
 
 /* Mobile drawer pour landing : panneau slide-in à droite */
+/* Le header (backdrop-filter → stacking context plafonné à --z-sticky) doit passer
+   au-dessus de l'overlay quand le drawer est ouvert, sinon l'overlay recouvre le
+   menu ET le burger (enfants du header) : menu mobile inerte. */
+.landing-drawer-open .landing-header { z-index: var(--z-modal); }
 .landing-drawer-open::before {
   content: '';
   position: fixed;
@@ -426,6 +437,9 @@ body[data-shell='dashboard'] {
 .dash-nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
 
 /* Mobile drawer (dashboard) */
+/* Même piège que .landing-header : la topbar sticky (stacking context à --z-sticky)
+   doit passer au-dessus de l'overlay pour que le burger reste cliquable (fermeture). */
+.dash-drawer-open .dash-topbar { z-index: var(--z-modal); }
 .dash-drawer-open .dash-sidebar {
   display: block;
   position: fixed;

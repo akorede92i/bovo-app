@@ -32,8 +32,10 @@ import Icon from '@components/Icon.astro';
   <CtaFooter buttonLabel="Envoyer ma demande" buttonType="button" buttonId="cta-submit" priceLabel="Estimation totale" priceValue="—" variant="rouge" />
 </Layout>
 
-<!-- Kkiapay widget (chargé seulement si acompte coché) -->
-<script src="https://cdn.kkiapay.me/k.js"></script>
+<!-- Kkiapay widget. is:inline obligatoire : sinon Astro le transforme en
+     `import "https://cdn.kkiapay.me/k.js"` (module ES cross-origin) qui échoue,
+     donc window.openKkiapayWidget n'est jamais défini → acompte mort. -->
+<script is:inline src="https://cdn.kkiapay.me/k.js"></script>
 
 <script>
   import { loadState, type DemenagementState } from '@lib/state';
