@@ -68,6 +68,7 @@ import { ZONES } from '@lib/catalog';
 <script>
   import { getSupabase } from '@lib/supabase';
   import { ZONES } from '@lib/catalog';
+  import { escapeHtml } from '@lib/admin';
 
   const supa = getSupabase();
   if (!supa) {
@@ -158,8 +159,8 @@ import { ZONES } from '@lib/catalog';
         const wz = zonesMap.get(w.id) ?? [];
         return `
           <tr data-id="${w.id}">
-            <td><strong>${w.full_name ?? '—'}</strong></td>
-            <td>${w.phone ?? '—'}</td>
+            <td><strong>${escapeHtml(w.full_name ?? '—')}</strong></td>
+            <td>${escapeHtml(w.phone ?? '—')}</td>
             <td>${w.role === 'admin' ? '<span class="status-badge" style="background:var(--bovo-rouge);">Admin</span>' : '<span class="status-badge" style="background:var(--bovo-bleu);">Worker</span>'}</td>
             <td style="font-size:0.84rem;">${ws.length ? ws.map((s: string) => SKILL_LABELS[s] ?? s).join(', ') : '<span style="color:var(--bovo-muted);">—</span>'}</td>
             <td style="font-size:0.84rem;">${wz.length ? wz.join(', ') : '<span style="color:var(--bovo-muted);">—</span>'}</td>
@@ -175,10 +176,10 @@ import { ZONES } from '@lib/catalog';
         return `
           <div data-id="${w.id}" style="background:#fff; border:1px solid var(--bovo-line-soft); border-radius:var(--r-lg); padding:14px; margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <strong>${w.full_name ?? '—'}</strong>
+              <strong>${escapeHtml(w.full_name ?? '—')}</strong>
               ${w.role === 'admin' ? '<span class="status-badge" style="background:var(--bovo-rouge);">Admin</span>' : '<span class="status-badge" style="background:var(--bovo-bleu);">Worker</span>'}
             </div>
-            <div style="font-size:0.84rem; color:var(--bovo-muted); margin-bottom:6px;">${w.phone ?? '—'}</div>
+            <div style="font-size:0.84rem; color:var(--bovo-muted); margin-bottom:6px;">${escapeHtml(w.phone ?? '—')}</div>
             <div style="font-size:0.82rem;">${ws.length ? ws.map((s: string) => SKILL_LABELS[s] ?? s).join(', ') : 'Aucun skill'}</div>
             <div style="font-size:0.82rem; color:var(--bovo-muted); margin-top:2px;">${wz.length ? wz.join(', ') : 'Aucune zone'}</div>
             <div style="font-size:0.82rem; margin-top:6px;">${ratingCell(w.id)}</div>
@@ -219,8 +220,8 @@ import { ZONES } from '@lib/catalog';
         <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Informations</h3>
         <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:20px;">
           <div style="font-size:0.86rem; line-height:1.6;">
-            <div><strong>${prof.full_name ?? 'Sans nom'}</strong></div>
-            <div style="color:var(--bovo-muted);">${prof.phone ?? '—'} · Role : <span style="font-weight:600; color:${prof.role === 'admin' ? 'var(--bovo-rouge)' : 'var(--bovo-bleu)'};">${prof.role}</span></div>
+            <div><strong>${escapeHtml(prof.full_name ?? 'Sans nom')}</strong></div>
+            <div style="color:var(--bovo-muted);">${escapeHtml(prof.phone ?? '—')} · Role : <span style="font-weight:600; color:${prof.role === 'admin' ? 'var(--bovo-rouge)' : 'var(--bovo-bleu)'};">${escapeHtml(prof.role)}</span></div>
           </div>
         </div>
 
@@ -264,7 +265,7 @@ import { ZONES } from '@lib/catalog';
         <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:14px; font-size:0.84rem;">
           ${(blackouts ?? []).length === 0 ? '<div style="color:var(--bovo-muted);">Aucune indisponibilité.</div>' : (blackouts ?? []).map((b: any) => `
             <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--bovo-line-soft);">
-              <span>${new Date(b.starts_at).toLocaleDateString('fr-FR')} → ${new Date(b.ends_at).toLocaleDateString('fr-FR')} ${b.reason ? `<em style="color:var(--bovo-muted);">— ${b.reason}</em>` : ''}</span>
+              <span>${new Date(b.starts_at).toLocaleDateString('fr-FR')} → ${new Date(b.ends_at).toLocaleDateString('fr-FR')} ${b.reason ? `<em style="color:var(--bovo-muted);">— ${escapeHtml(b.reason)}</em>` : ''}</span>
               <button class="del-blackout" data-id="${b.id}" style="color:var(--bovo-danger); background:none; border:none; cursor:pointer;">✕</button>
             </div>
           `).join('')}
@@ -287,10 +288,10 @@ import { ZONES } from '@lib/catalog';
           ${(reviewsList ?? []).length === 0 ? '<div style="color:var(--bovo-muted);">Aucun avis client pour le moment.</div>' : (reviewsList ?? []).map((rv: any) => `
             <div style="padding:8px 0; border-bottom:1px solid var(--bovo-line-soft);">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <span style="font-weight:600;"><span style="color:#f5b400;">${'★'.repeat(rv.rating)}${'☆'.repeat(5 - rv.rating)}</span> <span style="color:var(--bovo-muted); font-weight:400;">${SKILL_LABELS[rv.service_type] ?? rv.service_type}</span></span>
+                <span style="font-weight:600;"><span style="color:#f5b400;">${'★'.repeat(rv.rating)}${'☆'.repeat(5 - rv.rating)}</span> <span style="color:var(--bovo-muted); font-weight:400;">${escapeHtml(SKILL_LABELS[rv.service_type] ?? rv.service_type)}</span></span>
                 <span style="color:var(--bovo-muted); font-size:0.78rem;">${new Date(rv.created_at).toLocaleDateString('fr-FR')}</span>
               </div>
-              ${rv.comment ? `<div style="color:var(--bovo-ink-soft); line-height:1.5;">${rv.comment.replace(/</g, '&lt;')}</div>` : '<div style="color:var(--bovo-muted); font-style:italic;">(sans commentaire)</div>'}
+              ${rv.comment ? `<div style="color:var(--bovo-ink-soft); line-height:1.5;">${escapeHtml(rv.comment)}</div>` : '<div style="color:var(--bovo-muted); font-style:italic;">(sans commentaire)</div>'}
             </div>
           `).join('')}
         </div>
@@ -377,11 +378,11 @@ import { ZONES } from '@lib/catalog';
       promoteSelect.innerHTML = '<option value="">Chargement…</option>';
       const { data, error } = await supa.from('profiles').select('id, full_name, phone, role').eq('role', 'customer').order('full_name').limit(200);
       if (error) {
-        promoteSelect.innerHTML = `<option>Erreur : ${error.message}</option>`;
+        promoteSelect.innerHTML = `<option>Erreur : ${escapeHtml(error.message)}</option>`;
       } else if (!data || data.length === 0) {
         promoteSelect.innerHTML = '<option value="">Aucun utilisateur "customer" à promouvoir</option>';
       } else {
-        promoteSelect.innerHTML = '<option value="">— Choisir un utilisateur —</option>' + data.map((u: any) => `<option value="${u.id}">${u.full_name ?? '(sans nom)'} — ${u.phone ?? '—'}</option>`).join('');
+        promoteSelect.innerHTML = '<option value="">— Choisir un utilisateur —</option>' + data.map((u: any) => `<option value="${escapeHtml(u.id)}">${escapeHtml(u.full_name ?? '(sans nom)')} — ${escapeHtml(u.phone ?? '—')}</option>`).join('');
       }
       promoteModal.hidden = false;
     }
