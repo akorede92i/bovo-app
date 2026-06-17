@@ -3,6 +3,7 @@
  * À utiliser dans les pages /admin/*.
  */
 import { getSessionUser, type SessionUser } from './auth';
+import { getSupabase } from './supabase';
 
 export async function requireAdmin(redirectTo = '/compte/connexion/'): Promise<SessionUser> {
   const user = await getSessionUser();
@@ -68,4 +69,53 @@ export const STATUS_COLORS: Record<string, string> = {
 export function escapeHtml(s: string | null | undefined): string {
   if (!s) return '';
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
+}
+
+// ============================================
+// Création de worker (carte W1)
+// ============================================
+export interface CreateWorkerInput {
+  full_name: string;
+  phone: string;
+  email?: string;
+  skills: string[];
+  zones: string[];
+}
+
+export interface CreateWorkerResult {
+  ok: true;
+  worker_id: string;
+  full_name: string;
+  has_login: boolean;
+  login_email: string | null;
+  temp_password: string | null;
+}
+
+/**
+ * Crée un worker de A à Z via l'Edge Function `admin-create-worker`.
+ * Le JWT de l'admin connecté est attaché automatiquement par `functions.invoke` ;
+ * la fonction serveur revérifie le rôle admin et utilise la service_role pour
+ * créer le compte auth (impossible côté front avec la clé anon).
+ *
+ * Lève une Error portant le message renvoyé par la fonction en cas d'échec.
+ */
+export async function createWorker(input: CreateWorkerInput): Promise<CreateWorkerResult> {
+  const supa = getSupabase();
+  if (!supa) throw new Error('Supabase non configuré');
+
+  const { data, error } = await supa.functions.invoke('admin-create-worker', { body: input });
+  if (error) {
+    // functions.invoke encapsule les réponses non-2xx dans une FunctionsHttpError
+    // dont `context` est la Response : on en extrait le message métier { error }.
+    let message = error.message;
+    try {
+      const ctx = (error as any).context;
+      if (ctx && typeof ctx.json === 'function') {
+        const body = await ctx.json();
+        if (body?.error) message = body.error;
+      }
+    } catch { /* on garde le message générique */ }
+    throw new Error(message);
+  }
+  return data as CreateWorkerResult;
 }

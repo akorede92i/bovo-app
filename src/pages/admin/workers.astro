@@ -5,9 +5,10 @@ import { ZONES } from '@lib/catalog';
 <AdminLayout title="Workers — Bovo Admin" pageTitle="Workers" active="workers">
   <p class="admin-sub">Vos équipes terrain : skills, zones d'intervention, disponibilités, congés.</p>
 
-  <div style="display:flex; gap:8px; margin-bottom:18px; align-items:center;">
-    <input id="search" class="input" type="text" placeholder="Rechercher un worker par nom ou téléphone…" style="max-width:380px; flex:1;" />
-    <button id="promote-btn" class="btn btn-primary btn-sm">+ Promouvoir un user</button>
+  <div style="display:flex; gap:8px; margin-bottom:18px; align-items:center; flex-wrap:wrap;">
+    <input id="search" class="input" type="text" placeholder="Rechercher un worker par nom ou téléphone…" style="max-width:380px; flex:1; min-width:200px;" />
+    <button id="create-btn" class="btn btn-primary btn-sm">+ Nouveau worker</button>
+    <button id="promote-btn" class="btn btn-ghost btn-sm">Promouvoir un user</button>
   </div>
 
   <div id="list-loading" style="color: var(--bovo-muted); padding: 24px; text-align:center;">Chargement…</div>
@@ -31,7 +32,7 @@ import { ZONES } from '@lib/catalog';
   <div id="list-empty" hidden class="empty-state">
     <div class="empty-state-emoji">👥</div>
     <div class="empty-state-title">Aucun worker enregistré</div>
-    <div class="empty-state-desc">Cliquez "Promouvoir un user" pour ajouter votre première équipe.</div>
+    <div class="empty-state-desc">Cliquez "+ Nouveau worker" pour créer votre première équipe.</div>
   </div>
 
   <!-- MODAL PROMOTION -->
@@ -53,6 +54,48 @@ import { ZONES } from '@lib/catalog';
     </div>
   </div>
 
+  <!-- MODAL CRÉATION WORKER (W1) -->
+  <div id="create-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; width:100%; max-width:560px; max-height:90vh; overflow-y:auto; border-radius: var(--r-xl); padding:24px;">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h2 style="font-family:'Jost'; font-weight:700;">Nouveau worker</h2>
+        <button id="create-close" class="topbar-back" aria-label="Fermer">✕</button>
+      </div>
+
+      <div id="create-form">
+        <p class="text-muted" style="margin-bottom:16px;">Crée le compte de A à Z, sans que la personne ait à s'inscrire elle-même. Il devient aussitôt assignable par le matching.</p>
+
+        <div class="field">
+          <label class="field-label" for="cw-name">Nom complet <span style="color:var(--bovo-danger);">*</span></label>
+          <input id="cw-name" class="input" type="text" autocomplete="off" placeholder="Awa Koné" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="cw-phone">Téléphone <span style="color:var(--bovo-danger);">*</span></label>
+          <input id="cw-phone" class="input" type="tel" autocomplete="off" placeholder="+229 01 96 00 00 00" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="cw-email">Email <span class="text-muted" style="font-weight:400;">(optionnel)</span></label>
+          <input id="cw-email" class="input" type="email" autocomplete="off" placeholder="awa@exemple.bj" />
+          <div class="text-muted" style="font-size:0.8rem; margin-top:6px; line-height:1.4;">Avec email : le worker pourra se connecter (un mot de passe temporaire s'affichera ici). Sans email : compte géré par l'admin, login activable plus tard.</div>
+        </div>
+
+        <div class="field">
+          <label class="field-label">Services</label>
+          <div id="cw-skills" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+        </div>
+        <div class="field">
+          <label class="field-label">Zones d'intervention</label>
+          <div id="cw-zones" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+        </div>
+
+        <div id="create-error" style="color:var(--bovo-danger); display:none; margin:8px 0;"></div>
+        <button id="create-save" class="btn btn-primary btn-block">Créer le worker</button>
+      </div>
+
+      <div id="create-success" hidden></div>
+    </div>
+  </div>
+
   <!-- MODAL DÉTAIL WORKER -->
   <div id="worker-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:center; justify-content:center; padding:20px;">
     <div style="background:#fff; width:100%; max-width:720px; max-height:90vh; overflow-y:auto; border-radius: var(--r-xl); padding:24px;">
@@ -68,7 +111,7 @@ import { ZONES } from '@lib/catalog';
 <script>
   import { getSupabase } from '@lib/supabase';
   import { ZONES } from '@lib/catalog';
-  import { escapeHtml } from '@lib/admin';
+  import { escapeHtml, createWorker } from '@lib/admin';
 
   const supa = getSupabase();
   if (!supa) {
@@ -404,6 +447,115 @@ import { ZONES } from '@lib/catalog';
       }
       promoteModal.hidden = true;
       load();
+    });
+
+    // ---- Création worker de zéro (W1) ----
+    const createModal = document.getElementById('create-modal')!;
+    const createForm = document.getElementById('create-form')!;
+    const createSuccess = document.getElementById('create-success')!;
+    const createErr = document.getElementById('create-error')!;
+    const cwSkillsBox = document.getElementById('cw-skills')!;
+    const cwZonesBox = document.getElementById('cw-zones')!;
+    const createSaveBtn = document.getElementById('create-save') as HTMLButtonElement;
+    const selectedSkills = new Set<string>();
+    const selectedZones = new Set<string>();
+
+    function renderCreateChips() {
+      cwSkillsBox.innerHTML = SKILLS.map((s) =>
+        `<button type="button" class="chip ${selectedSkills.has(s) ? 'is-active' : ''}" data-cw-skill="${s}">${SKILL_LABELS[s]}</button>`
+      ).join('');
+      cwZonesBox.innerHTML = ZONES.map((z) =>
+        `<button type="button" class="chip ${selectedZones.has(z) ? 'is-active' : ''}" data-cw-zone="${escapeHtml(z)}">${escapeHtml(z)}</button>`
+      ).join('');
+      cwSkillsBox.querySelectorAll<HTMLButtonElement>('[data-cw-skill]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const s = btn.dataset.cwSkill!;
+          if (selectedSkills.has(s)) selectedSkills.delete(s); else selectedSkills.add(s);
+          btn.classList.toggle('is-active');
+        });
+      });
+      cwZonesBox.querySelectorAll<HTMLButtonElement>('[data-cw-zone]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const z = btn.dataset.cwZone!;
+          if (selectedZones.has(z)) selectedZones.delete(z); else selectedZones.add(z);
+          btn.classList.toggle('is-active');
+        });
+      });
+    }
+
+    function openCreateModal() {
+      selectedSkills.clear();
+      selectedZones.clear();
+      (document.getElementById('cw-name') as HTMLInputElement).value = '';
+      (document.getElementById('cw-phone') as HTMLInputElement).value = '';
+      (document.getElementById('cw-email') as HTMLInputElement).value = '';
+      createErr.style.display = 'none';
+      createForm.hidden = false;
+      createSuccess.hidden = true;
+      createSuccess.innerHTML = '';
+      renderCreateChips();
+      createModal.hidden = false;
+      (document.getElementById('cw-name') as HTMLInputElement).focus();
+    }
+
+    document.getElementById('create-btn')!.addEventListener('click', openCreateModal);
+    document.getElementById('create-close')!.addEventListener('click', () => createModal.hidden = true);
+    createModal.addEventListener('click', (e) => { if (e.target === createModal) createModal.hidden = true; });
+
+    createSaveBtn.addEventListener('click', async () => {
+      const full_name = (document.getElementById('cw-name') as HTMLInputElement).value.trim();
+      const phone = (document.getElementById('cw-phone') as HTMLInputElement).value.trim();
+      const email = (document.getElementById('cw-email') as HTMLInputElement).value.trim();
+      createErr.style.display = 'none';
+      if (!full_name) { createErr.textContent = 'Le nom complet est requis.'; createErr.style.display = 'block'; return; }
+      if (!phone) { createErr.textContent = 'Le téléphone est requis.'; createErr.style.display = 'block'; return; }
+
+      const prevLabel = createSaveBtn.textContent ?? 'Créer le worker';
+      createSaveBtn.disabled = true;
+      createSaveBtn.textContent = 'Création…';
+      try {
+        const res = await createWorker({
+          full_name, phone, email: email || undefined,
+          skills: [...selectedSkills], zones: [...selectedZones],
+        });
+        createForm.hidden = true;
+        createSuccess.hidden = false;
+        const pwBlock = res.temp_password ? `
+          <div style="background:var(--bovo-bg-soft); border:1px solid var(--bovo-line-soft); border-radius:var(--r-md); padding:12px; margin:12px 0;">
+            <div style="font-size:0.82rem; color:var(--bovo-muted); margin-bottom:4px;">Identifiants à transmettre au worker :</div>
+            <div style="font-size:0.9rem;"><strong>Email :</strong> ${escapeHtml(res.login_email)}</div>
+            <div style="font-size:0.9rem; display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;"><strong>Mot de passe :</strong> <code style="background:#fff; padding:2px 6px; border-radius:4px; border:1px solid var(--bovo-line-soft);">${escapeHtml(res.temp_password)}</code> <button id="cw-copy" class="btn btn-ghost btn-sm" type="button">Copier</button></div>
+            <div style="font-size:0.78rem; color:var(--bovo-muted); margin-top:6px;">⚠️ Ce mot de passe ne sera plus affiché. À changer à la première connexion.</div>
+          </div>` : `
+          <div class="text-muted" style="font-size:0.86rem; margin:12px 0;">Compte « géré » créé sans email : pas de login pour l'instant (activable plus tard via l'app worker).</div>`;
+        createSuccess.innerHTML = `
+          <div style="text-align:center; padding:8px 0 4px;">
+            <div style="font-size:2.2rem;">✅</div>
+            <h3 style="font-family:'Jost'; font-weight:700; margin:6px 0;">${escapeHtml(res.full_name)} créé·e</h3>
+          </div>
+          ${pwBlock}
+          <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+            <button id="cw-open" class="btn btn-primary btn-sm" type="button">Ouvrir la fiche</button>
+            <button id="cw-another" class="btn btn-ghost btn-sm" type="button">Créer un autre</button>
+            <button id="cw-done" class="btn btn-ghost btn-sm" type="button" style="margin-left:auto;">Fermer</button>
+          </div>`;
+        const copyBtn = document.getElementById('cw-copy');
+        if (copyBtn && res.temp_password) {
+          copyBtn.addEventListener('click', async () => {
+            try { await navigator.clipboard.writeText(res.temp_password!); copyBtn.textContent = 'Copié ✓'; } catch { /* clipboard indispo */ }
+          });
+        }
+        document.getElementById('cw-open')!.addEventListener('click', () => { createModal.hidden = true; openWorkerModal(res.worker_id); });
+        document.getElementById('cw-another')!.addEventListener('click', openCreateModal);
+        document.getElementById('cw-done')!.addEventListener('click', () => { createModal.hidden = true; });
+        load();
+      } catch (err: any) {
+        createErr.textContent = err?.message ?? 'Échec de la création.';
+        createErr.style.display = 'block';
+      } finally {
+        createSaveBtn.disabled = false;
+        createSaveBtn.textContent = prevLabel;
+      }
     });
 
     let searchTimer: any;
