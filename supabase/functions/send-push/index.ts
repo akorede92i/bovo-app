@@ -30,7 +30,7 @@
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 // @ts-ignore - deno runtime
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { coerceData, classifyFcmFailure, isServiceRoleAuthorized, messageForStatus } from './lib.ts';
+import { coerceData, classifyFcmFailure, isServiceRoleAuthorized, messageForStatus, SERVICE_LABELS } from './lib.ts';
 
 // @ts-ignore Deno global
 const env = (k: string) => (typeof Deno !== 'undefined' ? Deno.env.get(k) : undefined);
@@ -144,62 +144,75 @@ serve(async (req) => {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  // Résoudre la cible + le message selon le mode.
-  let targetUserIds: string[] = [];
-  let title = '';
-  let body = '';
-  let data: Record<string, string> = {};
-  let channel: 'transactional' | 'marketing' = 'transactional';
+  // Envoie un message à un ensemble d'utilisateurs (en respectant l'opt-in du canal).
+  // Purge les tokens réellement morts. Centralise la logique d'envoi pour pouvoir
+  // notifier plusieurs cibles dans une même requête (ex. client + worker).
+  async function notify(
+    userIds: string[],
+    title: string,
+    body: string,
+    data: Record<string, string>,
+    channel: 'transactional' | 'marketing',
+  ): Promise<{ sent: number; purged: number; total: number }> {
+    const ids = [...new Set(userIds.filter(Boolean))];
+    if (ids.length === 0) return { sent: 0, purged: 0, total: 0 };
+    const optInColumn = channel === 'marketing' ? 'allow_marketing' : 'allow_transactional';
+    const { data: tokens } = await supabase.from('device_tokens').select('token').in('user_id', ids).eq(optInColumn, true);
+    if (!tokens || tokens.length === 0) return { sent: 0, purged: 0, total: 0 };
+    const accessToken = await getAccessToken(sa);
+    let sent = 0;
+    const dead: string[] = [];
+    for (const { token } of tokens) {
+      const r = await sendOne(accessToken, projectId, token, title, body, data);
+      if (r === 'ok') sent++;
+      else if (r === 'invalid') dead.push(token);
+    }
+    if (dead.length) await supabase.from('device_tokens').delete().in('token', dead);
+    return { sent, purged: dead.length, total: tokens.length };
+  }
 
+  // ---- Mode 1 : webhook DB (UPDATE reservations) ----
   if (payload.type === 'UPDATE' && payload.table === 'reservations') {
-    // Mode webhook : suivi de réservation
     const rec = payload.record;
     const old = payload.old_record;
-    if (!rec?.user_id) return new Response(JSON.stringify({ skipped: 'guest reservation (no user)' }), { status: 200 });
-    if (rec.status === old?.status) return new Response(JSON.stringify({ skipped: 'status unchanged' }), { status: 200 });
-    const msg = messageForStatus(rec.status, rec.service_type);
-    if (!msg) return new Response(JSON.stringify({ skipped: `status ${rec.status} not notifiable` }), { status: 200 });
-    title = msg.title;
-    body = msg.body;
-    data = coerceData({ type: 'reservation', reservationId: rec.id, status: rec.status, url: '/compte/reservations/' });
-    targetUserIds = [rec.user_id];
-    channel = 'transactional';
-  } else if (payload.title && payload.body) {
-    // Mode direct : rappels / promos
-    title = String(payload.title);
-    body = String(payload.body);
-    data = coerceData(payload.data);
-    channel = payload.channel === 'marketing' ? 'marketing' : 'transactional';
-    if (payload.userId) targetUserIds = [String(payload.userId)];
-    else if (Array.isArray(payload.userIds)) targetUserIds = payload.userIds.map(String);
+    const result: Record<string, unknown> = {};
+
+    // (a) Suivi CLIENT sur changement de statut (réservation d'un compte).
+    if (rec?.user_id && rec.status !== old?.status) {
+      const msg = messageForStatus(rec.status, rec.service_type);
+      if (msg) {
+        result.client = await notify(
+          [rec.user_id], msg.title, msg.body,
+          coerceData({ type: 'reservation', reservationId: rec.id, status: rec.status, url: '/compte/reservations/' }),
+          'transactional',
+        );
+      }
+    }
+
+    // (b) WORKER sur nouvelle affectation (W7 v2) : assigned_worker_id vient de changer.
+    if (rec?.assigned_worker_id && rec.assigned_worker_id !== old?.assigned_worker_id) {
+      const svc = SERVICE_LABELS[rec.service_type] ?? 'mission';
+      result.worker = await notify(
+        [rec.assigned_worker_id], 'Nouvelle mission 🛠️',
+        `Une ${svc} vous a été assignée. Ouvrez l'app pour les détails.`,
+        coerceData({ type: 'assignment', reservationId: rec.id, url: '/worker/' }),
+        'transactional',
+      );
+    }
+
+    return new Response(JSON.stringify(result), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  }
+
+  // ---- Mode 2 : appel direct (rappels / promos) ----
+  if (payload.title && payload.body) {
+    const channel: 'transactional' | 'marketing' = payload.channel === 'marketing' ? 'marketing' : 'transactional';
+    let ids: string[] = [];
+    if (payload.userId) ids = [String(payload.userId)];
+    else if (Array.isArray(payload.userIds)) ids = payload.userIds.map(String);
     else return new Response('userId or userIds required', { status: 400 });
-  } else {
-    return new Response('Unrecognized payload', { status: 400 });
+    const res = await notify(ids, String(payload.title), String(payload.body), coerceData(payload.data), channel);
+    return new Response(JSON.stringify(res), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
 
-  // Récupérer les tokens (en respectant l'opt-in du canal).
-  const optInColumn = channel === 'marketing' ? 'allow_marketing' : 'allow_transactional';
-  const { data: tokens, error } = await supabase
-    .from('device_tokens')
-    .select('token')
-    .in('user_id', targetUserIds)
-    .eq(optInColumn, true);
-  if (error) return new Response('DB error: ' + error.message, { status: 500 });
-  if (!tokens || tokens.length === 0) return new Response(JSON.stringify({ sent: 0, reason: 'no tokens' }), { status: 200 });
-
-  const accessToken = await getAccessToken(sa);
-  let sent = 0;
-  const dead: string[] = [];
-  for (const { token } of tokens) {
-    const r = await sendOne(accessToken, projectId, token, title, body, data);
-    if (r === 'ok') sent++;
-    else if (r === 'invalid') dead.push(token);
-  }
-  // Purge des tokens morts.
-  if (dead.length) await supabase.from('device_tokens').delete().in('token', dead);
-
-  return new Response(JSON.stringify({ sent, purged: dead.length, total: tokens.length }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
+  return new Response('Unrecognized payload', { status: 400 });
 });
