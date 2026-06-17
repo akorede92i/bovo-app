@@ -65,7 +65,7 @@ import AdminLayout from '@layouts/AdminLayout.astro';
 
 <script>
   import { getSupabase } from '@lib/supabase';
-  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS, escapeHtml } from '@lib/admin';
+  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS, escapeHtml, isWorkerActive } from '@lib/admin';
   import { suggestWorkers } from '@lib/matching';
   import { fcfa } from '@lib/catalog';
 
@@ -86,7 +86,17 @@ import AdminLayout from '@layouts/AdminLayout.astro';
 
     // Cache des workers pour le selector d'assignation
     const { data: workersData } = await supa.from('profiles').select('id, full_name, role').in('role', ['worker', 'admin']);
-    const workers = workersData ?? [];
+    let workers = workersData ?? [];
+    // Statut RH (worker_profiles) : un worker suspendu/archivé ne doit pas être
+    // proposé à l'assignation manuelle (W3).
+    {
+      const wIds = workers.map((w: any) => w.id);
+      const wStatus = wIds.length
+        ? (await supa.from('worker_profiles').select('worker_id, status').in('worker_id', wIds)).data
+        : [];
+      const statusById = new Map((wStatus ?? []).map((s: any) => [s.worker_id, s.status]));
+      workers = workers.map((w: any) => ({ ...w, status: statusById.get(w.id) ?? 'active' }));
+    }
 
     async function load() {
       loadingEl.hidden = false;
@@ -179,7 +189,10 @@ import AdminLayout from '@layouts/AdminLayout.astro';
       const addr = payload.address ?? payload.from ?? {};
       const addressLine = addr.street ? escapeHtml(`${addr.street}${addr.quartier ? ', ' + addr.quartier : ''}, ${addr.zone ?? ''}`) : '—';
 
-      const workerOptions = workers.map((w: any) => `<option value="${escapeHtml(w.id)}" ${w.id === r.assigned_worker_id ? 'selected' : ''}>${escapeHtml(w.full_name) || 'Worker sans nom'}</option>`).join('');
+      // On masque les suspendus/archivés, mais on garde visible le worker déjà
+      // assigné (même suspendu) pour ne pas perdre l'info d'affectation (W3).
+      const assignable = workers.filter((w: any) => isWorkerActive(w.status) || w.id === r.assigned_worker_id);
+      const workerOptions = assignable.map((w: any) => `<option value="${escapeHtml(w.id)}" ${w.id === r.assigned_worker_id ? 'selected' : ''}>${escapeHtml(w.full_name) || 'Worker sans nom'}${!isWorkerActive(w.status) ? ' (suspendu)' : ''}</option>`).join('');
 
       modalBody.innerHTML = `
         <div style="margin-bottom:20px;">

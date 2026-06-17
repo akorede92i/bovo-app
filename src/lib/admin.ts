@@ -71,6 +71,14 @@ export function escapeHtml(s: string | null | undefined): string {
   return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
 }
 
+/**
+ * Un worker est assignable/disponible sauf s'il est suspendu ou archivé
+ * (statut `worker_profiles.status`, carte W3). Absent / null / 'active' → actif.
+ */
+export function isWorkerActive(status: string | null | undefined): boolean {
+  return status !== 'suspended' && status !== 'archived';
+}
+
 // ============================================
 // Création de worker (carte W1)
 // ============================================

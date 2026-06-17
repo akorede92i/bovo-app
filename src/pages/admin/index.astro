@@ -656,7 +656,7 @@ import { ZONES } from '@lib/catalog';
 <script>
   import { getSupabase } from '@lib/supabase';
   import { createClient } from '@supabase/supabase-js';
-  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS, escapeHtml } from '@lib/admin';
+  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS, escapeHtml, isWorkerActive } from '@lib/admin';
   import { fcfa } from '@lib/catalog';
 
   const supa = getSupabase();
@@ -768,7 +768,19 @@ import { ZONES } from '@lib/catalog';
     // ====== CHARGEMENT WORKERS ======
     async function loadWorkers() {
       const { data } = await supa.from('profiles').select('id, full_name, phone, role').in('role', ['worker', 'admin']);
-      workersCache = data ?? [];
+      const profiles = data ?? [];
+      // Statut RH (worker_profiles) pour exclure suspendus/archivés des suggestions (W3).
+      const ids = profiles.map((w: any) => w.id);
+      const statusRows = ids.length
+        ? (await supa.from('worker_profiles').select('worker_id, status').in('worker_id', ids)).data
+        : [];
+      const statusById = new Map((statusRows ?? []).map((s: any) => [s.worker_id, s.status]));
+      workersCache = profiles.map((w: any) => ({ ...w, status: statusById.get(w.id) ?? 'active' }));
+    }
+
+    // Worker assignable = ni suspendu ni archivé (W3). Délègue au helper partagé.
+    function isActiveWorker(w: any): boolean {
+      return isWorkerActive(w.status);
     }
 
     // ====== KPIs ACTIVITÉ ======
@@ -820,7 +832,7 @@ import { ZONES } from '@lib/catalog';
 
     // ====== KPIs WORKFORCE ======
     async function loadWorkforceKpis() {
-      const workerProfiles = workersCache.filter((w) => w.role === 'worker');
+      const workerProfiles = workersCache.filter((w) => w.role === 'worker' && isActiveWorker(w));
       const total = workerProfiles.length;
 
       const { data: todayResa } = await supa.from('reservations')
@@ -829,7 +841,7 @@ import { ZONES } from '@lib/catalog';
         .not('assigned_worker_id', 'is', null)
         .neq('status', 'cancelled');
       const busyIds = new Set((todayResa ?? []).map((r: any) => r.assigned_worker_id).filter(Boolean));
-      const busy = busyIds.size;
+      const busy = workerProfiles.filter((w: any) => busyIds.has(w.id)).length;
       const free = Math.max(0, total - busy);
       const occupation = total > 0 ? Math.round((busy / total) * 100) : 0;
 
@@ -1064,7 +1076,7 @@ import { ZONES } from '@lib/catalog';
 
     // ====== WORKERS LIBRES ======
     async function loadFreeWorkers() {
-      const workerProfiles = workersCache.filter((w) => w.role === 'worker');
+      const workerProfiles = workersCache.filter((w) => w.role === 'worker' && isActiveWorker(w));
       if (workerProfiles.length === 0) {
         document.getElementById('free-workers-loading')!.hidden = true;
         document.getElementById('free-workers-empty')!.hidden = false;
@@ -1173,7 +1185,7 @@ import { ZONES } from '@lib/catalog';
       const { data: skills } = await supa.from('worker_skills').select('worker_id, skill, level').eq('skill', serviceType);
       const skilledIds = new Set((skills ?? []).map((s: any) => s.worker_id));
 
-      const workersOnly = workersCache.filter((w) => w.role === 'worker');
+      const workersOnly = workersCache.filter((w) => w.role === 'worker' && isActiveWorker(w));
       const skilled = workersOnly.filter((w) => skilledIds.has(w.id));
       const others = workersOnly.filter((w) => !skilledIds.has(w.id));
 

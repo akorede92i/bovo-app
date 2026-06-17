@@ -9,6 +9,9 @@ import { ZONES } from '@lib/catalog';
     <input id="search" class="input" type="text" placeholder="Rechercher un worker par nom ou téléphone…" style="max-width:380px; flex:1; min-width:200px;" />
     <button id="create-btn" class="btn btn-primary btn-sm">+ Nouveau worker</button>
     <button id="promote-btn" class="btn btn-ghost btn-sm">Promouvoir un user</button>
+    <label style="display:flex; align-items:center; gap:6px; font-size:0.86rem; color:var(--bovo-muted); cursor:pointer; white-space:nowrap;">
+      <input id="active-only" type="checkbox" /> Actifs seulement
+    </label>
   </div>
 
   <div id="list-loading" style="color: var(--bovo-muted); padding: 24px; text-align:center;">Chargement…</div>
@@ -165,11 +168,29 @@ import { ZONES } from '@lib/catalog';
 
       // Fetch skills, zones et reviews pour tous les workers
       const ids = workers.map((w: any) => w.id);
-      const [{ data: skills }, { data: zones }, { data: reviewRows }] = await Promise.all([
+      const [{ data: skills }, { data: zones }, { data: reviewRows }, { data: statusRows }] = await Promise.all([
         supa.from('worker_skills').select('worker_id, skill').in('worker_id', ids),
         supa.from('worker_zones').select('worker_id, zone').in('worker_id', ids),
         supa.from('reviews').select('worker_id, rating').in('worker_id', ids),
+        supa.from('worker_profiles').select('worker_id, status').in('worker_id', ids),
       ]);
+
+      const statusMap = new Map<string, string>();
+      (statusRows ?? []).forEach((s: any) => statusMap.set(s.worker_id, s.status ?? 'active'));
+      const workerStatus = (wid: string) => statusMap.get(wid) ?? 'active';
+      function statusBadge(wid: string) {
+        const st = workerStatus(wid);
+        if (st === 'suspended') return ' <span class="status-badge" style="background:#F59E0B;">Suspendu</span>';
+        if (st === 'archived') return ' <span class="status-badge" style="background:#6B7280;">Archivé</span>';
+        return '';
+      }
+
+      // Filtre « actifs seulement » (W3) : par défaut on affiche tout le monde
+      // (avec badge), le filtre masque les suspendus/archivés.
+      if ((document.getElementById('active-only') as HTMLInputElement)?.checked) {
+        workers = workers.filter((w: any) => workerStatus(w.id) === 'active');
+        if (workers.length === 0) { emptyEl.hidden = false; return; }
+      }
 
       const skillsMap = new Map<string, string[]>();
       (skills ?? []).forEach((s: any) => {
@@ -202,7 +223,7 @@ import { ZONES } from '@lib/catalog';
         const wz = zonesMap.get(w.id) ?? [];
         return `
           <tr data-id="${w.id}">
-            <td><strong>${escapeHtml(w.full_name ?? '—')}</strong></td>
+            <td><strong>${escapeHtml(w.full_name ?? '—')}</strong>${statusBadge(w.id)}</td>
             <td>${escapeHtml(w.phone ?? '—')}</td>
             <td>${w.role === 'admin' ? '<span class="status-badge" style="background:var(--bovo-rouge);">Admin</span>' : '<span class="status-badge" style="background:var(--bovo-bleu);">Worker</span>'}</td>
             <td style="font-size:0.84rem;">${ws.length ? ws.map((s: string) => SKILL_LABELS[s] ?? s).join(', ') : '<span style="color:var(--bovo-muted);">—</span>'}</td>
@@ -219,7 +240,7 @@ import { ZONES } from '@lib/catalog';
         return `
           <div data-id="${w.id}" style="background:#fff; border:1px solid var(--bovo-line-soft); border-radius:var(--r-lg); padding:14px; margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <strong>${escapeHtml(w.full_name ?? '—')}</strong>
+              <span><strong>${escapeHtml(w.full_name ?? '—')}</strong>${statusBadge(w.id)}</span>
               ${w.role === 'admin' ? '<span class="status-badge" style="background:var(--bovo-rouge);">Admin</span>' : '<span class="status-badge" style="background:var(--bovo-bleu);">Worker</span>'}
             </div>
             <div style="font-size:0.84rem; color:var(--bovo-muted); margin-bottom:6px;">${escapeHtml(w.phone ?? '—')}</div>
@@ -289,6 +310,20 @@ import { ZONES } from '@lib/catalog';
             <div><strong>${escapeHtml(prof.full_name ?? 'Sans nom')}</strong></div>
             <div style="color:var(--bovo-muted);">${escapeHtml(prof.phone ?? '—')} · Role : <span style="font-weight:600; color:${prof.role === 'admin' ? 'var(--bovo-rouge)' : 'var(--bovo-bleu)'};">${escapeHtml(prof.role)}</span></div>
           </div>
+        </div>
+
+        <!-- STATUT (W3) -->
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Statut</h3>
+        <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:20px;">
+          <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+            <select id="status-select" class="select" style="max-width:200px;">
+              <option value="active" ${(rh?.status ?? 'active') === 'active' ? 'selected' : ''}>🟢 Actif</option>
+              <option value="suspended" ${rh?.status === 'suspended' ? 'selected' : ''}>🟠 Suspendu</option>
+              <option value="archived" ${rh?.status === 'archived' ? 'selected' : ''}>⚫ Archivé</option>
+            </select>
+            <span id="status-feedback" style="font-size:0.84rem;"></span>
+          </div>
+          <div class="text-muted" style="font-size:0.8rem; margin-top:6px; line-height:1.4;">Un worker suspendu ou archivé n'apparaît plus dans les suggestions d'affectation ni dans « disponibles cette semaine », mais reste consultable ici.</div>
         </div>
 
         <!-- FICHE RH (W2) -->
@@ -487,6 +522,21 @@ import { ZONES } from '@lib/catalog';
       });
       bindBkDel();
 
+      // Statut (W3) — changement immédiat (upsert ; status seul → RH préservée)
+      document.getElementById('status-select')!.addEventListener('change', async (e) => {
+        const sel = e.target as HTMLSelectElement;
+        const feedback = document.getElementById('status-feedback')!;
+        feedback.textContent = 'Enregistrement…'; feedback.style.color = 'var(--bovo-muted)';
+        const { error } = await supa.from('worker_profiles')
+          .upsert({ worker_id: id, status: sel.value }, { onConflict: 'worker_id' });
+        if (error) {
+          feedback.textContent = `Erreur : ${error.message}`; feedback.style.color = 'var(--bovo-danger)';
+        } else {
+          feedback.textContent = '✓ Statut mis à jour'; feedback.style.color = '#10B981';
+          load(); // rafraîchit la liste de fond (badge + filtre)
+        }
+      });
+
       // Fiche RH (W2) — enregistrement
       document.getElementById('rh-save')!.addEventListener('click', async () => {
         const feedback = document.getElementById('rh-feedback')!;
@@ -683,6 +733,7 @@ import { ZONES } from '@lib/catalog';
       clearTimeout(searchTimer);
       searchTimer = setTimeout(load, 250);
     });
+    document.getElementById('active-only')!.addEventListener('change', load);
 
     await load();
   }

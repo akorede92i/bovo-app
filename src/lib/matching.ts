@@ -36,6 +36,9 @@ export interface MatchInput {
   /** réservations assignées le même jour (hors la résa courante), pour conflit + charge */
   dayReservations: { worker_id: string; startMs: number; durationMin: number }[];
   reviews: { worker_id: string; rating: number }[];
+  /** statut RH (worker_profiles) ; 'suspended'/'archived' → exclus du matching (W3).
+   *  Absent / 'active' / null → worker éligible. */
+  statuses?: { worker_id: string; status: string | null }[];
 }
 
 export function rankCandidates(input: MatchInput): Candidate[] {
@@ -60,6 +63,12 @@ export function rankCandidates(input: MatchInput): Candidate[] {
     if (b.startMs < end && b.endMs > start) blockedByBlackout.add(b.worker_id);
   }
 
+  // Workers suspendus/archivés (worker_profiles.status) → exclus du matching (W3).
+  const inactive = new Set<string>();
+  for (const s of input.statuses ?? []) {
+    if (s.status === 'suspended' || s.status === 'archived') inactive.add(s.worker_id);
+  }
+
   const loadByWorker = new Map<string, number>();
   const conflicting = new Set<string>();
   for (const r of input.dayReservations) {
@@ -82,6 +91,7 @@ export function rankCandidates(input: MatchInput): Candidate[] {
   for (const workerId of levelById.keys()) {
     if (blockedByBlackout.has(workerId)) continue; // en congé → exclu
     if (conflicting.has(workerId)) continue;        // déjà pris sur le créneau → exclu
+    if (inactive.has(workerId)) continue;           // suspendu/archivé → exclu (W3)
 
     const reasons: string[] = [];
     const warnings: string[] = [];
@@ -185,7 +195,7 @@ export async function suggestWorkers(
   const dayEnd = new Date(startMs);
   dayEnd.setHours(23, 59, 59, 999);
 
-  const [profsRes, zonesRes, availRes, blackoutsRes, dayResRes, reviewsRes] = await Promise.all([
+  const [profsRes, zonesRes, availRes, blackoutsRes, dayResRes, reviewsRes, statusRes] = await Promise.all([
     supa.from('profiles').select('id, full_name').in('id', ids),
     supa.from('worker_zones').select('worker_id, zone').in('worker_id', ids),
     supa.from('worker_availability').select('worker_id, day_of_week, time_start, time_end').in('worker_id', ids),
@@ -198,6 +208,7 @@ export async function suggestWorkers(
       .neq('status', 'cancelled')
       .neq('id', res.id),
     supa.from('reviews').select('worker_id, rating').in('worker_id', ids),
+    supa.from('worker_profiles').select('worker_id, status').in('worker_id', ids),
   ]);
 
   return rankCandidates({
@@ -222,5 +233,6 @@ export async function suggestWorkers(
       durationMin: r.duration_min ?? 120,
     })),
     reviews: (reviewsRes.data ?? []) as any,
+    statuses: (statusRes.data ?? []) as any,
   });
 }
