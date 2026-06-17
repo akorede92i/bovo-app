@@ -87,6 +87,11 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
           </div>
           <div style="font-weight:700; font-family:'Jost'; font-size:0.96rem;">${escapeHtml(fmtWhen(r.scheduled_at))}</div>
           <div style="color:var(--bovo-muted); font-size:0.86rem; margin-top:2px;">${escapeHtml(firstName(r.guest_name))}${z ? ` · ${escapeHtml(z)}` : ''}</div>
+          ${r.status === 'assigned' ? (
+            r.worker_declined_at ? '<div style="color:var(--bovo-danger); font-size:0.8rem; font-weight:600; margin-top:5px;">✗ Refusée — à réassigner</div>'
+            : r.worker_accepted_at ? '<div style="color:var(--bovo-success); font-size:0.8rem; font-weight:600; margin-top:5px;">✓ Acceptée</div>'
+            : '<div style="color:#B45309; font-size:0.8rem; font-weight:600; margin-top:5px;">● À confirmer</div>'
+          ) : ''}
         </div>`;
     }
 
@@ -104,13 +109,21 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
 
       const row = (label: string, value: string) => `<div style="font-size:0.9rem; line-height:1.5;"><span style="color:var(--bovo-muted);">${label} :</span> ${value}</div>`;
 
+      const accepted = !!r.worker_accepted_at;
+      const declined = !!r.worker_declined_at;
       let action = '';
-      if (r.status === 'assigned') {
-        action = `<button id="act-start" class="btn btn-primary btn-block" type="button">▶ Démarrer la mission</button>`;
+      if (r.status === 'done') {
+        action = `<div style="text-align:center; color:var(--bovo-success); font-weight:600; padding:10px;">✓ Mission terminée</div>`;
       } else if (r.status === 'in_progress') {
         action = `<button id="act-done" class="btn btn-primary btn-block" type="button">✓ Terminer la mission</button>`;
-      } else if (r.status === 'done') {
-        action = `<div style="text-align:center; color:var(--bovo-success); font-weight:600; padding:10px;">✓ Mission terminée</div>`;
+      } else if (r.status === 'assigned') {
+        if (declined) {
+          action = `<div style="text-align:center; color:var(--bovo-danger); font-weight:600; padding:10px;">✗ Mission refusée${r.worker_decline_reason ? ` — ${escapeHtml(r.worker_decline_reason)}` : ''}<div style="color:var(--bovo-muted); font-weight:400; font-size:0.82rem; margin-top:4px;">En attente de réassignation par l'admin.</div></div>`;
+        } else if (accepted) {
+          action = `<button id="act-start" class="btn btn-primary btn-block" type="button">▶ Démarrer la mission</button>`;
+        } else {
+          action = `<div style="display:flex; gap:8px;"><button id="act-accept" class="btn btn-primary btn-sm" type="button" style="flex:1;">✓ Accepter</button><button id="act-decline" class="btn btn-ghost btn-sm" type="button" style="flex:1; color:var(--bovo-danger);">✗ Refuser</button></div>`;
+        }
       }
 
       return `
@@ -148,7 +161,7 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
 
       const since = new Date(); since.setDate(since.getDate() - 14);
       const { data, error } = await supa.from('reservations')
-        .select('id, service_type, guest_name, guest_phone, scheduled_at, duration_min, status, payload')
+        .select('id, service_type, guest_name, guest_phone, scheduled_at, duration_min, status, payload, worker_accepted_at, worker_declined_at, worker_decline_reason')
         .eq('assigned_worker_id', user.id)
         .in('status', ['assigned', 'in_progress', 'done'])
         .gte('scheduled_at', since.toISOString())
@@ -181,8 +194,28 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
 
       const start = document.getElementById('act-start');
       const done = document.getElementById('act-done');
+      const accept = document.getElementById('act-accept');
+      const decline = document.getElementById('act-decline');
       if (start) start.addEventListener('click', () => advance(r, 'in_progress'));
       if (done) done.addEventListener('click', () => advance(r, 'done'));
+      if (accept) accept.addEventListener('click', () => respond(r, 'accept'));
+      if (decline) decline.addEventListener('click', () => respond(r, 'decline'));
+    }
+
+    async function respond(r: any, kind: 'accept' | 'decline') {
+      const fb = document.getElementById('mission-feedback');
+      let patch: Record<string, unknown>;
+      if (kind === 'accept') {
+        patch = { worker_accepted_at: new Date().toISOString(), worker_declined_at: null, worker_decline_reason: null };
+      } else {
+        const reason = (prompt('Motif du refus (optionnel) :') ?? '').trim();
+        patch = { worker_declined_at: new Date().toISOString(), worker_accepted_at: null, worker_decline_reason: reason || null };
+      }
+      if (fb) { fb.textContent = 'Enregistrement…'; fb.style.color = 'var(--bovo-muted)'; }
+      const { error } = await supa.from('reservations').update(patch).eq('id', r.id);
+      if (error) { if (fb) { fb.textContent = `Erreur : ${error.message}`; fb.style.color = 'var(--bovo-danger)'; } return; }
+      modal.hidden = true;
+      await load();
     }
 
     async function advance(r: any, next: 'in_progress' | 'done') {

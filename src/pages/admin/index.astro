@@ -1218,7 +1218,7 @@ import { ZONES } from '@lib/catalog';
         return;
       }
       const { error } = await supa.from('reservations')
-        .update({ assigned_worker_id: workerId, status: 'assigned' })
+        .update({ assigned_worker_id: workerId, status: 'assigned', worker_accepted_at: null, worker_declined_at: null, worker_decline_reason: null })
         .eq('id', assigningResaId);
       if (error) {
         assignError.textContent = error.message;

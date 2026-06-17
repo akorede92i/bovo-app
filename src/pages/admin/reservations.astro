@@ -201,6 +201,11 @@ import AdminLayout from '@layouts/AdminLayout.astro';
             ${r.deposit_status === 'paid' ? '<span class="status-badge" style="background:var(--bovo-success);">Acompte payé</span>' : ''}
             ${r.deposit_status === 'pending' ? '<span class="status-badge" style="background:var(--bovo-warning);">Acompte demandé</span>' : ''}
           </div>
+          ${r.assigned_worker_id ? `<div style="font-size:0.86rem;">${
+            r.worker_declined_at ? `<span style="color:var(--bovo-danger); font-weight:600;">✗ Refusée par le worker${r.worker_decline_reason ? ` — ${escapeHtml(r.worker_decline_reason)}` : ''}</span> · à réassigner`
+            : r.worker_accepted_at ? `<span style="color:var(--bovo-success); font-weight:600;">✓ Acceptée par le worker</span>`
+            : `<span style="color:#B45309; font-weight:600;">● En attente de réponse du worker</span>`
+          }</div>` : ''}
         </div>
 
         <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Client</h3>
@@ -244,11 +249,18 @@ import AdminLayout from '@layouts/AdminLayout.astro';
         errEl.style.display = 'none';
         okEl.style.display = 'none';
 
-        const { error } = await supa.from('reservations').update({
+        const patch: Record<string, unknown> = {
           status: newStatus,
           assigned_worker_id: newWorker,
           updated_at: new Date().toISOString(),
-        }).eq('id', id);
+        };
+        // Réassignation (worker changé) → on remet à zéro la réponse du worker (W7 v2).
+        if (newWorker !== r.assigned_worker_id) {
+          patch.worker_accepted_at = null;
+          patch.worker_declined_at = null;
+          patch.worker_decline_reason = null;
+        }
+        const { error } = await supa.from('reservations').update(patch).eq('id', id);
 
         if (error) {
           errEl.textContent = error.message;
