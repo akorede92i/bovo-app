@@ -8,15 +8,39 @@ config Firebase/Apple et à déployer (C2 ci-dessous).
 
 ---
 
-## ✅ Déjà fait (dans le repo, branche `feat/capacitor-mobile`)
+## ✅ Déjà fait (code sur `main`, déployé sur app.bovo.bj)
 
 - `supabase/migrations/20260607_device_tokens.sql` — table `device_tokens` + RLS.
-- `supabase/functions/send-push/index.ts` — Edge Function FCM v1 (2 modes :
-  webhook suivi-réservation + appel direct rappels/promos).
+  **Déjà APPLIQUÉE en prod** (vérifié : table + 2 policies présentes).
+- `supabase/functions/send-push/index.ts` (+ `lib.ts` testé) — Edge Function FCM v1
+  (2 modes : webhook suivi-réservation + appel direct rappels/promos), garde service_role.
 - `src/lib/push.ts` — `saveDeviceToken()` / `flushPendingDeviceToken()`.
 - `src/lib/native.ts` — capture du token FCM + listeners (tap → routage) via
-  `@capacitor-firebase/messaging`. Permission via `requestPushPermission()`.
+  `@capacitor-firebase/messaging`, `requestPushPermission()`, et **`ensurePushRegistered()`**.
+- **Câblage app FAIT (2026-06-17)** : `/compte/` (post-login) appelle
+  `ensurePushRegistered()` → rattache un jeton capté avant login + demande la
+  permission au bon moment (jamais au 1er lancement). No-op sur le web.
 - Plugins installés : `@capacitor-firebase/app`, `@capacitor-firebase/messaging`, `firebase`.
+- Mobile natif (`android/`, `ios/`, `capacitor.config.ts`, appId `bj.bovo.app`) :
+  sur la branche `feat/capacitor-mobile` (PR #6), pas encore sur `main`.
+
+---
+
+## 🎯 Ce qu'il TE reste à faire (credentials + build natif)
+
+Le code est prêt. Il manque **uniquement** ce qui dépend de tes comptes :
+
+1. **Firebase** : créer le projet, ajouter app Android + iOS (package/bundle **`bj.bovo.app`**),
+   télécharger `google-services.json` (Android) et `GoogleService-Info.plist` (iOS),
+   uploader la **clé APNs .p8** (Apple Developer → Keys) dans Cloud Messaging.
+2. **Edge function** : `supabase secrets set FCM_SERVICE_ACCOUNT="$(cat serviceAccount.json)"`
+   puis `supabase functions deploy send-push` (la table `device_tokens` est déjà en prod),
+   puis créer le **webhook** DB (cf. §C2.1 ci-dessous).
+3. **Build natif** : copier les 2 fichiers Firebase dans `android/app/` et `ios/App/App/`,
+   `npx cap sync`, activer **Push Notifications** + **Background Modes** dans Xcode (§3-4).
+
+> ⚠️ Sans ces 3 points, le push reste inactif — mais l'app et le web continuent de
+> marcher normalement (tout le code push est garde-fou no-op).
 
 ---
 

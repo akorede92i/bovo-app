@@ -177,8 +177,12 @@ import CompteSidebar from '@components/CompteSidebar.astro';
   import { requireAuth } from '@lib/auth';
   import { getSupabase } from '@lib/supabase';
   import { fcfa } from '@lib/catalog';
+  import { ensurePushRegistered } from '@lib/native';
 
   const user = await requireAuth();
+  // Push (carte W7) : rattache un jeton capté avant login + demande la permission
+  // au moment opportun (post-login). No-op sur le web ; actif dans l'app native.
+  void ensurePushRegistered();
   const supa = getSupabase();
   if (!supa) {
     document.getElementById('loading')!.textContent = 'Service indisponible.';
