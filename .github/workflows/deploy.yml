@@ -1,11 +1,16 @@
-name: Deploy app.bovo.bj
+name: CI & Deploy — app.bovo.bj
 
+# - Sur pull_request vers main : lance UNIQUEMENT le job `test` (garde-fou avant merge).
+# - Sur push vers main (= merge) : test -> build -> deploy (GitHub Pages / app.bovo.bj).
+# Le build/deploy sont sautés sur les PR (cf. `if:` plus bas).
 on:
   push:
     branches: [main]
     paths:
       - '**'
       - '!README.md'
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -14,8 +19,10 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages-app-bovo"
-  cancel-in-progress: false
+  # Une file par ref : les runs de PR ne bloquent plus le déploiement de main,
+  # et un nouveau commit sur une PR annule le run précédent (pas pour les deploys).
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   test:
@@ -72,6 +79,7 @@ jobs:
 
   build:
     needs: test
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -103,6 +111,7 @@ jobs:
 
   deploy:
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment:
       name: github-pages
