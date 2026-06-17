@@ -1,0 +1,208 @@
+---
+import AdminLayout from '@layouts/AdminLayout.astro';
+---
+<AdminLayout title="Paie — Bovo Admin" pageTitle="Paie" active="paie">
+  <p class="admin-sub">Récapitulatif mensuel de ce qui est dû à chaque worker, à partir de son tarif (fiche RH) et de ses missions terminées.</p>
+
+  <div style="background:#FEF3C7; color:#92400E; border:1px solid #FDE68A; border-radius:var(--r-md); padding:10px 12px; font-size:0.84rem; margin-bottom:16px;">
+    ⚠️ <strong>Aucun virement automatique.</strong> « Marquer payé » enregistre seulement le suivi du paiement (effectué à la main par tes propres moyens).
+  </div>
+
+  <div style="display:flex; gap:8px; margin-bottom:16px; align-items:center; flex-wrap:wrap;">
+    <input id="month" type="month" class="input" style="max-width:180px;" />
+    <button id="export-csv" class="btn btn-ghost btn-sm">⬇ Exporter CSV</button>
+    <div id="period-totals" style="margin-left:auto; font-size:0.88rem; color:var(--bovo-muted);"></div>
+  </div>
+
+  <div id="paie-loading" class="loading" hidden>Chargement…</div>
+  <div id="paie-empty" hidden class="empty-state" style="padding:30px 16px;">
+    <div class="empty-state-emoji">💸</div>
+    <div class="empty-state-title">Aucune mission terminée ce mois-ci</div>
+    <div class="empty-state-desc">Les missions passées en statut « Terminée » apparaîtront ici.</div>
+  </div>
+  <div id="paie-list"></div>
+</AdminLayout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+  import { SERVICE_ICONS, SERVICE_LABELS, escapeHtml } from '@lib/admin';
+  import { fcfa } from '@lib/catalog';
+  import { computePayout } from '@lib/payroll';
+
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('paie-loading')!.textContent = 'Supabase non configuré.';
+  } else {
+    const monthInput = document.getElementById('month') as HTMLInputElement;
+    const listEl = document.getElementById('paie-list')!;
+    const emptyEl = document.getElementById('paie-empty')!;
+    const loadingEl = document.getElementById('paie-loading')!;
+    const totalsEl = document.getElementById('period-totals')!;
+
+    interface Row { resa: any; amount: number | null; paid: boolean; }
+    interface WorkerData { id: string; name: string; rows: Row[]; due: number; paid: number; noRate: number; }
+    let current: WorkerData[] = [];
+
+    const now = new Date();
+    monthInput.value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    // Bornes du mois en heure du BÉNIN (WAT = UTC+1, sans changement d'heure),
+    // indépendantes du fuseau du navigateur de l'admin (qui peut être hors Bénin) :
+    // sinon une mission de bord de mois serait rattachée au mauvais mois et le
+    // total mensuel d'argent serait faux selon d'où l'admin se connecte.
+    function monthBounds(v: string): { start: string; end: string } {
+      const [y, m] = v.split('-').map(Number);
+      const iso = (yy: number, mm: number) => new Date(`${yy}-${String(mm).padStart(2, '0')}-01T00:00:00+01:00`).toISOString();
+      return { start: iso(y, m), end: m === 12 ? iso(y + 1, 1) : iso(y, m + 1) };
+    }
+
+    async function load() {
+      const v = monthInput.value;
+      if (!v) return;
+      const { start, end } = monthBounds(v);
+      loadingEl.hidden = false; emptyEl.hidden = true; listEl.innerHTML = ''; totalsEl.textContent = '';
+
+      // Missions terminées du mois, assignées à un worker.
+      const { data: resaData, error } = await supa.from('reservations')
+        .select('id, assigned_worker_id, service_type, guest_name, scheduled_at, duration_min')
+        .eq('status', 'done')
+        .not('assigned_worker_id', 'is', null)
+        .gte('scheduled_at', start)
+        .lt('scheduled_at', end)
+        .order('scheduled_at');
+      if (error) { loadingEl.textContent = `Erreur : ${error.message}`; return; }
+
+      const resas = resaData ?? [];
+      loadingEl.hidden = true;
+      if (resas.length === 0) { emptyEl.hidden = false; current = []; return; }
+
+      const workerIds = [...new Set(resas.map((r: any) => r.assigned_worker_id))];
+      const resaIds = resas.map((r: any) => r.id);
+      const [{ data: profs }, { data: rhRows }, { data: payouts }] = await Promise.all([
+        supa.from('profiles').select('id, full_name').in('id', workerIds),
+        supa.from('worker_profiles').select('worker_id, rate_xof, pay_type').in('worker_id', workerIds),
+        supa.from('worker_payouts').select('reservation_id, amount_xof').in('reservation_id', resaIds),
+      ]);
+
+      const nameById = new Map((profs ?? []).map((p: any) => [p.id, p.full_name ?? 'Sans nom']));
+      const rhById = new Map((rhRows ?? []).map((r: any) => [r.worker_id, r]));
+      const paidByResa = new Map((payouts ?? []).map((p: any) => [p.reservation_id, p.amount_xof]));
+
+      const byWorker = new Map<string, WorkerData>();
+      for (const resa of resas) {
+        const wid = resa.assigned_worker_id;
+        if (!byWorker.has(wid)) byWorker.set(wid, { id: wid, name: nameById.get(wid) ?? wid.slice(0, 8), rows: [], due: 0, paid: 0, noRate: 0 });
+        const wd = byWorker.get(wid)!;
+        const isPaid = paidByResa.has(resa.id);
+        let amount: number | null;
+        if (isPaid) {
+          amount = paidByResa.get(resa.id) ?? 0;
+          wd.paid += amount ?? 0;
+        } else {
+          const rh = rhById.get(wid);
+          amount = computePayout(rh?.rate_xof ?? null, rh?.pay_type ?? null, resa.duration_min ?? null);
+          if (amount == null) wd.noRate += 1; else wd.due += amount;
+        }
+        wd.rows.push({ resa, amount, paid: isPaid });
+      }
+
+      current = [...byWorker.values()].sort((a, b) => b.due - a.due);
+      render();
+    }
+
+    function render() {
+      const totalDue = current.reduce((s, w) => s + w.due, 0);
+      const totalPaid = current.reduce((s, w) => s + w.paid, 0);
+      totalsEl.innerHTML = `Dû : <strong style="color:var(--bovo-rouge);">${escapeHtml(fcfa(totalDue))}</strong> · Payé : <strong style="color:var(--bovo-success);">${escapeHtml(fcfa(totalPaid))}</strong>`;
+
+      listEl.innerHTML = current.map((w) => {
+        const missionsHtml = w.rows.map((r) => {
+          const d = r.resa.scheduled_at ? new Date(r.resa.scheduled_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '—';
+          const amountTxt = r.amount == null
+            ? '<span style="color:var(--bovo-warning);">tarif à définir</span>'
+            : `<strong>${escapeHtml(fcfa(r.amount))}</strong>`;
+          const badge = r.paid
+            ? `<span class="status-badge" style="background:var(--bovo-success);">Payé</span> <button class="unmark" data-id="${escapeHtml(r.resa.id)}" title="Annuler le paiement" style="background:none; border:none; color:var(--bovo-muted); cursor:pointer;">↺</button>`
+            : '';
+          return `<div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--bovo-line-soft); font-size:0.84rem;">
+              <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${SERVICE_ICONS[r.resa.service_type] ?? '✦'} <span style="color:var(--bovo-muted);">${d}</span> ${escapeHtml(r.resa.guest_name ?? '')}</span>
+              <span style="display:flex; gap:8px; align-items:center; flex-shrink:0;">${amountTxt} ${badge}</span>
+            </div>`;
+        }).join('');
+
+        return `
+          <div style="background:#fff; border:1px solid var(--bovo-line-soft); border-radius:var(--r-lg); padding:14px; margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;">
+              <div>
+                <strong style="font-size:1.02rem;">${escapeHtml(w.name)}</strong>
+                <span style="color:var(--bovo-muted); font-size:0.84rem;"> · ${w.rows.length} mission${w.rows.length > 1 ? 's' : ''}${w.noRate ? ` · <span style="color:var(--bovo-warning);">${w.noRate} sans tarif</span>` : ''}</span>
+              </div>
+              <div style="display:flex; gap:12px; align-items:center;">
+                <span style="font-size:0.84rem;">Dû : <strong style="color:var(--bovo-rouge);">${escapeHtml(fcfa(w.due))}</strong>${w.paid ? ` · Payé : <strong style="color:var(--bovo-success);">${escapeHtml(fcfa(w.paid))}</strong>` : ''}</span>
+                ${w.due > 0 ? `<button class="mark-paid btn btn-primary btn-sm" data-id="${escapeHtml(w.id)}">Marquer payé</button>` : ''}
+              </div>
+            </div>
+            <details>
+              <summary style="cursor:pointer; color:var(--bovo-muted); font-size:0.84rem;">Détail des missions</summary>
+              <div style="margin-top:8px;">${missionsHtml}</div>
+            </details>
+          </div>`;
+      }).join('');
+
+      listEl.querySelectorAll<HTMLButtonElement>('.mark-paid').forEach((btn) => btn.addEventListener('click', () => markPaid(btn.dataset.id!)));
+      listEl.querySelectorAll<HTMLButtonElement>('.unmark').forEach((btn) => btn.addEventListener('click', () => unmark(btn.dataset.id!)));
+    }
+
+    async function markPaid(workerId: string) {
+      const wd = current.find((w) => w.id === workerId);
+      if (!wd) return;
+      const toPay = wd.rows.filter((r) => !r.paid && r.amount != null && r.amount > 0);
+      if (toPay.length === 0) return;
+      const total = toPay.reduce((s, r) => s + (r.amount ?? 0), 0);
+      if (!confirm(`Marquer ${toPay.length} mission(s) payée(s) pour ${wd.name} — total ${fcfa(total)} ?\n\nCeci enregistre uniquement le suivi du paiement (aucun virement n'est effectué).`)) return;
+
+      // Garde anti-double-paiement : on revérifie en DB ce qui est déjà payé (cas
+      // d'un 2e onglet à l'état périmé), EN PLUS de la contrainte unique + ON CONFLICT.
+      const ids = toPay.map((r) => r.resa.id);
+      const { data: already } = await supa.from('worker_payouts').select('reservation_id').in('reservation_id', ids);
+      const paidSet = new Set((already ?? []).map((p: any) => p.reservation_id));
+      const rows = toPay.filter((r) => !paidSet.has(r.resa.id)).map((r) => ({ reservation_id: r.resa.id, worker_id: workerId, amount_xof: r.amount }));
+      if (rows.length === 0) { await load(); return; }
+      const { error } = await supa.from('worker_payouts').upsert(rows, { onConflict: 'reservation_id', ignoreDuplicates: true });
+      if (error) { alert(`Erreur : ${error.message}`); return; }
+      await load();
+    }
+
+    async function unmark(reservationId: string) {
+      if (!confirm('Annuler ce paiement (correction d’une erreur de saisie) ?')) return;
+      const { error } = await supa.from('worker_payouts').delete().eq('reservation_id', reservationId);
+      if (error) { alert(`Erreur : ${error.message}`); return; }
+      await load();
+    }
+
+    // Neutralise l'injection de formule CSV (Excel) et échappe les guillemets.
+    function csvCell(v: string | number): string {
+      let s = String(v ?? '');
+      if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+      return `"${s.replace(/"/g, '""')}"`;
+    }
+
+    function exportCsv() {
+      if (current.length === 0) { alert('Rien à exporter pour ce mois.'); return; }
+      const header = ['Worker', 'Missions', 'Du_XOF', 'Paye_XOF', 'Sans_tarif'];
+      const lines = current.map((w) => [w.name, w.rows.length, w.due, w.paid, w.noRate].map(csvCell).join(','));
+      const csv = [header.map(csvCell).join(','), ...lines].join('\r\n');
+      const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `paie-bovo-${monthInput.value}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    monthInput.addEventListener('change', load);
+    document.getElementById('export-csv')!.addEventListener('click', exportCsv);
+    await load();
+  }
+</script>
