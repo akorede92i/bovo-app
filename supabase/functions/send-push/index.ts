@@ -21,41 +21,19 @@
  *   supabase functions deploy send-push
  *   Puis Database → Webhooks : table=reservations, events=UPDATE, URL=.../functions/v1/send-push,
  *   Header Authorization: Bearer <SERVICE_ROLE_KEY>.
+ *
+ * AUTORISATION (#8) : la fonction EXIGE `Authorization: Bearer <SERVICE_ROLE_KEY>`
+ * pour les deux modes (vérifié dans le code). Déployable avec `--no-verify-jwt`
+ * sans risque ; le webhook DB doit envoyer ce header (cf. ci-dessus).
  */
 // @ts-ignore - deno runtime
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 // @ts-ignore - deno runtime
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { coerceData, classifyFcmFailure, isServiceRoleAuthorized, messageForStatus } from './lib.ts';
 
 // @ts-ignore Deno global
 const env = (k: string) => (typeof Deno !== 'undefined' ? Deno.env.get(k) : undefined);
-
-const SERVICE_LABELS: Record<string, string> = {
-  menage: 'ménage',
-  airbnb: 'service Airbnb',
-  demenagement: 'déménagement',
-  chef: 'chef à domicile',
-  plombier: 'plomberie',
-};
-
-// Messages de suivi par statut de réservation.
-function messageForStatus(status: string, serviceType: string): { title: string; body: string } | null {
-  const svc = SERVICE_LABELS[serviceType] ?? 'prestation';
-  switch (status) {
-    case 'confirmed':
-      return { title: 'Réservation confirmée ✅', body: `Votre ${svc} est confirmé. On s'occupe de tout !` };
-    case 'assigned':
-      return { title: 'Prestataire assigné 👤', body: `Un professionnel Bovo a été assigné à votre ${svc}.` };
-    case 'in_progress':
-      return { title: 'Prestation en cours 🧹', body: `Votre ${svc} vient de démarrer.` };
-    case 'done':
-      return { title: 'Prestation terminée 🎉', body: `Votre ${svc} est terminé. Merci ! Laissez-nous un avis ⭐` };
-    case 'cancelled':
-      return { title: 'Réservation annulée', body: `Votre ${svc} a été annulé. Besoin d'aide ? Écrivez-nous.` };
-    default:
-      return null; // 'pending' et autres : pas de notification
-  }
-}
 
 // ---- FCM HTTP v1 : obtention d'un access token OAuth2 depuis le service account ----
 function b64url(input: ArrayBuffer | string): string {
@@ -134,14 +112,23 @@ async function sendOne(
     }),
   });
   if (res.ok) return 'ok';
-  // 404 UNREGISTERED / 400 invalid → token mort à purger
-  if (res.status === 404 || res.status === 400) return 'invalid';
-  console.error('FCM error', res.status, await res.text());
-  return 'error';
+  // #8 — ne purger que sur un token réellement mort ; jamais sur une erreur
+  // ambiguë (ex. message malformé) qui supprimerait un token encore valide.
+  const text = await res.text();
+  const verdict = classifyFcmFailure(res.status, text);
+  if (verdict === 'error') console.error('FCM error', res.status, text);
+  return verdict;
 }
 
 serve(async (req) => {
   if (req.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+
+  // #8 — Garde d'autorisation : les DEUX modes (webhook DB + appel direct) sont
+  // réservés au service_role. Sans ce contrôle, n'importe qui (la clé anon étant
+  // publique) pouvait forger un push vers n'importe quel utilisateur.
+  if (!isServiceRoleAuthorized(req.headers.get('Authorization'), env('SUPABASE_SERVICE_ROLE_KEY'))) {
+    return new Response('Unauthorized', { status: 401 });
+  }
 
   const saRaw = env('FCM_SERVICE_ACCOUNT');
   if (!saRaw) return new Response('FCM_SERVICE_ACCOUNT not set', { status: 500 });
@@ -174,14 +161,14 @@ serve(async (req) => {
     if (!msg) return new Response(JSON.stringify({ skipped: `status ${rec.status} not notifiable` }), { status: 200 });
     title = msg.title;
     body = msg.body;
-    data = { type: 'reservation', reservationId: String(rec.id), status: rec.status, url: `/compte/reservations/` };
+    data = coerceData({ type: 'reservation', reservationId: rec.id, status: rec.status, url: '/compte/reservations/' });
     targetUserIds = [rec.user_id];
     channel = 'transactional';
   } else if (payload.title && payload.body) {
     // Mode direct : rappels / promos
     title = String(payload.title);
     body = String(payload.body);
-    data = payload.data ?? {};
+    data = coerceData(payload.data);
     channel = payload.channel === 'marketing' ? 'marketing' : 'transactional';
     if (payload.userId) targetUserIds = [String(payload.userId)];
     else if (Array.isArray(payload.userIds)) targetUserIds = payload.userIds.map(String);
