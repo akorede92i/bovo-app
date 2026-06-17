@@ -8,10 +8,11 @@
  *
  * Setup :
  *   1. Créer un compte sur app.kkiapay.me
- *   2. Récupérer la clé publique (sandbox + prod)
+ *   2. Récupérer la clé publique (une clé sandbox + une clé prod)
  *   3. Mettre dans .env :
- *      PUBLIC_KKIAPAY_PUBLIC_KEY=xxx (sandbox d'abord)
- *   4. Passer `sandbox: false` côté front quand prêt pour la prod
+ *      PUBLIC_KKIAPAY_PUBLIC_KEY=xxx   (clé de test en dev/preprod, clé live en prod)
+ *      PUBLIC_KKIAPAY_SANDBOX=true     (paiements de test) — voir openDeposit()
+ *   4. En prod (web/mobile), laisser PUBLIC_KKIAPAY_SANDBOX vide/false → paiements réels.
  */
 
 declare global {
@@ -67,8 +68,9 @@ let currentFailed: ((resp: KkiapayResponse) => void | Promise<void>) | null = nu
 /**
  * Helper pour ouvrir le widget Kkiapay et écouter le résultat.
  * Lève une erreur si le widget n'est pas chargé.
- * Le mode sandbox suit l'environnement (`!import.meta.env.PROD`) : en prod, les
- * paiements sont réels — ne jamais coder `sandbox: true` en dur dans les pages.
+ * Le mode sandbox est piloté par la variable PUBLIC_KKIAPAY_SANDBOX (cf. plus bas) :
+ * en prod (web/mobile) les paiements sont réels — ne jamais coder `sandbox: true`
+ * en dur dans les pages, ni s'appuyer sur PROD pour distinguer preprod et prod.
  */
 export function openDeposit(opts: OpenDepositOpts): void {
   if (!isKkiapayReady()) {
@@ -76,7 +78,15 @@ export function openDeposit(opts: OpenDepositOpts): void {
   }
 
   const apiKey = (import.meta as any).env?.PUBLIC_KKIAPAY_PUBLIC_KEY ?? 'DEMO';
-  const sandbox = !((import.meta as any).env?.PROD);
+  // Mode sandbox piloté EXPLICITEMENT par PUBLIC_KKIAPAY_SANDBOX ('true'/'false').
+  // Repli (non défini) : sur l'environnement — sandbox en dev, paiements RÉELS en
+  // build de prod/mobile (PROD=true). ⚠️ Une PREPROD est aussi un `astro build`
+  // (PROD=true) : elle DOIT poser PUBLIC_KKIAPAY_SANDBOX=true, sinon vrais paiements.
+  const sandboxEnv = (import.meta as any).env?.PUBLIC_KKIAPAY_SANDBOX;
+  const sandbox =
+    sandboxEnv === 'true' || sandboxEnv === true ? true
+    : sandboxEnv === 'false' || sandboxEnv === false ? false
+    : !((import.meta as any).env?.PROD);
 
   currentSuccess = opts.onSuccess;
   currentFailed = opts.onFailed ?? null;
