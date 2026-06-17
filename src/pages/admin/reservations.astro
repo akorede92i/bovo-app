@@ -143,7 +143,7 @@ import AdminLayout from '@layouts/AdminLayout.astro';
                 <div style="font-weight:600;">${escapeHtml(r.guest_name) || 'Anonyme'} — ${SERVICE_LABELS[r.service_type] ?? escapeHtml(r.service_type)}</div>
                 <div style="font-size:0.84rem; color:var(--bovo-muted); margin-top:2px;">${dateStr} · ${escapeHtml(r.guest_phone) || '—'}</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
-                  <span class="status-badge" style="background:${STATUS_COLORS[r.status] ?? '#6B7280'};">${STATUS_LABELS[r.status] ?? r.status}</span>
+                  <span class="status-badge" style="background:${STATUS_COLORS[r.status] ?? '#6B7280'};">${STATUS_LABELS[r.status] ?? escapeHtml(r.status)}</span>
                   <span style="font-family:'Jost'; font-weight:700;">${r.estimated_total_xof ? fcfa(r.estimated_total_xof) : '—'}</span>
                 </div>
               </div>

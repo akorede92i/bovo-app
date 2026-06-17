@@ -756,11 +756,11 @@ import { ZONES } from '@lib/catalog';
         <a href="/admin/reservations/?id=${r.id}" class="${classes.join(' ')}">
           <div class="resa-card-icon">${SERVICE_ICONS[r.service_type] ?? '✦'}</div>
           <div class="resa-card-body">
-            <div class="resa-card-title">${SERVICE_LABELS[r.service_type] ?? r.service_type} — ${escapeHtml(r.guest_name) || 'Anonyme'}</div>
+            <div class="resa-card-title">${SERVICE_LABELS[r.service_type] ?? escapeHtml(r.service_type)} — ${escapeHtml(r.guest_name) || 'Anonyme'}</div>
             <div class="resa-card-meta">${dateStr} · ${escapeHtml(r.guest_phone) || '—'}${workerHtml ? ' · ' + workerHtml : ''}</div>
             ${flags.length ? `<div class="resa-card-flags">${flags.join('')}</div>` : ''}
           </div>
-          <span class="status-badge" style="background:${statusColor};">${STATUS_LABELS[r.status] ?? r.status}</span>
+          <span class="status-badge" style="background:${statusColor};">${STATUS_LABELS[r.status] ?? escapeHtml(r.status)}</span>
         </a>
       `;
     }
@@ -983,7 +983,7 @@ import { ZONES } from '@lib/catalog';
             <div class="activity-item">
               <span class="activity-icon">${SERVICE_ICONS[r.service_type] ?? '📋'}</span>
               <div class="activity-body">
-                <div class="activity-text">Nouvelle résa <strong>${SERVICE_LABELS[r.service_type] ?? r.service_type}</strong> — ${escapeHtml(r.guest_name) || 'Anonyme'}</div>
+                <div class="activity-text">Nouvelle résa <strong>${SERVICE_LABELS[r.service_type] ?? escapeHtml(r.service_type)}</strong> — ${escapeHtml(r.guest_name) || 'Anonyme'}</div>
                 <div class="activity-time">${relativeTime(r.created_at)}</div>
               </div>
             </div>
@@ -1133,7 +1133,7 @@ import { ZONES } from '@lib/catalog';
           return `
             <a href="/admin/reservations/?id=${r.id}" class="search-result">
               <div>${SERVICE_ICONS[r.service_type] ?? '✦'} <strong>${escapeHtml(r.guest_name) || 'Anonyme'}</strong> — ${escapeHtml(r.guest_phone) || '—'}</div>
-              <div class="search-result-meta">${SERVICE_LABELS[r.service_type] ?? r.service_type} · ${dateStr} · ${STATUS_LABELS[r.status] ?? r.status}</div>
+              <div class="search-result-meta">${SERVICE_LABELS[r.service_type] ?? escapeHtml(r.service_type)} · ${dateStr} · ${STATUS_LABELS[r.status] ?? escapeHtml(r.status)}</div>
             </a>
           `;
         }).join('');
