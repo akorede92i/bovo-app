@@ -210,6 +210,7 @@ returns boolean
 language sql
 security definer
 stable
+set search_path = ''
 as $$
   select exists(select 1 from public.profiles where id = auth.uid() and role = 'admin');
 $$;
@@ -220,6 +221,7 @@ returns boolean
 language sql
 security definer
 stable
+set search_path = ''
 as $$
   select exists(select 1 from public.profiles where id = auth.uid() and role in ('worker','admin'));
 $$;
