@@ -172,3 +172,32 @@ export async function requestPushPermission(): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * À appeler sur une page POST-LOGIN (ex. /compte/). Enchaîne :
+ *  1. rattache un éventuel jeton capté AVANT la connexion (flushPendingDeviceToken) ;
+ *  2. sur natif uniquement, et seulement si l'utilisateur n'a pas encore décidé,
+ *     demande la permission push (jamais au tout 1er lancement de l'app).
+ * No-op sur le web (`app.bovo.bj`). On respecte un refus (pas de re-demande).
+ */
+export async function ensurePushRegistered(): Promise<void> {
+  try {
+    const { flushPendingDeviceToken } = await import('@lib/push');
+    await flushPendingDeviceToken();
+  } catch {
+    /* ignore */
+  }
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    const { FirebaseMessaging } = await import('@capacitor-firebase/messaging');
+    const perm = await FirebaseMessaging.checkPermissions();
+    if (perm.receive === 'granted') {
+      await registerPushIfGranted();
+    } else if (perm.receive === 'prompt' || perm.receive === 'prompt-with-rationale') {
+      await requestPushPermission();
+    }
+    // 'denied' → on respecte le choix de l'utilisateur, pas de re-demande.
+  } catch {
+    /* plugin/Firebase non configuré (dev web) — ignore */
+  }
+}
