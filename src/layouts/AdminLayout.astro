@@ -4,7 +4,7 @@ import '@styles/global.css';
 interface Props {
   title?: string;
   pageTitle?: string;
-  active?: 'dashboard' | 'reservations' | 'workers' | 'planning' | 'airbnb';
+  active?: 'dashboard' | 'reservations' | 'workers' | 'planning' | 'paie' | 'airbnb';
 }
 
 const { title = 'Bovo Admin', pageTitle, active = 'dashboard' } = Astro.props;
@@ -14,6 +14,7 @@ const tabs = [
   { id: 'reservations', href: '/admin/reservations/', label: 'Réservations', emoji: '📋' },
   { id: 'workers',      href: '/admin/workers/',      label: 'Workers',    emoji: '👥' },
   { id: 'planning',     href: '/admin/planning/',     label: 'Planning',   emoji: '🗓️' },
+  { id: 'paie',         href: '/admin/paie/',         label: 'Paie',       emoji: '💰' },
   { id: 'airbnb',       href: '/admin/airbnb/',       label: 'Airbnb',     emoji: '🏠' },
 ];
 ---
