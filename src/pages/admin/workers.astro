@@ -240,13 +240,14 @@ import { ZONES } from '@lib/catalog';
       workerModalBody.innerHTML = '<div style="text-align:center; padding:40px; color:var(--bovo-muted);">Chargement…</div>';
       workerModal.hidden = false;
 
-      const [{ data: prof }, { data: skills }, { data: zones }, { data: avail }, { data: blackouts }, { data: reviewsList }] = await Promise.all([
+      const [{ data: prof }, { data: skills }, { data: zones }, { data: avail }, { data: blackouts }, { data: reviewsList }, { data: rh }] = await Promise.all([
         supa.from('profiles').select('*').eq('id', id).maybeSingle(),
         supa.from('worker_skills').select('*').eq('worker_id', id),
         supa.from('worker_zones').select('*').eq('worker_id', id),
         supa.from('worker_availability').select('*').eq('worker_id', id).order('day_of_week'),
         supa.from('worker_blackouts').select('*').eq('worker_id', id).order('starts_at'),
         supa.from('reviews').select('rating, comment, service_type, created_at').eq('worker_id', id).order('created_at', { ascending: false }).limit(20),
+        supa.from('worker_profiles').select('*').eq('worker_id', id).maybeSingle(),
       ]);
 
       if (!prof) {
@@ -258,6 +259,28 @@ import { ZONES } from '@lib/catalog';
       const currentSkills = new Set((skills ?? []).map((s: any) => s.skill));
       const currentZones = new Set((zones ?? []).map((z: any) => z.zone));
 
+      // Rendu des listes dispos/congés isolé, pour pouvoir rafraîchir UNIQUEMENT
+      // ces blocs après ajout/suppression — réécrire toute la modale ferait perdre
+      // une saisie RH non encore enregistrée (cf. revue W2).
+      function availListHtml(list: any[]) {
+        return list.length === 0
+          ? '<div style="color:var(--bovo-muted);">Aucun créneau récurrent enregistré.</div>'
+          : list.map((a: any) => `
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--bovo-line-soft);">
+              <span><strong>${DAYS[a.day_of_week]}</strong> · ${a.time_start.slice(0, 5)} → ${a.time_end.slice(0, 5)}</span>
+              <button class="del-avail" data-id="${a.id}" style="color:var(--bovo-danger); background:none; border:none; cursor:pointer;">✕</button>
+            </div>`).join('');
+      }
+      function bkListHtml(list: any[]) {
+        return list.length === 0
+          ? '<div style="color:var(--bovo-muted);">Aucune indisponibilité.</div>'
+          : list.map((b: any) => `
+            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--bovo-line-soft);">
+              <span>${new Date(b.starts_at).toLocaleDateString('fr-FR')} → ${new Date(b.ends_at).toLocaleDateString('fr-FR')} ${b.reason ? `<em style="color:var(--bovo-muted);">— ${escapeHtml(b.reason)}</em>` : ''}</span>
+              <button class="del-blackout" data-id="${b.id}" style="color:var(--bovo-danger); background:none; border:none; cursor:pointer;">✕</button>
+            </div>`).join('');
+      }
+
       workerModalBody.innerHTML = `
         <!-- INFOS -->
         <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Informations</h3>
@@ -265,6 +288,54 @@ import { ZONES } from '@lib/catalog';
           <div style="font-size:0.86rem; line-height:1.6;">
             <div><strong>${escapeHtml(prof.full_name ?? 'Sans nom')}</strong></div>
             <div style="color:var(--bovo-muted);">${escapeHtml(prof.phone ?? '—')} · Role : <span style="font-weight:600; color:${prof.role === 'admin' ? 'var(--bovo-rouge)' : 'var(--bovo-bleu)'};">${escapeHtml(prof.role)}</span></div>
+          </div>
+        </div>
+
+        <!-- FICHE RH (W2) -->
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Fiche RH <span class="text-muted" style="font-weight:400; font-size:0.82rem;">— admin uniquement</span></h3>
+        <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:20px;">
+          <div style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px;">
+            <div class="field" style="margin:0;">
+              <label class="field-label" for="rh-hire">Date d'embauche</label>
+              <input id="rh-hire" class="input" type="date" value="${escapeHtml(rh?.hire_date ?? '')}" />
+            </div>
+            <div class="field" style="margin:0;">
+              <label class="field-label" for="rh-contract">Type de contrat</label>
+              <select id="rh-contract" class="select">
+                <option value="">—</option>
+                <option value="freelance" ${rh?.contract_type === 'freelance' ? 'selected' : ''}>Freelance</option>
+                <option value="salarie" ${rh?.contract_type === 'salarie' ? 'selected' : ''}>Salarié</option>
+                <option value="essai" ${rh?.contract_type === 'essai' ? 'selected' : ''}>Période d'essai</option>
+              </select>
+            </div>
+            <div class="field" style="margin:0;">
+              <label class="field-label" for="rh-paytype">Rémunération</label>
+              <select id="rh-paytype" class="select">
+                <option value="">—</option>
+                <option value="horaire" ${rh?.pay_type === 'horaire' ? 'selected' : ''}>Par heure</option>
+                <option value="mission" ${rh?.pay_type === 'mission' ? 'selected' : ''}>Par mission</option>
+              </select>
+            </div>
+            <div class="field" style="margin:0;">
+              <label class="field-label" for="rh-rate">Tarif (XOF)</label>
+              <input id="rh-rate" class="input" type="number" min="0" step="100" value="${escapeHtml(rh?.rate_xof != null ? String(rh.rate_xof) : '')}" placeholder="ex. 2500" />
+            </div>
+            <div class="field" style="margin:0; grid-column:1 / -1;">
+              <label class="field-label" for="rh-emergency">Contact d'urgence</label>
+              <input id="rh-emergency" class="input" type="text" value="${escapeHtml(rh?.emergency_contact ?? '')}" placeholder="Nom + téléphone" />
+            </div>
+            <div class="field" style="margin:0; grid-column:1 / -1;">
+              <label class="field-label" for="rh-iddoc">Pièce d'identité (référence)</label>
+              <input id="rh-iddoc" class="input" type="text" value="${escapeHtml(rh?.id_doc_ref ?? '')}" placeholder="ex. CNI n°… (le fichier viendra en W4)" />
+            </div>
+            <div class="field" style="margin:0; grid-column:1 / -1;">
+              <label class="field-label" for="rh-note">Note interne <span class="text-muted" style="font-weight:400;">(jamais visible du client/worker)</span></label>
+              <textarea id="rh-note" class="input" rows="3" style="resize:vertical;">${escapeHtml(rh?.internal_note ?? '')}</textarea>
+            </div>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+            <button id="rh-save" class="btn btn-primary btn-sm" type="button">Enregistrer la fiche RH</button>
+            <span id="rh-feedback" style="font-size:0.84rem;"></span>
           </div>
         </div>
 
@@ -286,13 +357,8 @@ import { ZONES } from '@lib/catalog';
 
         <!-- DISPOS -->
         <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Disponibilités hebdomadaires</h3>
-        <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:14px; font-size:0.84rem;">
-          ${(avail ?? []).length === 0 ? '<div style="color:var(--bovo-muted);">Aucun créneau récurrent enregistré.</div>' : (avail ?? []).map((a: any) => `
-            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--bovo-line-soft);">
-              <span><strong>${DAYS[a.day_of_week]}</strong> · ${a.time_start.slice(0, 5)} → ${a.time_end.slice(0, 5)}</span>
-              <button class="del-avail" data-id="${a.id}" style="color:var(--bovo-danger); background:none; border:none; cursor:pointer;">✕</button>
-            </div>
-          `).join('')}
+        <div id="avail-list-box" style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:14px; font-size:0.84rem;">
+          ${availListHtml(avail ?? [])}
         </div>
         <div style="display:flex; gap:8px; margin-bottom:20px;">
           <select id="new-avail-day" class="select" style="max-width:120px;">
@@ -305,13 +371,8 @@ import { ZONES } from '@lib/catalog';
 
         <!-- BLACKOUTS -->
         <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Congés / indispos</h3>
-        <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:14px; font-size:0.84rem;">
-          ${(blackouts ?? []).length === 0 ? '<div style="color:var(--bovo-muted);">Aucune indisponibilité.</div>' : (blackouts ?? []).map((b: any) => `
-            <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--bovo-line-soft);">
-              <span>${new Date(b.starts_at).toLocaleDateString('fr-FR')} → ${new Date(b.ends_at).toLocaleDateString('fr-FR')} ${b.reason ? `<em style="color:var(--bovo-muted);">— ${escapeHtml(b.reason)}</em>` : ''}</span>
-              <button class="del-blackout" data-id="${b.id}" style="color:var(--bovo-danger); background:none; border:none; cursor:pointer;">✕</button>
-            </div>
-          `).join('')}
+        <div id="bk-list-box" style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:14px; font-size:0.84rem;">
+          ${bkListHtml(blackouts ?? [])}
         </div>
         <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:20px;">
           <input id="new-bk-start" class="input" type="date" style="max-width:160px;" />
@@ -375,36 +436,95 @@ import { ZONES } from '@lib/catalog';
         });
       });
 
-      // Avail
+      // Avail — refresh partiel (ne réécrit que la liste, préserve la saisie RH)
+      function bindAvailDel() {
+        document.querySelectorAll<HTMLButtonElement>('#avail-list-box .del-avail').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            await supa.from('worker_availability').delete().eq('id', btn.dataset.id!);
+            await reloadAvail();
+          });
+        });
+      }
+      async function reloadAvail() {
+        const { data } = await supa.from('worker_availability').select('*').eq('worker_id', id).order('day_of_week');
+        document.getElementById('avail-list-box')!.innerHTML = availListHtml(data ?? []);
+        bindAvailDel();
+      }
       document.getElementById('add-avail')!.addEventListener('click', async () => {
         const day = Number((document.getElementById('new-avail-day') as HTMLSelectElement).value);
         const start = (document.getElementById('new-avail-start') as HTMLInputElement).value;
         const end = (document.getElementById('new-avail-end') as HTMLInputElement).value;
         if (!start || !end) return;
         await supa.from('worker_availability').insert({ worker_id: id, day_of_week: day, time_start: start, time_end: end });
-        openWorkerModal(id);
+        await reloadAvail();
       });
-      workerModalBody.querySelectorAll<HTMLButtonElement>('.del-avail').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await supa.from('worker_availability').delete().eq('id', btn.dataset.id!);
-          openWorkerModal(id);
-        });
-      });
+      bindAvailDel();
 
-      // Blackouts
+      // Blackouts — refresh partiel
+      function bindBkDel() {
+        document.querySelectorAll<HTMLButtonElement>('#bk-list-box .del-blackout').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            await supa.from('worker_blackouts').delete().eq('id', btn.dataset.id!);
+            await reloadBlackouts();
+          });
+        });
+      }
+      async function reloadBlackouts() {
+        const { data } = await supa.from('worker_blackouts').select('*').eq('worker_id', id).order('starts_at');
+        document.getElementById('bk-list-box')!.innerHTML = bkListHtml(data ?? []);
+        bindBkDel();
+      }
       document.getElementById('add-blackout')!.addEventListener('click', async () => {
         const s = (document.getElementById('new-bk-start') as HTMLInputElement).value;
         const e = (document.getElementById('new-bk-end') as HTMLInputElement).value;
         const r = (document.getElementById('new-bk-reason') as HTMLInputElement).value.trim();
         if (!s || !e) return;
         await supa.from('worker_blackouts').insert({ worker_id: id, starts_at: s, ends_at: e, reason: r || null });
-        openWorkerModal(id);
+        (document.getElementById('new-bk-start') as HTMLInputElement).value = '';
+        (document.getElementById('new-bk-end') as HTMLInputElement).value = '';
+        (document.getElementById('new-bk-reason') as HTMLInputElement).value = '';
+        await reloadBlackouts();
       });
-      workerModalBody.querySelectorAll<HTMLButtonElement>('.del-blackout').forEach((btn) => {
-        btn.addEventListener('click', async () => {
-          await supa.from('worker_blackouts').delete().eq('id', btn.dataset.id!);
-          openWorkerModal(id);
-        });
+      bindBkDel();
+
+      // Fiche RH (W2) — enregistrement
+      document.getElementById('rh-save')!.addEventListener('click', async () => {
+        const feedback = document.getElementById('rh-feedback')!;
+        const hire = (document.getElementById('rh-hire') as HTMLInputElement).value || null;
+        const contract = (document.getElementById('rh-contract') as HTMLSelectElement).value || null;
+        const payType = (document.getElementById('rh-paytype') as HTMLSelectElement).value || null;
+        const rateRaw = (document.getElementById('rh-rate') as HTMLInputElement).value.trim();
+        const rate = rateRaw === '' ? null : Math.max(0, Math.round(Number(rateRaw)));
+        const emergency = (document.getElementById('rh-emergency') as HTMLInputElement).value.trim() || null;
+        const iddoc = (document.getElementById('rh-iddoc') as HTMLInputElement).value.trim() || null;
+        const note = (document.getElementById('rh-note') as HTMLTextAreaElement).value.trim() || null;
+
+        if (rate !== null && !Number.isFinite(rate)) {
+          feedback.textContent = 'Tarif invalide.'; feedback.style.color = 'var(--bovo-danger)';
+          return;
+        }
+
+        const saveBtn = document.getElementById('rh-save') as HTMLButtonElement;
+        saveBtn.disabled = true;
+        feedback.textContent = 'Enregistrement…'; feedback.style.color = 'var(--bovo-muted)';
+        // status n'est PAS dans le payload : conservé tel quel sur update, défaut 'active'
+        // à l'insert (la gestion du statut relève de W3).
+        const { error } = await supa.from('worker_profiles').upsert({
+          worker_id: id,
+          hire_date: hire,
+          contract_type: contract,
+          pay_type: payType,
+          rate_xof: rate,
+          emergency_contact: emergency,
+          id_doc_ref: iddoc,
+          internal_note: note,
+        }, { onConflict: 'worker_id' });
+        saveBtn.disabled = false;
+        if (error) {
+          feedback.textContent = `Erreur : ${error.message}`; feedback.style.color = 'var(--bovo-danger)';
+        } else {
+          feedback.textContent = '✓ Enregistré'; feedback.style.color = '#10B981';
+        }
       });
 
       // Demote
