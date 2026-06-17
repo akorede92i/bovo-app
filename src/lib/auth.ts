@@ -50,6 +50,32 @@ export async function requireAuth(redirectTo = '/compte/connexion/'): Promise<Se
   return user;
 }
 
+/**
+ * Protège l'espace worker (`/worker/*`) : réservé aux comptes `role='worker'`
+ * (les admins y ont aussi accès, pour visualiser/tester). Redirige si non connecté,
+ * affiche un refus si rôle insuffisant. Cf. requireAdmin pour le pattern.
+ */
+export async function requireWorker(redirectTo = '/compte/connexion/'): Promise<SessionUser> {
+  const user = await getSessionUser();
+  if (!user) {
+    const back = encodeURIComponent(window.location.pathname);
+    window.location.href = `${redirectTo}?next=${back}`;
+    return new Promise(() => {}) as any;
+  }
+  const role = user.profile?.role;
+  if (role !== 'worker' && role !== 'admin') {
+    document.body.innerHTML = `
+      <div style="max-width: 480px; margin: 80px auto; padding: 40px 24px; text-align: center; font-family: 'Jost', sans-serif;">
+        <h1 style="font-size: 1.4rem; margin-bottom: 12px;">Accès réservé</h1>
+        <p style="color: #6B7280; margin-bottom: 24px;">Cet espace est réservé aux intervenants Bovo.</p>
+        <a href="/" style="color: #4470B3; font-weight: 600;">← Retour à l'accueil</a>
+      </div>
+    `;
+    return new Promise(() => {}) as any;
+  }
+  return user;
+}
+
 export async function signOut(): Promise<void> {
   const supa = getSupabase();
   if (!supa) return;
