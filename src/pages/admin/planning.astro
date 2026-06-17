@@ -1,0 +1,165 @@
+---
+import AdminLayout from '@layouts/AdminLayout.astro';
+---
+<AdminLayout title="Planning — Bovo Admin" pageTitle="Planning" active="planning">
+  <p class="admin-sub">Vue hebdomadaire d'un worker : missions assignées, disponibilités récurrentes et congés.</p>
+
+  <div style="display:flex; gap:8px; margin-bottom:14px; align-items:center; flex-wrap:wrap;">
+    <select id="worker-select" class="select" style="max-width:300px; flex:1; min-width:200px;">
+      <option value="">Chargement…</option>
+    </select>
+    <div style="display:flex; gap:6px; align-items:center; margin-left:auto;">
+      <button id="week-prev" class="btn btn-ghost btn-sm" aria-label="Semaine précédente">←</button>
+      <button id="week-today" class="btn btn-ghost btn-sm">Cette semaine</button>
+      <button id="week-next" class="btn btn-ghost btn-sm" aria-label="Semaine suivante">→</button>
+    </div>
+  </div>
+
+  <div id="week-label" style="font-family:'Jost'; font-weight:700; margin-bottom:12px;"></div>
+
+  <div id="planning-loading" class="loading" hidden>Chargement…</div>
+  <div id="planning-empty" style="color:var(--bovo-muted); padding:24px; text-align:center;">Choisissez un worker pour voir son planning.</div>
+  <div id="planning-grid" hidden style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px;"></div>
+
+  <!-- Légende -->
+  <div style="display:flex; gap:14px; flex-wrap:wrap; margin-top:16px; font-size:0.78rem; color:var(--bovo-muted);">
+    <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:#DCFCE7; vertical-align:middle;"></span> Dispo récurrente</span>
+    <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:var(--bovo-bg-soft); border-left:3px solid var(--bovo-bleu); vertical-align:middle;"></span> Mission</span>
+    <span><span style="display:inline-block; width:10px; height:10px; border-radius:3px; background:#FEE2E2; vertical-align:middle;"></span> Congé</span>
+  </div>
+</AdminLayout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+  import { SERVICE_ICONS, escapeHtml } from '@lib/admin';
+
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('planning-empty')!.textContent = 'Supabase non configuré.';
+  } else {
+    const sel = document.getElementById('worker-select') as HTMLSelectElement;
+    const grid = document.getElementById('planning-grid')!;
+    const empty = document.getElementById('planning-empty')!;
+    const loadingEl = document.getElementById('planning-loading')!;
+    const weekLabel = document.getElementById('week-label')!;
+
+    let weekStart = startOfWeek(new Date());
+
+    function startOfWeek(d: Date): Date {
+      const x = new Date(d);
+      x.setHours(0, 0, 0, 0);
+      const dow = x.getDay();              // 0=dimanche
+      x.setDate(x.getDate() + (dow === 0 ? -6 : 1 - dow)); // → lundi
+      return x;
+    }
+    function addDays(d: Date, n: number): Date { const x = new Date(d); x.setDate(x.getDate() + n); return x; }
+    function sameDay(a: Date, b: Date): boolean {
+      return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+    }
+    function fmtDay(d: Date): string { return d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' }); }
+    function hm(t: string): string { return String(t).slice(0, 5); }
+    function weekRangeText(): string {
+      const end = addDays(weekStart, 6);
+      return `${weekStart.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} – ${end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    }
+
+    async function loadWorkers() {
+      const { data } = await supa.from('profiles').select('id, full_name, role').in('role', ['worker', 'admin']).order('full_name');
+      const workers = (data ?? []).filter((w: any) => w.role === 'worker');
+      const ids = workers.map((w: any) => w.id);
+      const statusRows = ids.length
+        ? (await supa.from('worker_profiles').select('worker_id, status').in('worker_id', ids)).data
+        : [];
+      const statusById = new Map((statusRows ?? []).map((s: any) => [s.worker_id, s.status]));
+
+      if (workers.length === 0) {
+        sel.innerHTML = '<option value="">Aucun worker</option>';
+      } else {
+        sel.innerHTML = '<option value="">— Choisir un worker —</option>' + workers.map((w: any) => {
+          const st = statusById.get(w.id) ?? 'active';
+          const tag = st === 'suspended' ? ' (suspendu)' : st === 'archived' ? ' (archivé)' : '';
+          return `<option value="${escapeHtml(w.id)}">${escapeHtml(w.full_name ?? 'Sans nom')}${tag}</option>`;
+        }).join('');
+      }
+
+      // Deep-link ?worker=<id> (depuis la fiche worker).
+      const pre = new URLSearchParams(location.search).get('worker');
+      if (pre && workers.some((w: any) => w.id === pre)) sel.value = pre;
+      render();
+    }
+
+    async function render() {
+      const workerId = sel.value;
+      if (!workerId) {
+        weekLabel.textContent = weekRangeText();
+        empty.hidden = false; empty.textContent = 'Choisissez un worker pour voir son planning.';
+        grid.hidden = true; loadingEl.hidden = true;
+        return;
+      }
+      empty.hidden = true; grid.hidden = true; loadingEl.hidden = false;
+
+      const weekEnd = addDays(weekStart, 7);
+      const [availRes, bkRes, resaRes] = await Promise.all([
+        supa.from('worker_availability').select('day_of_week, time_start, time_end').eq('worker_id', workerId).order('time_start'),
+        supa.from('worker_blackouts').select('starts_at, ends_at, reason').eq('worker_id', workerId)
+          .lt('starts_at', weekEnd.toISOString()).gt('ends_at', weekStart.toISOString()),
+        supa.from('reservations').select('id, service_type, guest_name, scheduled_at, status')
+          .eq('assigned_worker_id', workerId)
+          .gte('scheduled_at', weekStart.toISOString()).lt('scheduled_at', weekEnd.toISOString())
+          .neq('status', 'cancelled').order('scheduled_at'),
+      ]);
+      loadingEl.hidden = true;
+
+      const avail = availRes.data ?? [];
+      const blackouts = bkRes.data ?? [];
+      const resa = resaRes.data ?? [];
+
+      let totalMissions = 0;
+      const cards = Array.from({ length: 7 }, (_, i) => {
+        const day = addDays(weekStart, i);
+        const nextDay = addDays(day, 1);
+        const dow = day.getDay();
+        const isToday = sameDay(day, new Date());
+
+        const dayAvail = avail.filter((a: any) => a.day_of_week === dow);
+        const dayResa = resa.filter((r: any) => r.scheduled_at && sameDay(new Date(r.scheduled_at), day));
+        totalMissions += dayResa.length;
+        const blackout = blackouts.find((b: any) => new Date(b.starts_at) < nextDay && new Date(b.ends_at) > day);
+
+        const availHtml = dayAvail.length
+          ? `<div style="display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px;">${dayAvail.map((a: any) =>
+              `<span style="background:#DCFCE7; color:#166534; font-size:0.72rem; padding:2px 5px; border-radius:5px;">${hm(a.time_start)}–${hm(a.time_end)}</span>`).join('')}</div>`
+          : '';
+        const blackoutHtml = blackout
+          ? `<div style="background:#FEE2E2; color:#B91C1C; font-size:0.74rem; padding:3px 6px; border-radius:6px; margin-bottom:6px;">🔴 Congé${blackout.reason ? ` <span style="opacity:0.8;">— ${escapeHtml(blackout.reason)}</span>` : ''}</div>`
+          : '';
+        const resaHtml = dayResa.map((r: any) => {
+          const t = r.scheduled_at ? new Date(r.scheduled_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '';
+          return `<a href="/admin/reservations/?id=${encodeURIComponent(r.id)}" style="display:block; text-decoration:none; background:var(--bovo-bg-soft); border-left:3px solid var(--bovo-bleu); padding:4px 6px; border-radius:5px; margin-bottom:4px; font-size:0.78rem; color:var(--bovo-ink-soft);">${SERVICE_ICONS[r.service_type] ?? '✦'} <strong>${escapeHtml(t)}</strong> ${escapeHtml(r.guest_name ?? '')}</a>`;
+        }).join('');
+        const emptyDay = (!dayAvail.length && !dayResa.length && !blackout)
+          ? '<div style="color:var(--bovo-muted); font-size:0.78rem;">—</div>' : '';
+
+        return `
+          <div style="background:#fff; border:1px solid ${isToday ? 'var(--bovo-bleu)' : 'var(--bovo-line-soft)'}; border-radius:var(--r-lg); padding:10px; min-height:96px;">
+            <div style="font-weight:700; font-size:0.84rem; margin-bottom:6px; ${isToday ? 'color:var(--bovo-bleu);' : ''}">${escapeHtml(fmtDay(day))}</div>
+            ${blackoutHtml}
+            ${availHtml}
+            ${resaHtml}
+            ${emptyDay}
+          </div>`;
+      }).join('');
+
+      weekLabel.innerHTML = `${escapeHtml(weekRangeText())} · <span style="font-weight:400; color:var(--bovo-muted);">${totalMissions} mission${totalMissions > 1 ? 's' : ''} cette semaine</span>`;
+      grid.innerHTML = cards;
+      grid.hidden = false;
+    }
+
+    document.getElementById('week-prev')!.addEventListener('click', () => { weekStart = addDays(weekStart, -7); render(); });
+    document.getElementById('week-next')!.addEventListener('click', () => { weekStart = addDays(weekStart, 7); render(); });
+    document.getElementById('week-today')!.addEventListener('click', () => { weekStart = startOfWeek(new Date()); render(); });
+    sel.addEventListener('change', render);
+
+    await loadWorkers();
+  }
+</script>

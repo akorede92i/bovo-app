@@ -346,6 +346,7 @@ import { ZONES } from '@lib/catalog';
               <div style="display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap;">
                 <label class="btn btn-ghost btn-sm" style="cursor:pointer; margin:0;">📷 Photo<input id="avatar-input" type="file" accept="image/*" hidden /></label>
                 <button id="avatar-remove" class="btn btn-ghost btn-sm" type="button" style="color:var(--bovo-danger); ${prof.avatar_url ? '' : 'display:none;'}">Retirer</button>
+                <a href="/admin/planning/?worker=${encodeURIComponent(id)}" class="btn btn-ghost btn-sm" style="margin:0;">🗓️ Planning</a>
                 <span id="avatar-feedback" style="font-size:0.82rem;"></span>
               </div>
             </div>
@@ -565,7 +566,14 @@ import { ZONES } from '@lib/catalog';
         const e = (document.getElementById('new-bk-end') as HTMLInputElement).value;
         const r = (document.getElementById('new-bk-reason') as HTMLInputElement).value.trim();
         if (!s || !e) return;
-        await supa.from('worker_blackouts').insert({ worker_id: id, starts_at: s, ends_at: e, reason: r || null });
+        // Bornes de journée LOCALES (sinon une date brute "AAAA-MM-JJ" est lue en
+        // UTC minuit → décalage d'1h en UTC+1, visible dans le planning W5).
+        await supa.from('worker_blackouts').insert({
+          worker_id: id,
+          starts_at: new Date(`${s}T00:00:00`).toISOString(),
+          ends_at: new Date(`${e}T23:59:59`).toISOString(),
+          reason: r || null,
+        });
         (document.getElementById('new-bk-start') as HTMLInputElement).value = '';
         (document.getElementById('new-bk-end') as HTMLInputElement).value = '';
         (document.getElementById('new-bk-reason') as HTMLInputElement).value = '';
