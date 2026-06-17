@@ -1,0 +1,219 @@
+---
+import WorkerLayout from '@layouts/WorkerLayout.astro';
+---
+<WorkerLayout title="Mes missions — Bovo" pageTitle="Mes missions">
+  <p style="color:var(--bovo-muted); font-size:0.9rem; margin-bottom:16px;">Vos missions assignées. Démarrez puis terminez chacune une fois sur place.</p>
+
+  <div id="loading" style="text-align:center; padding:40px 16px; color:var(--bovo-muted);">Chargement…</div>
+
+  <div id="active-wrap" hidden>
+    <div id="active-list"></div>
+  </div>
+
+  <div id="empty" hidden style="text-align:center; padding:40px 16px; color:var(--bovo-muted);">
+    <div style="font-size:2.2rem; margin-bottom:8px;">🎉</div>
+    <div style="font-weight:700; font-family:'Jost';">Aucune mission en cours</div>
+    <div style="font-size:0.88rem; margin-top:4px;">Vos prochaines affectations apparaîtront ici.</div>
+  </div>
+
+  <details id="done-wrap" hidden style="margin-top:18px;">
+    <summary style="cursor:pointer; color:var(--bovo-muted); font-weight:600; font-size:0.9rem;">Missions terminées récemment</summary>
+    <div id="done-list" style="margin-top:10px;"></div>
+  </details>
+
+  <!-- DÉTAIL MISSION -->
+  <div id="mission-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:flex-end; justify-content:center;">
+    <div style="background:#fff; width:100%; max-width:560px; max-height:92vh; overflow-y:auto; border-radius: var(--r-xl) var(--r-xl) 0 0; padding:22px 18px calc(22px + env(safe-area-inset-bottom));">
+      <div class="flex-between" style="margin-bottom:14px;">
+        <h2 id="mission-title" style="font-family:'Jost'; font-weight:700; font-size:1.15rem;">Mission</h2>
+        <button id="mission-close" class="topbar-back" aria-label="Fermer">✕</button>
+      </div>
+      <div id="mission-body"></div>
+    </div>
+  </div>
+</WorkerLayout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+  import { getSessionUser } from '@lib/auth';
+  import { SERVICE_LABELS, SERVICE_ICONS, STATUS_LABELS, STATUS_COLORS, escapeHtml } from '@lib/admin';
+
+  const supa = getSupabase();
+  if (!supa) {
+    document.getElementById('loading')!.textContent = 'Service indisponible.';
+  } else {
+    const loadingEl = document.getElementById('loading')!;
+    const activeWrap = document.getElementById('active-wrap')!;
+    const activeList = document.getElementById('active-list')!;
+    const doneWrap = document.getElementById('done-wrap')!;
+    const doneList = document.getElementById('done-list')!;
+    const emptyEl = document.getElementById('empty')!;
+    const modal = document.getElementById('mission-modal')!;
+    const modalTitle = document.getElementById('mission-title')!;
+    const modalBody = document.getElementById('mission-body')!;
+
+    let missions: any[] = [];
+
+    function firstName(name: string | null): string {
+      return (name ?? '').trim().split(/\s+/)[0] || 'Client';
+    }
+    function zoneOf(r: any): string {
+      const a = r.payload?.address ?? r.payload?.from ?? {};
+      return a.zone ?? a.quartier ?? '';
+    }
+    function fmtWhen(iso: string | null): string {
+      if (!iso) return 'Date à définir';
+      const d = new Date(iso);
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const diff = Math.round((dDay.getTime() - today.getTime()) / 86400000);
+      const time = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      let day: string;
+      if (diff === 0) day = "Aujourd'hui";
+      else if (diff === 1) day = 'Demain';
+      else if (diff === -1) day = 'Hier';
+      else day = d.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' });
+      return `${day} · ${time}`;
+    }
+
+    function cardHtml(r: any): string {
+      const z = zoneOf(r);
+      return `
+        <div class="mission-card" data-id="${escapeHtml(r.id)}" role="button" tabindex="0" style="background:#fff; border:1px solid var(--bovo-line-soft); border-left:4px solid ${STATUS_COLORS[r.status] ?? '#6B7280'}; border-radius:var(--r-lg); padding:14px; margin-bottom:10px; cursor:pointer;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:6px;">
+            <span style="font-weight:600;">${SERVICE_ICONS[r.service_type] ?? '✦'} ${escapeHtml(SERVICE_LABELS[r.service_type] ?? r.service_type)}</span>
+            <span class="status-badge" style="background:${STATUS_COLORS[r.status] ?? '#6B7280'};">${escapeHtml(STATUS_LABELS[r.status] ?? r.status)}</span>
+          </div>
+          <div style="font-weight:700; font-family:'Jost'; font-size:0.96rem;">${escapeHtml(fmtWhen(r.scheduled_at))}</div>
+          <div style="color:var(--bovo-muted); font-size:0.86rem; margin-top:2px;">${escapeHtml(firstName(r.guest_name))}${z ? ` · ${escapeHtml(z)}` : ''}</div>
+        </div>`;
+    }
+
+    function detailHtml(r: any): string {
+      const p = r.payload ?? {};
+      const addr = p.address ?? p.from ?? {};
+      const addrStr = [addr.street, addr.quartier, addr.zone].filter(Boolean).join(', ');
+      const mapsQuery = encodeURIComponent(addrStr || addr.zone || 'Cotonou, Bénin');
+      const digits = String(r.guest_phone ?? '').replace(/\D/g, '');
+
+      const optionEntries = Object.entries(p)
+        .filter(([k, v]) => !['address', 'from', 'to'].includes(k) && v != null && typeof v !== 'object')
+        .map(([k, v]) => `<div style="display:flex; justify-content:space-between; gap:10px; padding:4px 0; border-bottom:1px solid var(--bovo-line-soft); font-size:0.86rem;"><span style="color:var(--bovo-muted);">${escapeHtml(k)}</span><span style="font-weight:600; text-align:right;">${escapeHtml(String(v))}</span></div>`)
+        .join('');
+
+      const row = (label: string, value: string) => `<div style="font-size:0.9rem; line-height:1.5;"><span style="color:var(--bovo-muted);">${label} :</span> ${value}</div>`;
+
+      let action = '';
+      if (r.status === 'assigned') {
+        action = `<button id="act-start" class="btn btn-primary btn-block" type="button">▶ Démarrer la mission</button>`;
+      } else if (r.status === 'in_progress') {
+        action = `<button id="act-done" class="btn btn-primary btn-block" type="button">✓ Terminer la mission</button>`;
+      } else if (r.status === 'done') {
+        action = `<div style="text-align:center; color:var(--bovo-success); font-weight:600; padding:10px;">✓ Mission terminée</div>`;
+      }
+
+      return `
+        <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px;">
+          <span class="status-badge" style="background:${STATUS_COLORS[r.status] ?? '#6B7280'};">${escapeHtml(STATUS_LABELS[r.status] ?? r.status)}</span>
+          <strong style="font-family:'Jost';">${escapeHtml(fmtWhen(r.scheduled_at))}</strong>
+        </div>
+
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:8px;">Client</h3>
+        <div style="background:var(--bovo-bg-soft); padding:12px; border-radius:var(--r-md); margin-bottom:16px;">
+          ${row('Nom', `<strong>${escapeHtml(r.guest_name ?? '—')}</strong>`)}
+          ${row('Téléphone', digits ? `<a href="tel:${escapeHtml(digits)}" style="color:var(--bovo-bleu); font-weight:600;">${escapeHtml(r.guest_phone)}</a> · <a href="https://wa.me/${escapeHtml(digits)}" target="_blank" rel="noopener" style="color:var(--bovo-success); font-weight:600;">WhatsApp</a>` : '—')}
+        </div>
+
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:8px;">Lieu</h3>
+        <div style="background:var(--bovo-bg-soft); padding:12px; border-radius:var(--r-md); margin-bottom:16px;">
+          <div style="font-size:0.9rem; margin-bottom:8px;">${escapeHtml(addrStr || 'Adresse non précisée')}</div>
+          <a href="https://www.google.com/maps/search/?api=1&query=${escapeHtml(mapsQuery)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="margin:0;">🗺️ Itinéraire</a>
+        </div>
+
+        ${optionEntries ? `
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:8px;">Détails de la prestation</h3>
+        <div style="background:var(--bovo-bg-soft); padding:12px; border-radius:var(--r-md); margin-bottom:18px;">${optionEntries}</div>` : ''}
+
+        <div id="mission-feedback" style="font-size:0.85rem; margin-bottom:10px;"></div>
+        ${action}`;
+    }
+
+    async function load() {
+      loadingEl.hidden = false;
+      activeWrap.hidden = true; emptyEl.hidden = true; doneWrap.hidden = true;
+
+      const user = await getSessionUser();
+      if (!user) { loadingEl.textContent = 'Session expirée.'; return; }
+
+      const since = new Date(); since.setDate(since.getDate() - 14);
+      const { data, error } = await supa.from('reservations')
+        .select('id, service_type, guest_name, guest_phone, scheduled_at, duration_min, status, payload')
+        .eq('assigned_worker_id', user.id)
+        .in('status', ['assigned', 'in_progress', 'done'])
+        .gte('scheduled_at', since.toISOString())
+        .order('scheduled_at', { ascending: true });
+
+      loadingEl.hidden = true;
+      if (error) { loadingEl.textContent = `Erreur : ${error.message}`; loadingEl.hidden = false; return; }
+
+      missions = data ?? [];
+      const active = missions.filter((r) => r.status === 'assigned' || r.status === 'in_progress');
+      const done = missions.filter((r) => r.status === 'done').reverse(); // plus récentes d'abord
+
+      if (active.length === 0) emptyEl.hidden = false;
+      else { activeList.innerHTML = active.map(cardHtml).join(''); activeWrap.hidden = false; }
+
+      if (done.length) { doneList.innerHTML = done.map(cardHtml).join(''); doneWrap.hidden = false; }
+
+      [activeList, doneList].forEach((el) => el.querySelectorAll<HTMLElement>('.mission-card').forEach((c) => {
+        c.addEventListener('click', () => openMission(c.dataset.id!));
+        c.addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Enter') openMission(c.dataset.id!); });
+      }));
+    }
+
+    function openMission(id: string) {
+      const r = missions.find((m) => m.id === id);
+      if (!r) return;
+      modalTitle.textContent = SERVICE_LABELS[r.service_type] ?? 'Mission';
+      modalBody.innerHTML = detailHtml(r);
+      modal.hidden = false;
+
+      const start = document.getElementById('act-start');
+      const done = document.getElementById('act-done');
+      if (start) start.addEventListener('click', () => advance(r, 'in_progress'));
+      if (done) done.addEventListener('click', () => advance(r, 'done'));
+    }
+
+    async function advance(r: any, next: 'in_progress' | 'done') {
+      const fb = document.getElementById('mission-feedback');
+      const btn = document.getElementById(next === 'in_progress' ? 'act-start' : 'act-done') as HTMLButtonElement | null;
+      if (btn) btn.disabled = true;
+      if (fb) { fb.textContent = 'Enregistrement…'; fb.style.color = 'var(--bovo-muted)'; }
+      const { data, error } = await supa.from('reservations')
+        .update({ status: next }).eq('id', r.id)
+        .select('status').maybeSingle();
+      if (error) {
+        if (btn) btn.disabled = false;
+        if (fb) { fb.textContent = `Erreur : ${error.message}`; fb.style.color = 'var(--bovo-danger)'; }
+        return;
+      }
+      // Le trigger BEFORE UPDATE refuse une transition invalide SANS erreur (il
+      // remet l'ancien statut) : on vérifie le statut réellement enregistré pour
+      // ne pas afficher un faux succès.
+      if (data?.status !== next) {
+        if (btn) btn.disabled = false;
+        if (fb) { fb.textContent = 'Action impossible : le statut de la mission a changé entre-temps. Liste actualisée.'; fb.style.color = 'var(--bovo-danger)'; }
+        await load();
+        return;
+      }
+      modal.hidden = true;
+      await load();
+    }
+
+    document.getElementById('mission-close')!.addEventListener('click', () => modal.hidden = true);
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
+
+    await load();
+  }
+</script>

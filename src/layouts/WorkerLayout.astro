@@ -1,0 +1,99 @@
+---
+import '@styles/global.css';
+
+interface Props {
+  title?: string;
+  pageTitle?: string;
+}
+const { title = 'Espace worker — Bovo', pageTitle } = Astro.props;
+---
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>{title}</title>
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="theme-color" content="#4470B3" />
+
+  <style>
+    body { background: var(--bovo-bg-soft) !important; }
+    .worker-shell {
+      max-width: 560px;
+      margin: 0 auto;
+      min-height: 100vh;
+      min-height: 100dvh;
+      background: var(--bovo-bg);
+    }
+    .worker-header {
+      position: sticky;
+      top: 0;
+      z-index: var(--z-sticky);
+      background: var(--bovo-bleu);
+      color: #fff;
+      padding: 14px 18px;
+      padding-top: calc(14px + env(safe-area-inset-top));
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .worker-header .worker-logo {
+      font-family: 'Jost', sans-serif;
+      font-weight: 800;
+      font-size: 1.15rem;
+      letter-spacing: 1.5px;
+      color: #fff;
+      text-decoration: none;
+    }
+    .worker-header .worker-pill {
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      background: rgba(255,255,255,0.18);
+      color: #fff;
+      padding: 3px 9px;
+      border-radius: var(--r-full);
+      text-transform: uppercase;
+      margin-left: 8px;
+    }
+    .worker-header a#worker-signout {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.85);
+      text-decoration: none;
+    }
+    .worker-page { padding: 18px 16px calc(32px + env(safe-area-inset-bottom)); }
+    .worker-h1 { font-family: 'Jost', sans-serif; font-weight: 800; font-size: 1.3rem; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <div class="worker-shell">
+    <header class="worker-header">
+      <div style="display:flex; align-items:center;">
+        <a href="/worker/" class="worker-logo">BOVO</a>
+        <span class="worker-pill">Worker</span>
+      </div>
+      <a href="#" id="worker-signout">Déconnexion</a>
+    </header>
+
+    <main class="worker-page">
+      {pageTitle && <h1 class="worker-h1">{pageTitle}</h1>}
+      <slot />
+    </main>
+  </div>
+
+  <script>
+    import { requireWorker, signOut } from '@lib/auth';
+    import { ensurePushRegistered } from '@lib/native';
+
+    await requireWorker();
+    // Push : rattache le jeton + demande la permission (no-op web, actif natif).
+    void ensurePushRegistered();
+
+    document.getElementById('worker-signout')!.addEventListener('click', (e) => {
+      e.preventDefault();
+      signOut();
+    });
+  </script>
+</body>
+</html>

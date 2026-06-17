@@ -57,6 +57,19 @@ import Icon from '@components/Icon.astro';
       return;
     }
     const next = new URLSearchParams(window.location.search).get('next');
-    window.location.href = next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/compte/';
+    if (next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\')) {
+      window.location.href = next;
+      return;
+    }
+    // Pas de redirection demandée : on route selon le rôle (un worker → son espace).
+    let dest = '/compte/';
+    try {
+      const { data: { user } } = await supa.auth.getUser();
+      if (user) {
+        const { data: prof } = await supa.from('profiles').select('role').eq('id', user.id).maybeSingle();
+        if (prof?.role === 'worker') dest = '/worker/';
+      }
+    } catch { /* défaut /compte/ */ }
+    window.location.href = dest;
   });
 </script>
