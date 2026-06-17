@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2732 2732" width="2732" height="2732">
+  <!-- Fond uni bleu Bovo foncé (mode sombre) -->
+  <rect width="2732" height="2732" fill="#345a8f"/>
+  <g transform="translate(1366 1366) scale(22.35) translate(-33.5 -33)">
+    <path d="M21 16 H35 Q44 16 44 24 Q44 30 38 31.5 Q46 33 46 41 Q46 50 35 50 H21 Z M28 22 V29 H34 Q37 29 37 25.5 Q37 22 34 22 Z M28 35 V44 H35 Q39 44 39 39.5 Q39 35 35 35 Z" fill="#FFFFFF"/>
+  </g>
+</svg>
