@@ -115,6 +115,7 @@ import { ZONES } from '@lib/catalog';
   import { getSupabase } from '@lib/supabase';
   import { ZONES } from '@lib/catalog';
   import { escapeHtml, createWorker } from '@lib/admin';
+  import { uploadAvatar, removeAvatar, signedUrl, signedUrls, listDocs, uploadDoc, deleteDoc, humanSize } from '@lib/storage';
 
   const supa = getSupabase();
   if (!supa) {
@@ -192,6 +193,15 @@ import { ZONES } from '@lib/catalog';
         if (workers.length === 0) { emptyEl.hidden = false; return; }
       }
 
+      // Miniatures avatar (URLs signées en lot, bucket privé) (W4).
+      const avatarMap = await signedUrls(workers.map((w: any) => w.avatar_url).filter(Boolean));
+      function avatarThumbSmall(w: any) {
+        const url = w.avatar_url ? avatarMap.get(w.avatar_url) : null;
+        return url
+          ? `<img src="${escapeHtml(url)}" alt="" style="width:28px; height:28px; border-radius:50%; object-fit:cover; vertical-align:middle; margin-right:8px;" />`
+          : `<span style="display:inline-flex; width:28px; height:28px; border-radius:50%; background:var(--bovo-line-soft); align-items:center; justify-content:center; vertical-align:middle; margin-right:8px; font-size:0.8rem;">👤</span>`;
+      }
+
       const skillsMap = new Map<string, string[]>();
       (skills ?? []).forEach((s: any) => {
         const arr = skillsMap.get(s.worker_id) ?? [];
@@ -223,7 +233,7 @@ import { ZONES } from '@lib/catalog';
         const wz = zonesMap.get(w.id) ?? [];
         return `
           <tr data-id="${w.id}">
-            <td><strong>${escapeHtml(w.full_name ?? '—')}</strong>${statusBadge(w.id)}</td>
+            <td>${avatarThumbSmall(w)}<strong>${escapeHtml(w.full_name ?? '—')}</strong>${statusBadge(w.id)}</td>
             <td>${escapeHtml(w.phone ?? '—')}</td>
             <td>${w.role === 'admin' ? '<span class="status-badge" style="background:var(--bovo-rouge);">Admin</span>' : '<span class="status-badge" style="background:var(--bovo-bleu);">Worker</span>'}</td>
             <td style="font-size:0.84rem;">${ws.length ? ws.map((s: string) => SKILL_LABELS[s] ?? s).join(', ') : '<span style="color:var(--bovo-muted);">—</span>'}</td>
@@ -240,7 +250,7 @@ import { ZONES } from '@lib/catalog';
         return `
           <div data-id="${w.id}" style="background:#fff; border:1px solid var(--bovo-line-soft); border-radius:var(--r-lg); padding:14px; margin-bottom:10px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-              <span><strong>${escapeHtml(w.full_name ?? '—')}</strong>${statusBadge(w.id)}</span>
+              <span>${avatarThumbSmall(w)}<strong>${escapeHtml(w.full_name ?? '—')}</strong>${statusBadge(w.id)}</span>
               ${w.role === 'admin' ? '<span class="status-badge" style="background:var(--bovo-rouge);">Admin</span>' : '<span class="status-badge" style="background:var(--bovo-bleu);">Worker</span>'}
             </div>
             <div style="font-size:0.84rem; color:var(--bovo-muted); margin-bottom:6px;">${escapeHtml(w.phone ?? '—')}</div>
@@ -280,6 +290,26 @@ import { ZONES } from '@lib/catalog';
       const currentSkills = new Set((skills ?? []).map((s: any) => s.skill));
       const currentZones = new Set((zones ?? []).map((z: any) => z.zone));
 
+      // Avatar (URL signée, bucket privé) + documents (W4).
+      const [avatarSignedUrl, docs] = await Promise.all([signedUrl(prof.avatar_url), listDocs(id)]);
+      function avatarThumbHtml(url: string | null) {
+        return url
+          ? `<img src="${escapeHtml(url)}" alt="" style="width:64px; height:64px; border-radius:50%; object-fit:cover; border:1px solid var(--bovo-line-soft);" />`
+          : `<div style="width:64px; height:64px; border-radius:50%; background:var(--bovo-line-soft); display:flex; align-items:center; justify-content:center; font-size:1.6rem;">👤</div>`;
+      }
+      function docsListHtml(list: any[]) {
+        return list.length === 0
+          ? '<div style="color:var(--bovo-muted);">Aucun document.</div>'
+          : list.map((d: any) => `
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:6px 0; border-bottom:1px solid var(--bovo-line-soft);">
+              <a href="#" class="doc-dl" data-path="${escapeHtml(d.path)}" style="color:var(--bovo-bleu); text-decoration:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0;">📄 ${escapeHtml(d.name.replace(/^\d+-/, ''))}</a>
+              <span style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
+                <span style="color:var(--bovo-muted); font-size:0.78rem;">${humanSize(d.size)}</span>
+                <button class="doc-del" data-path="${escapeHtml(d.path)}" style="color:var(--bovo-danger); background:none; border:none; cursor:pointer;">✕</button>
+              </span>
+            </div>`).join('');
+      }
+
       // Rendu des listes dispos/congés isolé, pour pouvoir rafraîchir UNIQUEMENT
       // ces blocs après ajout/suppression — réécrire toute la modale ferait perdre
       // une saisie RH non encore enregistrée (cf. revue W2).
@@ -303,12 +333,22 @@ import { ZONES } from '@lib/catalog';
       }
 
       workerModalBody.innerHTML = `
-        <!-- INFOS -->
+        <!-- INFOS + AVATAR (W4) -->
         <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Informations</h3>
         <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:20px;">
-          <div style="font-size:0.86rem; line-height:1.6;">
-            <div><strong>${escapeHtml(prof.full_name ?? 'Sans nom')}</strong></div>
-            <div style="color:var(--bovo-muted);">${escapeHtml(prof.phone ?? '—')} · Role : <span style="font-weight:600; color:${prof.role === 'admin' ? 'var(--bovo-rouge)' : 'var(--bovo-bleu)'};">${escapeHtml(prof.role)}</span></div>
+          <div style="display:flex; gap:14px; align-items:center;">
+            <div id="avatar-thumb" style="flex-shrink:0;">${avatarThumbHtml(avatarSignedUrl)}</div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:0.86rem; line-height:1.6;">
+                <div><strong>${escapeHtml(prof.full_name ?? 'Sans nom')}</strong></div>
+                <div style="color:var(--bovo-muted);">${escapeHtml(prof.phone ?? '—')} · Role : <span style="font-weight:600; color:${prof.role === 'admin' ? 'var(--bovo-rouge)' : 'var(--bovo-bleu)'};">${escapeHtml(prof.role)}</span></div>
+              </div>
+              <div style="display:flex; gap:8px; margin-top:8px; align-items:center; flex-wrap:wrap;">
+                <label class="btn btn-ghost btn-sm" style="cursor:pointer; margin:0;">📷 Photo<input id="avatar-input" type="file" accept="image/*" hidden /></label>
+                <button id="avatar-remove" class="btn btn-ghost btn-sm" type="button" style="color:var(--bovo-danger); ${prof.avatar_url ? '' : 'display:none;'}">Retirer</button>
+                <span id="avatar-feedback" style="font-size:0.82rem;"></span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -372,6 +412,17 @@ import { ZONES } from '@lib/catalog';
             <button id="rh-save" class="btn btn-primary btn-sm" type="button">Enregistrer la fiche RH</button>
             <span id="rh-feedback" style="font-size:0.84rem;"></span>
           </div>
+        </div>
+
+        <!-- PIÈCES & DOCUMENTS (W4) -->
+        <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:10px;">Pièces &amp; documents <span class="text-muted" style="font-weight:400; font-size:0.82rem;">— admin uniquement</span></h3>
+        <div style="background:var(--bovo-bg-soft); padding:14px; border-radius:var(--r-md); margin-bottom:20px;">
+          <div id="docs-list" style="font-size:0.86rem;">${docsListHtml(docs)}</div>
+          <div style="display:flex; align-items:center; gap:10px; margin-top:12px;">
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer; margin:0;">+ Ajouter un document<input id="doc-input" type="file" accept="image/*,application/pdf" hidden /></label>
+            <span id="doc-feedback" style="font-size:0.82rem;"></span>
+          </div>
+          <div class="text-muted" style="font-size:0.78rem; margin-top:6px;">CNI, contrat… (images ou PDF, max 15 Mo). Stockés en bucket privé, téléchargeables par l'admin uniquement.</div>
         </div>
 
         <!-- SKILLS -->
@@ -521,6 +572,73 @@ import { ZONES } from '@lib/catalog';
         await reloadBlackouts();
       });
       bindBkDel();
+
+      // Avatar (W4)
+      document.getElementById('avatar-input')!.addEventListener('change', async (e) => {
+        const input = e.target as HTMLInputElement;
+        const file = input.files?.[0];
+        if (!file) return;
+        const fb = document.getElementById('avatar-feedback')!;
+        fb.textContent = 'Téléversement…'; fb.style.color = 'var(--bovo-muted)';
+        try {
+          const key = await uploadAvatar(id, file);
+          prof.avatar_url = key;
+          document.getElementById('avatar-thumb')!.innerHTML = avatarThumbHtml(await signedUrl(key));
+          (document.getElementById('avatar-remove') as HTMLElement).style.display = '';
+          fb.textContent = '✓ Photo mise à jour'; fb.style.color = '#10B981';
+          load();
+        } catch (err: any) {
+          fb.textContent = err?.message ?? 'Échec.'; fb.style.color = 'var(--bovo-danger)';
+        } finally { input.value = ''; }
+      });
+      document.getElementById('avatar-remove')!.addEventListener('click', async () => {
+        if (!prof.avatar_url || !confirm('Retirer la photo de ce worker ?')) return;
+        const fb = document.getElementById('avatar-feedback')!;
+        try {
+          await removeAvatar(id, prof.avatar_url);
+          prof.avatar_url = null;
+          document.getElementById('avatar-thumb')!.innerHTML = avatarThumbHtml(null);
+          (document.getElementById('avatar-remove') as HTMLElement).style.display = 'none';
+          fb.textContent = '✓ Retirée'; fb.style.color = '#10B981';
+          load();
+        } catch (err: any) { fb.textContent = err?.message ?? 'Échec.'; fb.style.color = 'var(--bovo-danger)'; }
+      });
+
+      // Documents (W4) — refresh partiel de la seule liste
+      function bindDocActions() {
+        document.querySelectorAll<HTMLElement>('#docs-list .doc-dl').forEach((a) => {
+          a.addEventListener('click', async (e) => {
+            e.preventDefault();
+            const url = await signedUrl(a.dataset.path!);
+            if (url) window.open(url, '_blank', 'noopener');
+          });
+        });
+        document.querySelectorAll<HTMLButtonElement>('#docs-list .doc-del').forEach((btn) => {
+          btn.addEventListener('click', async () => {
+            if (!confirm('Supprimer ce document ?')) return;
+            await deleteDoc(btn.dataset.path!);
+            await reloadDocs();
+          });
+        });
+      }
+      async function reloadDocs() {
+        document.getElementById('docs-list')!.innerHTML = docsListHtml(await listDocs(id));
+        bindDocActions();
+      }
+      document.getElementById('doc-input')!.addEventListener('change', async (e) => {
+        const input = e.target as HTMLInputElement;
+        const file = input.files?.[0];
+        if (!file) return;
+        const fb = document.getElementById('doc-feedback')!;
+        fb.textContent = 'Téléversement…'; fb.style.color = 'var(--bovo-muted)';
+        try {
+          await uploadDoc(id, file);
+          fb.textContent = '✓ Ajouté'; fb.style.color = '#10B981';
+          await reloadDocs();
+        } catch (err: any) { fb.textContent = err?.message ?? 'Échec.'; fb.style.color = 'var(--bovo-danger)'; }
+        finally { input.value = ''; }
+      });
+      bindDocActions();
 
       // Statut (W3) — changement immédiat (upsert ; status seul → RH préservée)
       document.getElementById('status-select')!.addEventListener('change', async (e) => {
