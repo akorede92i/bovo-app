@@ -228,8 +228,40 @@ $$;
 
 -- profiles
 create policy "users read own profile" on public.profiles for select using (auth.uid() = id or public.is_admin());
-create policy "users update own profile" on public.profiles for update using (auth.uid() = id);
+-- `with check` indispensable : sans lui, Postgres réutilise le `using` comme
+-- contrôle post-écriture et un user peut forger `role := 'admin'` (cf. migration
+-- 20260618). Ici on interdit que `role` diffère du rôle courant de l'appelant.
+create policy "users update own profile" on public.profiles for update
+  using (auth.uid() = id)
+  with check (
+    auth.uid() = id
+    and role = (select pr.role from public.profiles pr where pr.id = auth.uid())
+  );
 create policy "admin manages profiles" on public.profiles for all using (public.is_admin());
+
+-- Verrou de la colonne `role` (cf. migration 20260618) : 2e barrière, décisive.
+-- Un non-admin ne peut JAMAIS changer son rôle (escalade customer->admin).
+-- Admin/service_role/superuser-sans-JWT (bootstrap) gardent la main.
+create or replace function public.lock_profile_role()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  if public.is_admin()
+     or auth.role() = 'service_role'
+     or auth.uid() is null then
+    return new;
+  end if;
+  new.role := old.role;
+  return new;
+end;
+$$;
+drop trigger if exists profiles_lock_role on public.profiles;
+create trigger profiles_lock_role
+  before update on public.profiles
+  for each row execute function public.lock_profile_role();
 
 -- addresses
 create policy "users manage own addresses" on public.addresses for all using (auth.uid() = user_id);
