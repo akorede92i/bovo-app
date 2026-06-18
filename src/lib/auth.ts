@@ -76,9 +76,11 @@ export async function requireWorker(redirectTo = '/compte/connexion/'): Promise<
   return user;
 }
 
-export async function signOut(): Promise<void> {
+export async function signOut(redirectTo = '/'): Promise<void> {
   const supa = getSupabase();
   if (!supa) return;
   await supa.auth.signOut();
-  window.location.href = '/';
+  // redirectTo permet de rester dans un périmètre dédié (ex. app worker → écran de
+  // connexion worker, et non la home client).
+  window.location.href = redirectTo;
 }

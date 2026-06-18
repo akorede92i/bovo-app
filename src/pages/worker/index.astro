@@ -10,19 +10,19 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
     <div id="active-list"></div>
   </div>
 
-  <div id="empty" hidden style="text-align:center; padding:40px 16px; color:var(--bovo-muted);">
-    <div style="font-size:2.2rem; margin-bottom:8px;">🎉</div>
-    <div style="font-weight:700; font-family:'Jost';">Aucune mission en cours</div>
-    <div style="font-size:0.88rem; margin-top:4px;">Vos prochaines affectations apparaîtront ici.</div>
+  <div id="empty" hidden class="empty-state">
+    <div class="empty-state-emoji">🎉</div>
+    <div class="empty-state-title">Aucune mission en cours</div>
+    <div class="empty-state-desc">Vos prochaines affectations apparaîtront ici.</div>
   </div>
 
   <details id="done-wrap" hidden style="margin-top:18px;">
-    <summary style="cursor:pointer; color:var(--bovo-muted); font-weight:600; font-size:0.9rem;">Missions terminées récemment</summary>
+    <summary style="cursor:pointer; color:var(--bovo-muted); font-weight:600; font-size:0.9rem;">Missions terminées / annulées récemment</summary>
     <div id="done-list" style="margin-top:10px;"></div>
   </details>
 
   <!-- DÉTAIL MISSION -->
-  <div id="mission-modal" hidden style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:flex-end; justify-content:center;">
+  <div id="mission-modal" hidden role="dialog" aria-modal="true" aria-labelledby="mission-title" style="position:fixed; inset:0; z-index: var(--z-modal); background: rgba(17,24,39,0.6); display:flex; align-items:flex-end; justify-content:center;">
     <div style="background:#fff; width:100%; max-width:560px; max-height:92vh; overflow-y:auto; border-radius: var(--r-xl) var(--r-xl) 0 0; padding:22px 18px calc(22px + env(safe-area-inset-bottom));">
       <div class="flex-between" style="margin-bottom:14px;">
         <h2 id="mission-title" style="font-family:'Jost'; font-weight:700; font-size:1.15rem;">Mission</h2>
@@ -77,6 +77,40 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
       return `${day} · ${time}`;
     }
 
+    // ---- Rendu du lieu (aligné sur ce que l'admin/le client voient) ----
+    function floorLabel(n: unknown): string {
+      if (n === 0 || n === '0') return 'RDC';
+      return n != null && n !== '' ? `${n}e étage` : '';
+    }
+    function addrText(a: any): string {
+      if (!a) return '';
+      return [a.street, a.building, a.quartier, a.zone].filter(Boolean).join(', ');
+    }
+    function mapsHref(a: any): string {
+      const hasGeo = a && a.lat != null && a.lng != null && Number.isFinite(+a.lat) && Number.isFinite(+a.lng);
+      const q = hasGeo ? `${a.lat},${a.lng}` : (addrText(a) || a?.zone || 'Cotonou, Bénin');
+      return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`;
+    }
+    function accessLines(a: any): string {
+      if (!a) return '';
+      const out: string[] = [];
+      const fl = floorLabel(a.floor);
+      if (fl) out.push(`Étage : ${fl}${a.elevator === true ? ' · ascenseur' : a.elevator === false ? ' · sans ascenseur' : ''}`);
+      else if (a.elevator != null) out.push(`Ascenseur : ${a.elevator ? 'oui' : 'non'}`);
+      if (a.parking) out.push(`Accès camion : ${String(a.parking)}`);
+      return out.map((l) => `<div style="font-size:0.84rem; color:var(--bovo-muted); margin-top:2px;">${escapeHtml(l)}</div>`).join('');
+    }
+    const ACCESS_MODES: Record<string, string> = { 'cles-boite': 'Boîte à clés', code: 'Code serrure', gardien: 'Gardien', rdv: 'Rendez-vous' };
+    function placeBlock(label: string, a: any): string {
+      if (!a || typeof a !== 'object' || Object.keys(a).length === 0) return '';
+      return `<div style="margin-bottom:10px;">
+        <div style="font-weight:600; font-size:0.78rem; color:var(--bovo-muted); text-transform:uppercase; letter-spacing:0.5px;">${escapeHtml(label)}</div>
+        <div style="font-size:0.92rem; margin:2px 0;">${escapeHtml(addrText(a) || 'Adresse non précisée')}</div>
+        ${accessLines(a)}
+        <a href="${mapsHref(a)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="margin:6px 0 0;">🗺️ Itinéraire</a>
+      </div>`;
+    }
+
     function cardHtml(r: any): string {
       const z = zoneOf(r);
       return `
@@ -97,14 +131,36 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
 
     function detailHtml(r: any): string {
       const p = r.payload ?? {};
-      const addr = p.address ?? p.from ?? {};
-      const addrStr = [addr.street, addr.quartier, addr.zone].filter(Boolean).join(', ');
-      const mapsQuery = encodeURIComponent(addrStr || addr.zone || 'Cotonou, Bénin');
+      const isMove = r.service_type === 'demenagement';
       const digits = String(r.guest_phone ?? '').replace(/\D/g, '');
 
+      // Lieu : déménagement = Départ + Arrivée ; sinon adresse unique. (building,
+      // étage/ascenseur/accès camion et GPS lat/lng inclus — cf. placeBlock.)
+      const locationHtml = isMove
+        ? (placeBlock('Départ', p.from) + placeBlock('Arrivée', p.to)) || '<div style="font-size:0.9rem;">Adresse non précisée</div>'
+        : (placeBlock('Adresse', p.address ?? p.from) || '<div style="font-size:0.9rem;">Adresse non précisée</div>');
+
+      // Accès logement (Airbnb : boîte à clés / code / gardien…) — indispensable pour entrer.
+      const acc = p.access;
+      const accessHtml = (acc && typeof acc === 'object' && (acc.mode || acc.details)) ? `
+        <div style="margin-top:6px; padding-top:8px; border-top:1px solid var(--bovo-line-soft);">
+          <div style="font-weight:600; font-size:0.86rem;">🔑 Accès : ${escapeHtml(ACCESS_MODES[acc.mode] ?? acc.mode ?? '—')}</div>
+          ${acc.details ? `<div style="font-size:0.86rem; margin-top:2px;">${escapeHtml(String(acc.details))}</div>` : ''}
+        </div>` : '';
+
+      // Autres détails : scalaires + tableaux de scalaires (ex. cuisines[] du chef).
+      const SKIP = ['address', 'from', 'to', 'access'];
       const optionEntries = Object.entries(p)
-        .filter(([k, v]) => !['address', 'from', 'to'].includes(k) && v != null && typeof v !== 'object')
-        .map(([k, v]) => `<div style="display:flex; justify-content:space-between; gap:10px; padding:4px 0; border-bottom:1px solid var(--bovo-line-soft); font-size:0.86rem;"><span style="color:var(--bovo-muted);">${escapeHtml(k)}</span><span style="font-weight:600; text-align:right;">${escapeHtml(String(v))}</span></div>`)
+        .filter(([k, v]) => !SKIP.includes(k) && v != null && v !== '')
+        .map(([k, v]) => {
+          let display = '';
+          if (Array.isArray(v)) display = v.filter((x) => x != null && typeof x !== 'object').join(', ');
+          else if (typeof v === 'object') return '';
+          else display = String(v);
+          if (!display) return '';
+          return `<div style="display:flex; justify-content:space-between; gap:10px; padding:4px 0; border-bottom:1px solid var(--bovo-line-soft); font-size:0.86rem;"><span style="color:var(--bovo-muted);">${escapeHtml(k)}</span><span style="font-weight:600; text-align:right;">${escapeHtml(display)}</span></div>`;
+        })
+        .filter(Boolean)
         .join('');
 
       const row = (label: string, value: string) => `<div style="font-size:0.9rem; line-height:1.5;"><span style="color:var(--bovo-muted);">${label} :</span> ${value}</div>`;
@@ -112,7 +168,9 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
       const accepted = !!r.worker_accepted_at;
       const declined = !!r.worker_declined_at;
       let action = '';
-      if (r.status === 'done') {
+      if (r.status === 'cancelled') {
+        action = `<div style="text-align:center; color:var(--bovo-danger); font-weight:600; padding:10px;">✗ Mission annulée par l'admin</div>`;
+      } else if (r.status === 'done') {
         action = `<div style="text-align:center; color:var(--bovo-success); font-weight:600; padding:10px;">✓ Mission terminée</div>`;
       } else if (r.status === 'in_progress') {
         action = `<button id="act-done" class="btn btn-primary btn-block" type="button">✓ Terminer la mission</button>`;
@@ -140,8 +198,8 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
 
         <h3 style="font-family:'Jost'; font-weight:700; margin-bottom:8px;">Lieu</h3>
         <div style="background:var(--bovo-bg-soft); padding:12px; border-radius:var(--r-md); margin-bottom:16px;">
-          <div style="font-size:0.9rem; margin-bottom:8px;">${escapeHtml(addrStr || 'Adresse non précisée')}</div>
-          <a href="https://www.google.com/maps/search/?api=1&query=${escapeHtml(mapsQuery)}" target="_blank" rel="noopener" class="btn btn-ghost btn-sm" style="margin:0;">🗺️ Itinéraire</a>
+          ${locationHtml}
+          ${accessHtml}
         </div>
 
         ${optionEntries ? `
@@ -165,7 +223,7 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
       // (cf. migration 20260619). Le worker n'a plus de SELECT direct sur reservations.
       const { data, error } = await supa.from('worker_missions')
         .select('id, service_type, guest_name, guest_phone, scheduled_at, duration_min, status, payload, worker_accepted_at, worker_declined_at, worker_decline_reason')
-        .in('status', ['assigned', 'in_progress', 'done'])
+        .in('status', ['assigned', 'in_progress', 'done', 'cancelled'])
         .gte('scheduled_at', since.toISOString())
         .order('scheduled_at', { ascending: true });
 
@@ -174,7 +232,7 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
 
       missions = data ?? [];
       const active = missions.filter((r) => r.status === 'assigned' || r.status === 'in_progress');
-      const done = missions.filter((r) => r.status === 'done').reverse(); // plus récentes d'abord
+      const done = missions.filter((r) => r.status === 'done' || r.status === 'cancelled').reverse(); // terminées/annulées, plus récentes d'abord
 
       if (active.length === 0) emptyEl.hidden = false;
       else { activeList.innerHTML = active.map(cardHtml).join(''); activeWrap.hidden = false; }
@@ -250,7 +308,12 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
 
     document.getElementById('mission-close')!.addEventListener('click', () => modal.hidden = true);
     modal.addEventListener('click', (e) => { if (e.target === modal) modal.hidden = true; });
+    document.addEventListener('keydown', (e) => { if ((e as KeyboardEvent).key === 'Escape' && !modal.hidden) modal.hidden = true; });
 
     await load();
+
+    // Deep-link push (notif « nouvelle mission ») : ouvrir directement la mission tapée.
+    const deepMission = new URLSearchParams(location.search).get('mission');
+    if (deepMission) { openMission(deepMission); history.replaceState(null, '', location.pathname); }
   }
 </script>

@@ -249,8 +249,13 @@ import AdminLayout from '@layouts/AdminLayout.astro';
         errEl.style.display = 'none';
         okEl.style.display = 'none';
 
+        // Si un worker est affecté mais le statut est resté < assigned, on force
+        // 'assigned' : sinon la mission reste invisible côté worker (qui ne lit que
+        // assigned/in_progress/done). Aligne sur la modale d'affectation du dashboard.
+        const effectiveStatus = (newWorker && (newStatus === 'pending' || newStatus === 'confirmed'))
+          ? 'assigned' : newStatus;
         const patch: Record<string, unknown> = {
-          status: newStatus,
+          status: effectiveStatus,
           assigned_worker_id: newWorker,
           updated_at: new Date().toISOString(),
         };

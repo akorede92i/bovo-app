@@ -195,7 +195,7 @@ serve(async (req) => {
       result.worker = await notify(
         [rec.assigned_worker_id], 'Nouvelle mission 🛠️',
         `Une ${svc} vous a été assignée. Ouvrez l'app pour les détails.`,
-        coerceData({ type: 'assignment', reservationId: rec.id, url: '/worker/' }),
+        coerceData({ type: 'assignment', reservationId: rec.id, url: `/worker/?mission=${rec.id}` }),
         'transactional',
       );
     }
