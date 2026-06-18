@@ -493,31 +493,34 @@ import { ZONES } from '@lib/catalog';
         </div>
       `;
 
-      // Skills toggle
+      // Skills toggle — auto-correcteur : on ne bascule le chip qu'en cas de SUCCÈS,
+      // et on signale l'échec sans désynchroniser l'état visuel de la base.
       workerModalBody.querySelectorAll<HTMLButtonElement>('[data-skill]').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const skill = btn.dataset.skill!;
           const isActive = btn.classList.contains('is-active');
-          if (isActive) {
-            await supa.from('worker_skills').delete().eq('worker_id', id).eq('skill', skill);
-          } else {
-            await supa.from('worker_skills').insert({ worker_id: id, skill });
-          }
+          btn.disabled = true;
+          const { error } = isActive
+            ? await supa.from('worker_skills').delete().eq('worker_id', id).eq('skill', skill)
+            : await supa.from('worker_skills').insert({ worker_id: id, skill });
+          btn.disabled = false;
+          if (error) { alert(`Échec de la mise à jour du skill : ${error.message}`); return; }
           btn.classList.toggle('is-active');
           load();
         });
       });
 
-      // Zones toggle
+      // Zones toggle — même logique auto-correctrice que les skills.
       workerModalBody.querySelectorAll<HTMLButtonElement>('[data-zone]').forEach((btn) => {
         btn.addEventListener('click', async () => {
           const zone = btn.dataset.zone!;
           const isActive = btn.classList.contains('is-active');
-          if (isActive) {
-            await supa.from('worker_zones').delete().eq('worker_id', id).eq('zone', zone);
-          } else {
-            await supa.from('worker_zones').insert({ worker_id: id, zone });
-          }
+          btn.disabled = true;
+          const { error } = isActive
+            ? await supa.from('worker_zones').delete().eq('worker_id', id).eq('zone', zone)
+            : await supa.from('worker_zones').insert({ worker_id: id, zone });
+          btn.disabled = false;
+          if (error) { alert(`Échec de la mise à jour de la zone : ${error.message}`); return; }
           btn.classList.toggle('is-active');
           load();
         });

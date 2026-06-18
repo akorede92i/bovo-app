@@ -91,6 +91,9 @@ jobs:
           PUBLIC_SUPABASE_URL: ${{ secrets.PUBLIC_SUPABASE_URL }}
           PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.PUBLIC_SUPABASE_ANON_KEY }}
           PUBLIC_KKIAPAY_PUBLIC_KEY: ${{ secrets.PUBLIC_KKIAPAY_PUBLIC_KEY }}
+          # Paiements RÉELS : opt-in EXPLICITE, prod web uniquement. Le défaut du code
+          # est sandbox (cf. kkiapay.ts) → tout autre build reste en paiements de test.
+          PUBLIC_KKIAPAY_SANDBOX: 'false'
         run: npm run build
 
       - name: Add CNAME for custom domain
