@@ -41,7 +41,7 @@ import Icon from '@components/Icon.astro';
   import { loadState, type DemenagementState } from '@lib/state';
   import { getSupabase } from '@lib/supabase';
   import { getCurrentUserId, submitReservation, submitAndRedirect, navigateAfterSubmit, whatsappUrl, isOffline, showSubmitError } from '@lib/tunnel';
-  import { openDeposit, isKkiapayReady } from '@lib/kkiapay';
+  import { openDeposit, isKkiapayReady, confirmDeposit, type KkiapayResponse } from '@lib/kkiapay';
   import { DEM_VOLUMES, DEM_OPTIONS, DEM_ETAGE_SUPP_XOF, fcfa } from '@lib/catalog';
 
   function init() {
@@ -178,19 +178,28 @@ import Icon from '@components/Icon.astro';
       }
       cta.disabled = true;
       cta.textContent = 'Envoi en cours…';
-      const finish = async (depositStatus: 'none' | 'pending') => {
+      // id généré AVANT le widget : un invité ne peut pas relire sa résa (RLS) et on
+      // le passe à Kkiapay via `data` pour LIER le paiement à CETTE résa (confirm-deposit
+      // vérifie la correspondance côté serveur, en plus du montant et de l'usage unique).
+      const reservationId = crypto.randomUUID();
+      const finish = async (depositStatus: 'none' | 'pending', resp?: KkiapayResponse) => {
         const supa = getSupabase();
         const userId = await getCurrentUserId(supa);
-        await submitReservation(supa, { ...buildPayload(depositStatus), user_id: userId });
+        const res = await submitReservation(supa, { id: reservationId, ...buildPayload(depositStatus), user_id: userId });
+        // Acompte réellement encaissé → confirmation serveur (vérif Kkiapay → 'paid').
+        if (res.ok && depositStatus === 'pending' && resp?.transactionId) {
+          await confirmDeposit(reservationId, resp.transactionId);
+        }
         navigateAfterSubmit('demenagement', whatsappUrl(buildWhatsappMessage()), s.customer);
       };
       openDeposit({
         amountXof: deposit,
+        reservationId,
         customerName: s.customer?.fullName,
         customerEmail: s.customer?.email,
         customerPhone: s.customer?.phone,
         reason: 'Acompte déménagement Bovo',
-        onSuccess: () => finish('pending'),
+        onSuccess: (resp) => finish('pending', resp),
         onFailed: () => finish('none'),
       });
     } else {

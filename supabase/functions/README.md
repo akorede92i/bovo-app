@@ -52,3 +52,32 @@ Dans Supabase Studio :
    ```
 
 À chaque INSERT, la fonction reçoit `{ type: 'INSERT', table: 'reservations', record: {...} }` et envoie le message WhatsApp.
+
+## confirm-deposit
+
+Ferme la boucle d'acompte Kkiapay **côté serveur** : le client ne peut écrire que
+`deposit_status` `none`/`pending` (RLS + trigger). Cette fonction, appelée par les
+pages recap après un paiement réussi, **vérifie la transaction auprès de Kkiapay**
+puis passe la réservation à `deposit_status='paid'` + enregistre le `transactionId`.
+
+Sans cette vérification serveur, marquer `paid` recréerait la faille « forger un
+paiement ». La fonction ne marque **jamais** `paid` sans une transaction Kkiapay
+réellement `SUCCESS`, d'un montant ≥ ~20 % de l'estimation, et non déjà utilisée.
+
+### Setup
+
+```bash
+cd supabase
+# 3 clés Kkiapay (compte app.kkiapay.me → Paramètres → API keys)
+supabase secrets set KKIAPAY_PUBLIC_KEY=xxxxxx
+supabase secrets set KKIAPAY_PRIVATE_KEY=xxxxxx
+supabase secrets set KKIAPAY_SECRET_KEY=xxxxxx
+# Mode : 'false' = API prod (def), 'true' = sandbox (doit correspondre au widget)
+supabase secrets set KKIAPAY_SANDBOX=false
+
+# Déploiement — invocable par les réservations invité (sans JWT) :
+supabase functions deploy confirm-deposit --no-verify-jwt
+```
+
+> Tant que les 3 clés ne sont pas posées, la fonction répond `503` et ne marque
+> rien `paid` (fail-safe : pas pire que l'état actuel, jamais de faux `paid`).

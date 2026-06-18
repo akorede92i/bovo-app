@@ -117,10 +117,16 @@ serve(async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // 4) Garde-fou anti-doublon : un worker/admin avec ce téléphone existe-t-il déjà ?
-  const { data: dupe } = await admin
-    .from('profiles').select('id, full_name')
-    .eq('phone', phone).in('role', ['worker', 'admin']).maybeSingle();
+  // 4) Garde-fou anti-doublon : un worker/admin avec ce numéro (NORMALISÉ) existe-t-il
+  //    déjà ? On compare les chiffres (phoneDigits), pas la chaîne brute : deux
+  //    formatages du même numéro (« 01 97… » vs « +229 0197… ») doivent collisionner
+  //    ici — sinon ils passent ce contrôle mais heurtent le loginEmail déterministe
+  //    (worker.<digits>@…) plus bas → 409 trompeur « email déjà utilisé ».
+  const { data: existing } = await admin
+    .from('profiles').select('id, full_name, phone').in('role', ['worker', 'admin']);
+  const dupe = (existing ?? []).find(
+    (p: any) => String(p.phone ?? '').replace(/\D/g, '') === phoneDigits,
+  );
   if (dupe) {
     return json({ error: `Un worker existe déjà avec ce téléphone (${dupe.full_name ?? dupe.id}).` }, 409);
   }

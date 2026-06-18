@@ -667,7 +667,6 @@ import { ZONES } from '@lib/catalog';
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    const tomorrowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2);
     const weekEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 7);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 1);
@@ -856,7 +855,7 @@ import { ZONES } from '@lib/catalog';
       const { data } = await supa.from('reservations')
         .select('id, service_type, guest_name, guest_phone, scheduled_at, status, assigned_worker_id, deposit_status, created_at')
         .gte('scheduled_at', iso(todayStart))
-        .lt('scheduled_at', iso(tomorrowEnd))
+        .lt('scheduled_at', iso(todayEnd))
         .neq('status', 'cancelled')
         .order('scheduled_at', { ascending: true });
 
@@ -1130,13 +1129,23 @@ import { ZONES } from '@lib/catalog';
     async function runGlobalSearch() {
       const q = globalSearch.value.trim();
       if (q.length < 2) { searchResults.hidden = true; return; }
+      // Neutralise les caractères qui cassent la syntaxe du filtre .or() PostgREST
+      // (virgule = séparateur de conditions, parenthèses = groupes) et les wildcards
+      // ilike (%, *). Sans ça, un nom avec virgule ou un tél « +229 (01)… » → 400 avalé.
+      const safe = q.replace(/[,()*%\\]/g, ' ').replace(/\s+/g, ' ').trim();
+      if (safe.length < 2) { searchResults.hidden = true; return; }
 
-      const { data } = await supa.from('reservations')
+      const { data, error } = await supa.from('reservations')
         .select('id, service_type, guest_name, guest_phone, scheduled_at, status')
-        .or(`guest_name.ilike.%${q}%,guest_phone.ilike.%${q}%`)
+        .or(`guest_name.ilike.%${safe}%,guest_phone.ilike.%${safe}%`)
         .order('scheduled_at', { ascending: false, nullsFirst: false })
         .limit(8);
 
+      if (error) {
+        searchResults.innerHTML = `<div class="search-result"><span style="color:var(--bovo-muted);">Recherche indisponible</span></div>`;
+        searchResults.hidden = false;
+        return;
+      }
       if (!data || data.length === 0) {
         searchResults.innerHTML = `<div class="search-result"><span style="color:var(--bovo-muted);">Aucun résultat</span></div>`;
       } else {

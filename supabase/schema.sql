@@ -172,6 +172,10 @@ create index if not exists reservations_user_idx on public.reservations(user_id)
 create index if not exists reservations_status_idx on public.reservations(status);
 create index if not exists reservations_scheduled_idx on public.reservations(scheduled_at);
 create index if not exists reservations_worker_idx on public.reservations(assigned_worker_id);
+-- Usage unique du transactionId Kkiapay : un acompte payé ne peut valider qu'UNE résa
+-- (cf. migration 20260619_deposit_tx_single_use ; confirm-deposit s'appuie dessus).
+create unique index if not exists reservations_deposit_tx_unique
+  on public.reservations(deposit_kkiapay_tx) where deposit_kkiapay_tx is not null;
 
 -- ============================================
 -- REVIEWS — notes et avis après prestation
@@ -268,8 +272,11 @@ create policy "users manage own addresses" on public.addresses for all using (au
 create policy "admin sees all addresses" on public.addresses for select using (public.is_admin());
 
 -- reservations
+-- NB : un worker lit ses missions via la vue worker_missions (colonnes restreintes,
+-- définie dans la migration 20260619), PAS via cette policy — d'où l'absence de
+-- branche worker ici (évite d'exposer guest_email/deposit_*/montant au worker).
 create policy "users see own reservations" on public.reservations for select
-  using (auth.uid() = user_id or public.is_admin() or (public.is_worker() and assigned_worker_id = auth.uid()));
+  using (auth.uid() = user_id or public.is_admin());
 -- résa invité autorisée, mais colonnes sensibles verrouillées (cf. migration 20260610) :
 -- pas d'usurpation de user_id, pas de status/deposit_status/worker/tx forgés.
 -- Le passage à deposit_status='paid' relève du service_role (vérif Kkiapay serveur).
@@ -313,10 +320,10 @@ create trigger reservations_lock_sensitive
   before update on public.reservations
   for each row execute function public.lock_reservation_sensitive_fields();
 
--- worker tables (lecture réservée aux utilisateurs connectés — matching admin ; écriture admin)
-create policy "auth reads worker skills" on public.worker_skills for select using (auth.uid() is not null);
-create policy "auth reads worker zones" on public.worker_zones for select using (auth.uid() is not null);
-create policy "auth reads worker avail" on public.worker_availability for select using (auth.uid() is not null);
+-- worker tables (lecture réservée aux workers/admins — matching admin ; écriture admin)
+create policy "worker/admin read worker skills" on public.worker_skills for select using (public.is_worker());
+create policy "worker/admin read worker zones" on public.worker_zones for select using (public.is_worker());
+create policy "worker/admin read worker avail" on public.worker_availability for select using (public.is_worker());
 create policy "worker reads own blackouts" on public.worker_blackouts for select using (auth.uid() = worker_id or public.is_admin());
 create policy "admin manages worker data" on public.worker_skills for all using (public.is_admin());
 create policy "admin manages worker zones" on public.worker_zones for all using (public.is_admin());

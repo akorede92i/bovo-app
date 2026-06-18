@@ -12,8 +12,12 @@
  *   3. Mettre dans .env :
  *      PUBLIC_KKIAPAY_PUBLIC_KEY=xxx   (clé de test en dev/preprod, clé live en prod)
  *      PUBLIC_KKIAPAY_SANDBOX=true     (paiements de test) — voir openDeposit()
- *   4. En prod (web/mobile), laisser PUBLIC_KKIAPAY_SANDBOX vide/false → paiements réels.
+ *   4. Paiements RÉELS = opt-in EXPLICITE : poser PUBLIC_KKIAPAY_SANDBOX=false
+ *      (uniquement sur le build prod web / release mobile). Sinon → sandbox par défaut,
+ *      donc aucun build oublié (preprod, APK de test, dev) ne peut débiter un vrai compte.
  */
+
+import { getSupabase } from './supabase';
 
 declare global {
   interface Window {
@@ -78,15 +82,14 @@ export function openDeposit(opts: OpenDepositOpts): void {
   }
 
   const apiKey = (import.meta as any).env?.PUBLIC_KKIAPAY_PUBLIC_KEY ?? 'DEMO';
-  // Mode sandbox piloté EXPLICITEMENT par PUBLIC_KKIAPAY_SANDBOX ('true'/'false').
-  // Repli (non défini) : sur l'environnement — sandbox en dev, paiements RÉELS en
-  // build de prod/mobile (PROD=true). ⚠️ Une PREPROD est aussi un `astro build`
-  // (PROD=true) : elle DOIT poser PUBLIC_KKIAPAY_SANDBOX=true, sinon vrais paiements.
+  // Mode sandbox à DÉFAUT SÛR : on reste en sandbox SAUF si les paiements réels sont
+  // activés EXPLICITEMENT par PUBLIC_KKIAPAY_SANDBOX='false'. Ainsi tout build qui
+  // oublie la variable (preprod, APK de test, dev) ne peut PAS débiter un vrai compte
+  // Mobile Money. Les vrais paiements exigent un opt-in explicite, posé uniquement
+  // dans deploy.yml (build prod web). Ne JAMAIS coder sandbox:true/false en dur dans
+  // les pages, ni s'appuyer sur PROD pour distinguer preprod et prod.
   const sandboxEnv = (import.meta as any).env?.PUBLIC_KKIAPAY_SANDBOX;
-  const sandbox =
-    sandboxEnv === 'true' || sandboxEnv === true ? true
-    : sandboxEnv === 'false' || sandboxEnv === false ? false
-    : !((import.meta as any).env?.PROD);
+  const sandbox = !(sandboxEnv === 'false' || sandboxEnv === false);
 
   currentSuccess = opts.onSuccess;
   currentFailed = opts.onFailed ?? null;
@@ -112,4 +115,25 @@ export function openDeposit(opts: OpenDepositOpts): void {
     phone: opts.customerPhone ?? '',
     reason: opts.reason ?? 'Acompte réservation Bovo',
   });
+}
+
+/**
+ * Confirme un acompte CÔTÉ SERVEUR après un paiement Kkiapay réussi.
+ * Appelle l'Edge Function `confirm-deposit`, qui VÉRIFIE la transaction auprès de
+ * Kkiapay avant de passer la réservation à deposit_status='paid' (le client ne
+ * peut pas l'écrire : RLS + trigger). Best-effort : un échec n'interrompt pas le
+ * parcours (l'admin peut réconcilier), mais le transactionId est transmis au
+ * serveur pour ne jamais être perdu.
+ */
+export async function confirmDeposit(reservationId: string, transactionId: string): Promise<void> {
+  try {
+    const supa = getSupabase();
+    if (!supa) return;
+    const { error } = await supa.functions.invoke('confirm-deposit', {
+      body: { reservationId, transactionId },
+    });
+    if (error) console.warn('[Bovo] confirm-deposit a échoué :', error.message);
+  } catch (e: any) {
+    console.warn('[Bovo] confirm-deposit a levé une exception :', e?.message);
+  }
 }
