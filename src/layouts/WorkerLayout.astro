@@ -17,6 +17,12 @@ const { title = 'Espace worker — Bovo', pageTitle } = Astro.props;
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <meta name="theme-color" content="#4470B3" />
 
+  <!-- Polices Bovo (Jost titres + Montserrat corps) — WorkerLayout n'étend pas Layout.astro,
+       il doit donc charger les polices lui-même (page racine de l'app native worker). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jost:wght@500;600;700;800&family=Montserrat:wght@400;500;600;700&display=swap" />
+
   <style>
     body { background: var(--bovo-bg-soft) !important; }
     .worker-shell {
@@ -46,6 +52,8 @@ const { title = 'Espace worker — Bovo', pageTitle } = Astro.props;
       color: #fff;
       text-decoration: none;
     }
+    /* O de marque atténué sur fond bleu (même traitement que l'admin). */
+    .worker-header .worker-logo .o-rouge { color: #fff; opacity: 0.72; }
     .worker-header .worker-pill {
       font-size: 0.64rem;
       font-weight: 700;
@@ -57,10 +65,15 @@ const { title = 'Espace worker — Bovo', pageTitle } = Astro.props;
       text-transform: uppercase;
       margin-left: 8px;
     }
-    .worker-header a#worker-signout {
+    .worker-header #worker-signout {
       font-size: 0.82rem;
       color: rgba(255,255,255,0.85);
       text-decoration: none;
+      background: none;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+      font-family: inherit;
     }
     .worker-page { padding: 18px 16px calc(32px + env(safe-area-inset-bottom)); }
     .worker-h1 { font-family: 'Jost', sans-serif; font-weight: 800; font-size: 1.3rem; margin-bottom: 4px; }
@@ -70,10 +83,10 @@ const { title = 'Espace worker — Bovo', pageTitle } = Astro.props;
   <div class="worker-shell">
     <header class="worker-header">
       <div style="display:flex; align-items:center;">
-        <a href="/worker/" class="worker-logo">BOVO</a>
+        <a href="/worker/" class="worker-logo">B<span class="o-rouge">O</span>VO</a>
         <span class="worker-pill">Worker</span>
       </div>
-      <a href="#" id="worker-signout">Déconnexion</a>
+      <button type="button" id="worker-signout">Déconnexion</button>
     </header>
 
     <main class="worker-page">
@@ -92,7 +105,9 @@ const { title = 'Espace worker — Bovo', pageTitle } = Astro.props;
 
     document.getElementById('worker-signout')!.addEventListener('click', (e) => {
       e.preventDefault();
-      signOut();
+      // Rester dans le périmètre worker (sinon l'app native « Bovo Pro » afficherait
+      // la vitrine client au lieu de l'écran de connexion worker).
+      signOut('/compte/connexion/?next=/worker/');
     });
   </script>
 </body>
