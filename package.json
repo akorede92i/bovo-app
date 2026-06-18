@@ -14,7 +14,11 @@
     "test:unit:watch": "vitest",
     "test:unit:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "android:add": "npm run build && npx cap add android",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:assets": "npx @capacitor/assets generate --android",
+    "android:open": "npx cap open android"
   },
   "dependencies": {
     "@astrojs/sitemap": "~3.2.1",
