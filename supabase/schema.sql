@@ -329,6 +329,9 @@ create policy "admin manages worker data" on public.worker_skills for all using 
 create policy "admin manages worker zones" on public.worker_zones for all using (public.is_admin());
 create policy "admin manages worker availability" on public.worker_availability for all using (public.is_admin());
 create policy "admin manages worker blackouts" on public.worker_blackouts for all using (public.is_admin());
+-- Worker autonome sur SES dispos/congés (auto-déclaration depuis l'app worker, W8 — migration 20260619).
+create policy "worker manages own availability" on public.worker_availability for all using (auth.uid() = worker_id) with check (auth.uid() = worker_id);
+create policy "worker manages own blackouts" on public.worker_blackouts for all using (auth.uid() = worker_id) with check (auth.uid() = worker_id);
 
 -- airbnb properties (hosts = owners)
 create policy "owner manages property" on public.airbnb_properties for all using (auth.uid() = owner_user_id or public.is_admin());
