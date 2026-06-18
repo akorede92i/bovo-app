@@ -320,10 +320,11 @@ create trigger reservations_lock_sensitive
   before update on public.reservations
   for each row execute function public.lock_reservation_sensitive_fields();
 
--- worker tables (lecture réservée aux workers/admins — matching admin ; écriture admin)
-create policy "worker/admin read worker skills" on public.worker_skills for select using (public.is_worker());
-create policy "worker/admin read worker zones" on public.worker_zones for select using (public.is_worker());
-create policy "worker/admin read worker avail" on public.worker_availability for select using (public.is_worker());
+-- worker tables : un worker ne lit que SES skills/zones/dispos ; l'admin (matching) lit tout.
+-- (cf. migration 20260619_worker_self_availability — resserrage vs is_worker() global.)
+create policy "own/admin read worker skills" on public.worker_skills for select using (auth.uid() = worker_id or public.is_admin());
+create policy "own/admin read worker zones" on public.worker_zones for select using (auth.uid() = worker_id or public.is_admin());
+create policy "own/admin read worker avail" on public.worker_availability for select using (auth.uid() = worker_id or public.is_admin());
 create policy "worker reads own blackouts" on public.worker_blackouts for select using (auth.uid() = worker_id or public.is_admin());
 create policy "admin manages worker data" on public.worker_skills for all using (public.is_admin());
 create policy "admin manages worker zones" on public.worker_zones for all using (public.is_admin());

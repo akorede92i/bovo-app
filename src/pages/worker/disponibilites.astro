@@ -99,6 +99,7 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
         : '<div style="color:var(--bovo-muted); font-size:0.86rem; padding:4px 0;">Aucun créneau déclaré. Ajoutez vos disponibilités habituelles ci-dessous.</div>';
       availList.querySelectorAll<HTMLButtonElement>('.del-avail').forEach((btn) => {
         btn.addEventListener('click', async () => {
+          if (!confirm('Supprimer ce créneau ?')) return;
           btn.disabled = true;
           const { error } = await supa.from('worker_availability').delete().eq('id', btn.dataset.id!);
           if (error) { err(availFb, `Erreur : ${error.message}`); btn.disabled = false; return; }
@@ -113,6 +114,12 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
       availFb.textContent = '';
       if (!start || !end) { err(availFb, 'Indiquez une heure de début et de fin.'); return; }
       if (end <= start) { err(availFb, "L'heure de fin doit être après le début."); return; }
+      // Garde anti-chevauchement (revue #28, point #3) : pas deux créneaux qui se recoupent le même jour.
+      const { data: sameDay } = await supa.from('worker_availability')
+        .select('time_start, time_end').eq('worker_id', userId).eq('day_of_week', day);
+      if ((sameDay ?? []).some((a) => hhmm(a.time_start) < end && start < hhmm(a.time_end))) {
+        err(availFb, 'Ce créneau en chevauche un autre le même jour.'); return;
+      }
       const { error } = await supa.from('worker_availability')
         .insert({ worker_id: userId, day_of_week: day, time_start: start, time_end: end });
       if (error) { err(availFb, `Erreur : ${error.message}`); return; }
@@ -136,6 +143,7 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
         : '<div style="color:var(--bovo-muted); font-size:0.86rem; padding:4px 0;">Aucun congé déclaré.</div>';
       bkList.querySelectorAll<HTMLButtonElement>('.del-bk').forEach((btn) => {
         btn.addEventListener('click', async () => {
+          if (!confirm('Supprimer ce congé ?')) return;
           btn.disabled = true;
           const { error } = await supa.from('worker_blackouts').delete().eq('id', btn.dataset.id!);
           if (error) { err(bkFb, `Erreur : ${error.message}`); btn.disabled = false; return; }
