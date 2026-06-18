@@ -43,7 +43,11 @@ with (security_invoker = false) as
   from public.reservations
   where assigned_worker_id = auth.uid();
 
-revoke all on public.worker_missions from anon;
+-- Lecture SEULE. La vue est DEFINER (contourne la RLS) et auto-updatable : sans ce
+-- verrou, les grants par défaut Supabase (authenticated = ALL sur le public) lui
+-- ouvriraient INSERT/UPDATE/DELETE sur reservations À TRAVERS la vue. On révoque donc
+-- tout (anon/authenticated/public) AVANT de n'accorder que SELECT à authenticated.
+revoke all on public.worker_missions from anon, authenticated, public;
 grant select on public.worker_missions to authenticated;
 
 -- 2b) On retire la branche worker du SELECT de base reservations : un worker lit
