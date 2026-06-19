@@ -3,6 +3,12 @@ dist/
 .output/
 .astro/
 
+# Capacitor — projets natifs générés localement (cap add), non versionnés
+android/
+ios/
+android-worker/
+android-client/
+
 # dependencies
 node_modules/
 
