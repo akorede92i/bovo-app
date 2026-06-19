@@ -118,5 +118,9 @@ Function `send-push`). Les deux apps partagent **un seul projet Firebase** :
 - **Mises à jour** : l'app charge le site live → la plupart des évolutions ne nécessitent
   **pas** de re-soumission (juste un déploiement web). On re-soumet pour un changement
   natif (icône, plugins, permissions, push).
+- **App client — paiement Kkiapay** : `allowNavigation` inclut `*.kkiapay.me` (durci) pour
+  garder le tunnel d'acompte Mobile Money DANS l'app si jamais il fait une navigation
+  top-level. ⚠️ **Teste l'acompte sur appareil** (en sandbox) avant publication — c'est
+  le seul flux réellement sensible au webview natif. Le worker n'a pas de paiement.
 - **iOS** : non couvert (pas de Mac/compte Apple). Les utilisateurs iOS utilisent
   `app.bovo.bj` dans Safari (« Ajouter à l'écran d'accueil » possible).

@@ -20,9 +20,14 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 const APP = process.env.BOVO_APP === 'client' ? 'client' : 'worker';
 
+// nav = domaines autorisés en navigation TOP-LEVEL dans le webview (le reste s'ouvre
+// en externe/natif). Le client inclut Kkiapay : si le tunnel d'acompte fait une
+// navigation top-level vers le widget/paiement, elle doit rester DANS l'app — sinon
+// le callback onSuccess ne revient pas et l'acompte n'est jamais confirmé. Le worker
+// n'a pas de paiement → domaine Bovo seul.
 const APPS = {
-  worker: { appId: 'bj.bovo.worker', appName: 'Bovo Pro', start: 'https://app.bovo.bj/worker/', dir: 'android-worker' },
-  client: { appId: 'bj.bovo.app',    appName: 'Bovo',     start: 'https://app.bovo.bj/',       dir: 'android-client' },
+  worker: { appId: 'bj.bovo.worker', appName: 'Bovo Pro', start: 'https://app.bovo.bj/worker/', dir: 'android-worker', nav: ['app.bovo.bj'] },
+  client: { appId: 'bj.bovo.app',    appName: 'Bovo',     start: 'https://app.bovo.bj/',       dir: 'android-client', nav: ['app.bovo.bj', 'kkiapay.me', '*.kkiapay.me'] },
 } as const;
 
 const A = APPS[APP];
@@ -36,8 +41,9 @@ const config: CapacitorConfig = {
   android: { path: A.dir },
   server: {
     url: A.start,
-    // Navigation interne limitée au domaine Bovo ; tel:/geo:/wa.me s'ouvrent en natif.
-    allowNavigation: ['app.bovo.bj'],
+    // Navigation top-level autorisée (cf. APPS[app].nav) ; tel:/geo:/wa.me + le reste
+    // s'ouvrent en natif/externe.
+    allowNavigation: [...A.nav],
   },
   plugins: {
     SplashScreen: {
