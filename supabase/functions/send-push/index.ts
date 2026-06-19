@@ -200,6 +200,22 @@ serve(async (req) => {
       );
     }
 
+    // (c) ADMIN sur REFUS worker : worker_declined_at vient d'être posé → à réassigner.
+    //     (Inerte tant qu'aucun admin n'a de device_token ; le dashboard surface déjà
+    //      le refus visuellement — cf. flags « ✗ refusée » + panneau « à traiter ».)
+    if (rec?.worker_declined_at && !old?.worker_declined_at) {
+      const { data: admins } = await supabase.from('profiles').select('id').eq('role', 'admin');
+      const adminIds = (admins ?? []).map((a: { id: string }) => a.id);
+      const svc = SERVICE_LABELS[rec.service_type] ?? 'mission';
+      const why = rec.worker_decline_reason ? ` : ${rec.worker_decline_reason}` : '';
+      result.adminDecline = await notify(
+        adminIds, 'Mission refusée ✗',
+        `Un worker a refusé une ${svc}${why}. À réassigner.`,
+        coerceData({ type: 'decline', reservationId: rec.id, url: `/admin/reservations/?id=${rec.id}` }),
+        'transactional',
+      );
+    }
+
     return new Response(JSON.stringify(result), { status: 200, headers: { 'Content-Type': 'application/json' } });
   }
 

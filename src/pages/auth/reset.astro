@@ -173,7 +173,16 @@
         }
 
         show(stateSuccess);
-        setTimeout(() => { window.location.replace('/compte/'); }, 2000);
+        // Routage par rôle : un worker revient sur son espace, pas l'espace client.
+        let dest = '/compte/';
+        try {
+          const { data: { user } } = await supa.auth.getUser();
+          if (user) {
+            const { data: prof } = await supa.from('profiles').select('role').eq('id', user.id).maybeSingle();
+            if (prof?.role === 'worker') dest = '/worker/';
+          }
+        } catch { /* défaut /compte/ */ }
+        setTimeout(() => { window.location.replace(dest); }, 2000);
       });
     }
   </script>
