@@ -147,7 +147,10 @@ create table if not exists public.reservations (
   service_type text not null check (service_type in ('menage', 'airbnb', 'demenagement', 'chef', 'plombier')),
   payload jsonb not null default '{}'::jsonb, -- les étapes du tunnel
 
-  -- adresse (référence si user a compte, sinon stocké dans payload)
+  -- ⚠️ adresse — NON UTILISÉ : aucun tunnel n'écrit address_id. L'adresse vit dans
+  -- payload.address / payload.from / payload.to (source de vérité). Ne pas câbler cette
+  -- colonne dans la vue worker_missions / les jointures sans l'alimenter d'abord, sinon
+  -- divergence admin/worker. Cf. issue #30 (à câbler réellement ou supprimer).
   address_id uuid references public.addresses(id) on delete set null,
 
   -- planning
