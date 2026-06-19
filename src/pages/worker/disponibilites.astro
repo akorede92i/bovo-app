@@ -1,0 +1,187 @@
+---
+import WorkerLayout from '@layouts/WorkerLayout.astro';
+---
+<WorkerLayout title="Mes disponibilités — Bovo" pageTitle="Mes disponibilités">
+  <p style="color:var(--bovo-muted); font-size:0.9rem; margin-bottom:18px;">
+    Indiquez vos créneaux habituels et vos congés. L'équipe Bovo s'en sert pour vous assigner des missions au bon moment.
+  </p>
+
+  <div id="loading" style="text-align:center; padding:40px 16px; color:var(--bovo-muted);">Chargement…</div>
+
+  <div id="content" hidden>
+    <!-- ===== Créneaux récurrents ===== -->
+    <h2 style="font-family:'Jost'; font-weight:700; font-size:1.05rem; margin-bottom:8px;">Créneaux récurrents</h2>
+    <div id="avail-list" style="margin-bottom:10px;"></div>
+    <div style="background:var(--bovo-bg-soft); padding:12px; border-radius:var(--r-md); margin-bottom:24px;">
+      <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-bottom:10px;">
+        <div>
+          <label class="field-label" for="new-avail-day">Jour</label>
+          <select id="new-avail-day" class="select"></select>
+        </div>
+        <div>
+          <label class="field-label" for="new-avail-start">Début</label>
+          <input type="time" id="new-avail-start" class="input" value="08:00" />
+        </div>
+        <div>
+          <label class="field-label" for="new-avail-end">Fin</label>
+          <input type="time" id="new-avail-end" class="input" value="18:00" />
+        </div>
+      </div>
+      <button id="add-avail" type="button" class="btn btn-primary btn-block btn-sm">+ Ajouter le créneau</button>
+      <div id="avail-feedback" style="font-size:0.82rem; margin-top:6px;"></div>
+    </div>
+
+    <!-- ===== Congés / indisponibilités ===== -->
+    <h2 style="font-family:'Jost'; font-weight:700; font-size:1.05rem; margin-bottom:8px;">Congés / indisponibilités</h2>
+    <div id="bk-list" style="margin-bottom:10px;"></div>
+    <div style="background:var(--bovo-bg-soft); padding:12px; border-radius:var(--r-md);">
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px;">
+        <div>
+          <label class="field-label" for="new-bk-start">Du</label>
+          <input type="date" id="new-bk-start" class="input" />
+        </div>
+        <div>
+          <label class="field-label" for="new-bk-end">Au</label>
+          <input type="date" id="new-bk-end" class="input" />
+        </div>
+      </div>
+      <label class="field-label" for="new-bk-reason">Motif (optionnel)</label>
+      <input type="text" id="new-bk-reason" class="input" placeholder="Ex. congé, indisponible…" style="margin-bottom:8px;" />
+      <button id="add-bk" type="button" class="btn btn-primary btn-block btn-sm">+ Ajouter le congé</button>
+      <div id="bk-feedback" style="font-size:0.82rem; margin-top:6px;"></div>
+    </div>
+  </div>
+</WorkerLayout>
+
+<script>
+  import { getSupabase } from '@lib/supabase';
+  import { getSessionUser } from '@lib/auth';
+  import { escapeHtml } from '@lib/admin';
+
+  const DAYS = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
+  const DAYS_SHORT = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+
+  const supa = getSupabase();
+  const loadingEl = document.getElementById('loading')!;
+  const contentEl = document.getElementById('content')!;
+
+  if (!supa) {
+    loadingEl.textContent = 'Service indisponible.';
+  } else {
+    const availList = document.getElementById('avail-list')!;
+    const bkList = document.getElementById('bk-list')!;
+    const availFb = document.getElementById('avail-feedback')!;
+    const bkFb = document.getElementById('bk-feedback')!;
+
+    function ok(el: HTMLElement, msg: string) { el.textContent = msg; el.style.color = 'var(--bovo-success)'; }
+    function err(el: HTMLElement, msg: string) { el.textContent = msg; el.style.color = 'var(--bovo-danger)'; }
+    const hhmm = (t: string) => (t ?? '').slice(0, 5);
+
+    // Sélecteur de jour (Lun → Dim, en gardant la valeur = index 0..6).
+    const daySelect = document.getElementById('new-avail-day') as HTMLSelectElement;
+    daySelect.innerHTML = [1, 2, 3, 4, 5, 6, 0]
+      .map((i) => `<option value="${i}">${DAYS[i]}</option>`).join('');
+
+    let userId: string | null = null;
+
+    // ---------- Créneaux récurrents ----------
+    function availRow(a: any): string {
+      return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; background:#fff; border:1px solid var(--bovo-line-soft); border-radius:var(--r-md); padding:10px 12px; margin-bottom:6px;">
+        <span style="font-size:0.9rem;"><strong style="font-family:'Jost';">${DAYS_SHORT[a.day_of_week]}</strong> · ${hhmm(a.time_start)} → ${hhmm(a.time_end)}</span>
+        <button type="button" class="del-avail topbar-back" data-id="${escapeHtml(a.id)}" aria-label="Supprimer" style="font-size:1rem;">🗑️</button>
+      </div>`;
+    }
+    async function loadAvail() {
+      const { data } = await supa.from('worker_availability')
+        .select('*').eq('worker_id', userId).order('day_of_week').order('time_start');
+      availList.innerHTML = (data && data.length)
+        ? data.map(availRow).join('')
+        : '<div style="color:var(--bovo-muted); font-size:0.86rem; padding:4px 0;">Aucun créneau déclaré. Ajoutez vos disponibilités habituelles ci-dessous.</div>';
+      availList.querySelectorAll<HTMLButtonElement>('.del-avail').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Supprimer ce créneau ?')) return;
+          btn.disabled = true;
+          const { error } = await supa.from('worker_availability').delete().eq('id', btn.dataset.id!);
+          if (error) { err(availFb, `Erreur : ${error.message}`); btn.disabled = false; return; }
+          await loadAvail();
+        });
+      });
+    }
+    document.getElementById('add-avail')!.addEventListener('click', async () => {
+      const day = Number(daySelect.value);
+      const start = (document.getElementById('new-avail-start') as HTMLInputElement).value;
+      const end = (document.getElementById('new-avail-end') as HTMLInputElement).value;
+      availFb.textContent = '';
+      if (!start || !end) { err(availFb, 'Indiquez une heure de début et de fin.'); return; }
+      if (end <= start) { err(availFb, "L'heure de fin doit être après le début."); return; }
+      // Garde anti-chevauchement (revue #28, point #3) : pas deux créneaux qui se recoupent le même jour.
+      const { data: sameDay } = await supa.from('worker_availability')
+        .select('time_start, time_end').eq('worker_id', userId).eq('day_of_week', day);
+      if ((sameDay ?? []).some((a) => hhmm(a.time_start) < end && start < hhmm(a.time_end))) {
+        err(availFb, 'Ce créneau en chevauche un autre le même jour.'); return;
+      }
+      const { error } = await supa.from('worker_availability')
+        .insert({ worker_id: userId, day_of_week: day, time_start: start, time_end: end });
+      if (error) { err(availFb, `Erreur : ${error.message}`); return; }
+      ok(availFb, '✓ Créneau ajouté');
+      await loadAvail();
+    });
+
+    // ---------- Congés / indisponibilités ----------
+    const fmtDate = (iso: string) => new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' });
+    function bkRow(b: any): string {
+      return `<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; background:#fff; border:1px solid var(--bovo-line-soft); border-radius:var(--r-md); padding:10px 12px; margin-bottom:6px;">
+        <span style="font-size:0.9rem;"><strong style="font-family:'Jost';">${fmtDate(b.starts_at)}</strong> → ${fmtDate(b.ends_at)}${b.reason ? ` · <span style="color:var(--bovo-muted);">${escapeHtml(b.reason)}</span>` : ''}</span>
+        <button type="button" class="del-bk topbar-back" data-id="${escapeHtml(b.id)}" aria-label="Supprimer" style="font-size:1rem;">🗑️</button>
+      </div>`;
+    }
+    async function loadBlackouts() {
+      const { data } = await supa.from('worker_blackouts')
+        .select('*').eq('worker_id', userId).order('starts_at');
+      bkList.innerHTML = (data && data.length)
+        ? data.map(bkRow).join('')
+        : '<div style="color:var(--bovo-muted); font-size:0.86rem; padding:4px 0;">Aucun congé déclaré.</div>';
+      bkList.querySelectorAll<HTMLButtonElement>('.del-bk').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (!confirm('Supprimer ce congé ?')) return;
+          btn.disabled = true;
+          const { error } = await supa.from('worker_blackouts').delete().eq('id', btn.dataset.id!);
+          if (error) { err(bkFb, `Erreur : ${error.message}`); btn.disabled = false; return; }
+          await loadBlackouts();
+        });
+      });
+    }
+    document.getElementById('add-bk')!.addEventListener('click', async () => {
+      const s = (document.getElementById('new-bk-start') as HTMLInputElement).value;
+      const e = (document.getElementById('new-bk-end') as HTMLInputElement).value;
+      const reason = (document.getElementById('new-bk-reason') as HTMLInputElement).value.trim();
+      bkFb.textContent = '';
+      if (!s || !e) { err(bkFb, 'Indiquez une date de début et de fin.'); return; }
+      if (e < s) { err(bkFb, 'La date de fin doit être après le début.'); return; }
+      // Bornes de journée LOCALES (sinon "AAAA-MM-JJ" est lue en UTC minuit → décalage
+      // d'1h en UTC+1, visible dans le planning admin).
+      const { error } = await supa.from('worker_blackouts').insert({
+        worker_id: userId,
+        starts_at: new Date(`${s}T00:00:00`).toISOString(),
+        ends_at: new Date(`${e}T23:59:59`).toISOString(),
+        reason: reason || null,
+      });
+      if (error) { err(bkFb, `Erreur : ${error.message}`); return; }
+      (document.getElementById('new-bk-start') as HTMLInputElement).value = '';
+      (document.getElementById('new-bk-end') as HTMLInputElement).value = '';
+      (document.getElementById('new-bk-reason') as HTMLInputElement).value = '';
+      ok(bkFb, '✓ Congé ajouté');
+      await loadBlackouts();
+    });
+
+    // ---------- Init ----------
+    (async () => {
+      const user = await getSessionUser();
+      if (!user) { loadingEl.textContent = 'Session expirée.'; return; }
+      userId = user.id;
+      await Promise.all([loadAvail(), loadBlackouts()]);
+      loadingEl.hidden = true;
+      contentEl.hidden = false;
+    })();
+  }
+</script>

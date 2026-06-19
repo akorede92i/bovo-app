@@ -6,6 +6,9 @@ interface Props {
   pageTitle?: string;
 }
 const { title = 'Espace worker — Bovo', pageTitle } = Astro.props;
+const path = Astro.url.pathname;
+const isMissions = path === '/worker' || path === '/worker/';
+const isDispo = path.startsWith('/worker/disponibilites');
 ---
 <!DOCTYPE html>
 <html lang="fr">
@@ -75,6 +78,25 @@ const { title = 'Espace worker — Bovo', pageTitle } = Astro.props;
       cursor: pointer;
       font-family: inherit;
     }
+    .worker-nav {
+      display: flex;
+      background: var(--bovo-bg);
+      border-bottom: 1px solid var(--bovo-line-soft);
+      position: sticky;
+      top: calc(52px + env(safe-area-inset-top));
+      z-index: var(--z-sticky);
+    }
+    .worker-nav a {
+      flex: 1;
+      text-align: center;
+      padding: 12px 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--bovo-muted);
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+    }
+    .worker-nav a.is-active { color: var(--bovo-bleu); border-bottom-color: var(--bovo-bleu); }
     .worker-page { padding: 18px 16px calc(32px + env(safe-area-inset-bottom)); }
     .worker-h1 { font-family: 'Jost', sans-serif; font-weight: 800; font-size: 1.3rem; margin-bottom: 4px; }
   </style>
@@ -88,6 +110,11 @@ const { title = 'Espace worker — Bovo', pageTitle } = Astro.props;
       </div>
       <button type="button" id="worker-signout">Déconnexion</button>
     </header>
+
+    <nav class="worker-nav">
+      <a href="/worker/" class={isMissions ? 'is-active' : ''}>Mes missions</a>
+      <a href="/worker/disponibilites/" class={isDispo ? 'is-active' : ''}>Mes dispos</a>
+    </nav>
 
     <main class="worker-page">
       {pageTitle && <h1 class="worker-h1">{pageTitle}</h1>}
