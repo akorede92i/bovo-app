@@ -14,7 +14,14 @@
     "test:unit:watch": "vitest",
     "test:unit:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui"
+    "test:e2e:ui": "playwright test --ui",
+    "android:assets": "npx @capacitor/assets generate --android",
+    "cap:client:add": "npm run build && BOVO_APP=client npx cap add android",
+    "cap:client:sync": "npm run build && BOVO_APP=client npx cap sync android",
+    "cap:client:open": "BOVO_APP=client npx cap open android",
+    "cap:worker:add": "npm run build && BOVO_APP=worker npx cap add android",
+    "cap:worker:sync": "npm run build && BOVO_APP=worker npx cap sync android",
+    "cap:worker:open": "BOVO_APP=worker npx cap open android"
   },
   "dependencies": {
     "@astrojs/sitemap": "~3.2.1",
