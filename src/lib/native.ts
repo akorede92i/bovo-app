@@ -129,9 +129,12 @@ async function attachPushListeners(): Promise<void> {
   // Tap sur une notification → router vers la page concernée (data.url).
   await FirebaseMessaging.addListener('notificationActionPerformed', (event: any) => {
     const url = event?.notification?.data?.url;
-    if (typeof url === 'string' && url.startsWith('/')) {
-      window.location.href = url;
-    }
+    if (typeof url !== 'string' || !url.startsWith('/')) return;
+    // Dans le shell worker (app « Bovo Pro », démarre sur /worker/), on ne suit que les
+    // routes /worker* : évite qu'un push d'un autre espace (ex. /compte) sorte le worker
+    // de son périmètre (cas d'un compte à double rôle worker + client).
+    if (window.location.pathname.startsWith('/worker') && !url.startsWith('/worker')) return;
+    window.location.href = url;
   });
 }
 

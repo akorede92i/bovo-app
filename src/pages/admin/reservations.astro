@@ -254,6 +254,16 @@ import AdminLayout from '@layouts/AdminLayout.astro';
         // assigned/in_progress/done). Aligne sur la modale d'affectation du dashboard.
         const effectiveStatus = (newWorker && (newStatus === 'pending' || newStatus === 'confirmed'))
           ? 'assigned' : newStatus;
+        // Garde retour-arrière (issue #30 #6) : l'admin garde tous les droits (override
+        // assumé), mais on confirme un retour en arrière sur une mission déjà avancée
+        // (le worker la reverra/reprendra). 'cancelled' = cas spécial, hors barème.
+        const STATUS_ORDER: Record<string, number> = { pending: 0, confirmed: 1, assigned: 2, in_progress: 3, done: 4 };
+        const cur = STATUS_ORDER[r.status];
+        const nxt = STATUS_ORDER[effectiveStatus];
+        if (cur != null && nxt != null && nxt < cur &&
+            !confirm(`Revenir de « ${STATUS_LABELS[r.status]} » à « ${STATUS_LABELS[effectiveStatus]} » ? Le worker reverra la mission.`)) {
+          return;
+        }
         const patch: Record<string, unknown> = {
           status: effectiveStatus,
           assigned_worker_id: newWorker,
