@@ -259,20 +259,46 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
       if (start) start.addEventListener('click', () => advance(r, 'in_progress'));
       if (done) done.addEventListener('click', () => advance(r, 'done'));
       if (accept) accept.addEventListener('click', () => respond(r, 'accept'));
-      if (decline) decline.addEventListener('click', () => respond(r, 'decline'));
+      if (decline) decline.addEventListener('click', () => showDeclineForm(r));
     }
 
-    async function respond(r: any, kind: 'accept' | 'decline') {
+    async function respond(r: any, _kind: 'accept') {
       const fb = document.getElementById('mission-feedback');
-      let patch: Record<string, unknown>;
-      if (kind === 'accept') {
-        patch = { worker_accepted_at: new Date().toISOString(), worker_declined_at: null, worker_decline_reason: null };
-      } else {
-        const reason = (prompt('Motif du refus (optionnel) :') ?? '').trim();
-        patch = { worker_declined_at: new Date().toISOString(), worker_accepted_at: null, worker_decline_reason: reason || null };
-      }
+      const patch = { worker_accepted_at: new Date().toISOString(), worker_declined_at: null, worker_decline_reason: null };
       if (fb) { fb.textContent = 'Enregistrement…'; fb.style.color = 'var(--bovo-muted)'; }
       const { error } = await supa.from('reservations').update(patch).eq('id', r.id);
+      if (error) { if (fb) { fb.textContent = `Erreur : ${error.message}`; fb.style.color = 'var(--bovo-danger)'; } return; }
+      modal.hidden = true;
+      await load();
+    }
+
+    // Refus : saisie du motif via un champ inline stylé (pas de prompt() natif, hors charte).
+    function showDeclineForm(r: any) {
+      const fb = document.getElementById('mission-feedback');
+      if (!fb) return;
+      const declineBtn = document.getElementById('act-decline');
+      if (declineBtn?.parentElement) (declineBtn.parentElement as HTMLElement).style.display = 'none';
+      fb.innerHTML = `
+        <label class="field-label" for="decline-reason">Motif du refus (optionnel)</label>
+        <textarea id="decline-reason" class="textarea" placeholder="Ex. indisponible, trop loin…"></textarea>
+        <div style="display:flex; gap:8px; margin-top:8px;">
+          <button id="decline-confirm" type="button" class="btn btn-sm" style="flex:1; background:var(--bovo-danger); color:#fff;">Confirmer le refus</button>
+          <button id="decline-cancel" type="button" class="btn btn-ghost btn-sm" style="flex:1;">Annuler</button>
+        </div>
+        <div id="decline-fb" style="font-size:0.82rem; margin-top:6px;"></div>`;
+      document.getElementById('decline-confirm')!.addEventListener('click', () => {
+        const reason = (document.getElementById('decline-reason') as HTMLTextAreaElement).value.trim();
+        void submitDecline(r, reason);
+      });
+      document.getElementById('decline-cancel')!.addEventListener('click', () => openMission(r.id));
+    }
+
+    async function submitDecline(r: any, reason: string) {
+      const fb = document.getElementById('decline-fb');
+      if (fb) { fb.textContent = 'Enregistrement…'; fb.style.color = 'var(--bovo-muted)'; }
+      const { error } = await supa.from('reservations')
+        .update({ worker_declined_at: new Date().toISOString(), worker_accepted_at: null, worker_decline_reason: reason || null })
+        .eq('id', r.id);
       if (error) { if (fb) { fb.textContent = `Erreur : ${error.message}`; fb.style.color = 'var(--bovo-danger)'; } return; }
       modal.hidden = true;
       await load();

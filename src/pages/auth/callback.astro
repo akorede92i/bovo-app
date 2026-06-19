@@ -56,13 +56,21 @@
 
       // next= est dans les query params (?next=/compte/reservations/), pas dans le hash
       const next = new URLSearchParams(window.location.search).get('next');
-      const redirectTo = next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : '/compte/';
+      const validNext = next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') ? next : null;
 
-      supa.auth.onAuthStateChange((event, session) => {
+      supa.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session) {
           clearTimeout(timeout);
           msg.textContent = 'Connecté ! Redirection…';
-          window.location.replace(redirectTo);
+          // À défaut de next explicite, routage par rôle (un worker → son espace).
+          let dest = validNext ?? '/compte/';
+          if (!validNext) {
+            try {
+              const { data: prof } = await supa.from('profiles').select('role').eq('id', session.user.id).maybeSingle();
+              if (prof?.role === 'worker') dest = '/worker/';
+            } catch { /* défaut /compte/ */ }
+          }
+          window.location.replace(dest);
         }
         if (event === 'SIGNED_OUT') {
           clearTimeout(timeout);
