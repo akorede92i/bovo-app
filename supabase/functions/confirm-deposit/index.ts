@@ -108,6 +108,10 @@ serve(async (req: Request) => {
   if (resa.deposit_status === 'paid' && resa.deposit_kkiapay_tx === transactionId) {
     return json({ ok: true, status: 'already_paid' });
   }
+  // Déjà payée avec un AUTRE tx → refus (ne pas écraser un acompte légitime).
+  if (resa.deposit_status === 'paid') {
+    return json({ error: 'Réservation déjà payée' }, 409);
+  }
 
   // 3) Usage unique : ce transactionId n'est pas déjà rattaché à une AUTRE réservation.
   const { data: reused } = await admin
@@ -149,10 +153,12 @@ serve(async (req: Request) => {
   }
 
   // Liaison paiement ↔ réservation : la page a passé reservationId dans le champ
-  // `data` du widget. Si Kkiapay le renvoie, on EXIGE la correspondance (empêche
-  // d'utiliser un paiement fait pour une autre réservation). S'il est absent selon
-  // l'API, on retombe sur la vérif montant + usage unique (index unique sur le tx).
-  const txData = verified?.data != null ? String(verified.data) : '';
+  // `data` du widget. L'API Kkiapay /transactions/status le renvoie sous `state`
+  // (et/ou `data` selon la version) ; s'il est présent on EXIGE la correspondance
+  // (empêche d'utiliser un paiement fait pour une AUTRE réservation). Absent → on
+  // retombe sur montant + usage unique (index unique sur le tx).
+  const txDataRaw = verified?.state ?? verified?.data;
+  const txData = txDataRaw != null ? String(txDataRaw) : '';
   if (txData && txData !== reservationId) {
     return json({ error: 'Transaction non liée à cette réservation' }, 409);
   }
@@ -160,7 +166,9 @@ serve(async (req: Request) => {
   // 5) Montant suffisant : au moins ~20 % de l'estimation (avec petite tolérance).
   const total = Number(resa.estimated_total_xof ?? 0);
   const expected = Math.round(total * DEPOSIT_RATE);
-  const minAmount = Math.floor(expected * AMOUNT_TOLERANCE);
+  // Plancher absolu : empêche qu'une résa au montant truqué très bas (estimated_total_xof
+  // est posé côté client) passe 'paid' avec un paiement dérisoire.
+  const minAmount = Math.max(Math.floor(expected * AMOUNT_TOLERANCE), 100);
   if (!(txAmount > 0 && txAmount >= minAmount)) {
     console.warn(`confirm-deposit : montant insuffisant tx=${txAmount} attendu>=${minAmount} (résa ${reservationId})`);
     return json({ error: 'Montant du paiement insuffisant' }, 402);

@@ -26,7 +26,7 @@ create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
   insert into public.profiles (id, full_name, phone)
@@ -167,6 +167,10 @@ create table if not exists public.reservations (
 
   -- assignation (rempli par admin)
   assigned_worker_id uuid references auth.users(id) on delete set null,
+  -- réponse du worker à l'affectation (W7 v2 ; aussi ajouté par migration 20260617_worker_accept_decline)
+  worker_accepted_at timestamptz,
+  worker_declined_at timestamptz,
+  worker_decline_reason text,
 
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -296,22 +300,59 @@ create policy "admin manages reservations" on public.reservations for all using 
 
 -- Verrou des champs sensibles sur UPDATE (cf. migration 20260610) : un non-admin
 -- ne peut qu'annuler sa résa, jamais forger deposit_status/worker/montant/user_id.
+-- ÉTAT FINAL (3 branches : admin / worker assigné / autre non-admin). NB : cette
+-- version est aussi (ré)appliquée par migrations/20260619_finalize_lock_trigger.sql
+-- pour garantir qu'elle gagne sur tout rejeu (ordre de nom de fichier).
 create or replace function public.lock_reservation_sensitive_fields()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = ''
 as $$
 begin
+  -- Admin et service_role : tous les droits.
   if public.is_admin() or auth.role() = 'service_role' then
     return new;
   end if;
-  new.user_id             := old.user_id;
-  new.service_type        := old.service_type;
-  new.estimated_total_xof := old.estimated_total_xof;
-  new.deposit_status      := old.deposit_status;
-  new.deposit_kkiapay_tx  := old.deposit_kkiapay_tx;
-  new.assigned_worker_id  := old.assigned_worker_id;
+
+  -- Worker ASSIGNÉ : avance le statut de SA mission (assigned→in_progress→done) et
+  -- pose sa réponse (worker_accepted_at/declined_at/decline_reason) ; reste restauré.
+  if public.is_worker()
+     and old.assigned_worker_id is not null
+     and old.assigned_worker_id = auth.uid() then
+    new.user_id             := old.user_id;
+    new.guest_name          := old.guest_name;
+    new.guest_phone         := old.guest_phone;
+    new.guest_email         := old.guest_email;
+    new.service_type        := old.service_type;
+    new.payload             := old.payload;
+    new.address_id          := old.address_id;
+    new.scheduled_at        := old.scheduled_at;
+    new.duration_min        := old.duration_min;
+    new.estimated_total_xof := old.estimated_total_xof;
+    new.deposit_status      := old.deposit_status;
+    new.deposit_kkiapay_tx  := old.deposit_kkiapay_tx;
+    new.assigned_worker_id  := old.assigned_worker_id;
+    if not (
+      (old.status = 'assigned'    and new.status = 'in_progress') or
+      (old.status = 'in_progress' and new.status = 'done')
+    ) then
+      new.status := old.status;
+    end if;
+    return new;
+  end if;
+
+  -- Client propriétaire / autre non-admin : ne peut qu'annuler ; les colonnes de
+  -- réponse worker sont VERROUILLÉES (restaurées depuis OLD).
+  new.user_id               := old.user_id;
+  new.service_type          := old.service_type;
+  new.estimated_total_xof   := old.estimated_total_xof;
+  new.deposit_status        := old.deposit_status;
+  new.deposit_kkiapay_tx    := old.deposit_kkiapay_tx;
+  new.assigned_worker_id    := old.assigned_worker_id;
+  new.worker_accepted_at    := old.worker_accepted_at;
+  new.worker_declined_at    := old.worker_declined_at;
+  new.worker_decline_reason := old.worker_decline_reason;
   if new.status is distinct from old.status and new.status <> 'cancelled' then
     new.status := old.status;
   end if;
