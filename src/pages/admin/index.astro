@@ -912,8 +912,10 @@ import { ZONES } from '@lib/catalog';
     async function loadUrgent() {
       const { data } = await supa.from('reservations')
         .select('id, service_type, guest_name, guest_phone, scheduled_at, status, assigned_worker_id, deposit_status, created_at, worker_accepted_at, worker_declined_at')
-        // À traiter = sans worker (pending/confirmed) OU refusée par le worker (à réassigner).
-        .or('and(status.in.(pending,confirmed),assigned_worker_id.is.null),worker_declined_at.not.is.null')
+        // À traiter = sans worker (pending/confirmed) OU mission ENCORE assignée mais
+        // refusée par le worker (à réassigner). Le `status.eq.assigned` évite qu'une
+        // mission annulée/terminée autrefois refusée reste coincée ici à vie.
+        .or('and(status.in.(pending,confirmed),assigned_worker_id.is.null),and(status.eq.assigned,worker_declined_at.not.is.null)')
         .order('scheduled_at', { ascending: true, nullsFirst: false })
         .limit(8);
 

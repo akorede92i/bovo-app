@@ -224,7 +224,9 @@ import WorkerLayout from '@layouts/WorkerLayout.astro';
       const { data, error } = await supa.from('worker_missions')
         .select('id, service_type, guest_name, guest_phone, scheduled_at, duration_min, status, payload, worker_accepted_at, worker_declined_at, worker_decline_reason')
         .in('status', ['assigned', 'in_progress', 'done', 'cancelled'])
-        .gte('scheduled_at', since.toISOString())
+        // Inclure les missions sans date (« date à définir ») : .gte exclurait les NULL
+        // → une mission assignée sans scheduled_at serait invisible pour le worker.
+        .or(`scheduled_at.is.null,scheduled_at.gte.${since.toISOString()}`)
         .order('scheduled_at', { ascending: true });
 
       loadingEl.hidden = true;
