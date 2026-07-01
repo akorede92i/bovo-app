@@ -94,6 +94,10 @@ jobs:
           # Paiements RÉELS : opt-in EXPLICITE, prod web uniquement. Le défaut du code
           # est sandbox (cf. kkiapay.ts) → tout autre build reste en paiements de test.
           PUBLIC_KKIAPAY_SANDBOX: 'false'
+          # ID de mesure GA4 (flux « Bovo — Web », propriété Bovo). Non secret (exposé
+          # côté client), posé UNIQUEMENT sur le build prod → aucune mesure en dev/CI.
+          # La collecte reste opt-in (bannière de consentement, cf. Analytics.astro).
+          PUBLIC_GA_ID: 'G-LBV0W3WQXD'
         run: npm run build
 
       - name: Add CNAME for custom domain

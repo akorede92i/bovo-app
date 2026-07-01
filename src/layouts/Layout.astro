@@ -1,6 +1,7 @@
 ---
 import '@styles/global.css';
 import { ViewTransitions } from 'astro:transitions';
+import Analytics from '@components/Analytics.astro';
 
 interface Props {
   title?: string;
@@ -191,6 +192,9 @@ const canonical = new URL(Astro.url.pathname, Astro.site ?? 'https://app.bovo.bj
         <slot name="cta-footer" />
       </div>
     )}
+
+    <!-- Google Analytics 4 (opt-in RGPD/CNIL, no-op si PUBLIC_GA_ID absent). -->
+    <Analytics />
 
     <!-- Register PWA service worker (web only — désactivé dans l'app native
          Capacitor, où il entrerait en conflit avec le serveur local). -->

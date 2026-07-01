@@ -1,0 +1,220 @@
+---
+/**
+ * Google Analytics 4 (gtag.js) — chargement opt-in, conforme RGPD/CNIL.
+ *
+ * - No-op tant que `PUBLIC_GA_ID` n'est pas défini → dev / preprod / CI sûrs
+ *   (aucune mesure tant que l'ID n'est pas posé dans l'environnement de build).
+ * - Opt-in STRICT : aucune requête vers Google, aucun cookie déposé tant que
+ *   l'utilisateur n'a pas cliqué « Accepter ». Consent Mode v2 par défaut = tout
+ *   refusé ; gtag.js n'est injecté qu'au consentement.
+ * - Le choix (granted / denied) est mémorisé dans localStorage : la bannière ne
+ *   réapparaît plus, et un visiteur ayant déjà accepté est mesuré dès l'arrivée.
+ * - RÉVERSIBLE : un déclencheur `data-consent="open"` (lien « Gérer les
+ *   statistiques » du footer) rouvre la bannière ; « Refuser » après un accord
+ *   repasse en denied et recharge la page pour purger gtag.js et les cookies _ga.
+ * - Désactivé dans l'app native Capacitor (comme le service worker) : le flux Web
+ *   ne mesure que le web. La mesure de l'app native relèvera de Firebase si besoin.
+ * - Robuste aux View Transitions (actives sur les tunnels de réservation) :
+ *   délégation d'événements sur `document` (survit au remplacement du <body>),
+ *   et un page_view est ré-émis à chaque navigation client (`astro:page-load`,
+ *   dédupliqué par chemin) — GA4 ne compte pas les navigations SPA autrement.
+ *   L'IIFE est idempotente (garde `window.__bovoGa`).
+ *
+ * Styles : classes `.consent-banner*` dans global.css (convention du repo, cf.
+ * CtaFooter qui n'a pas de <style> propre). z-index SOUS la couche modale
+ * (--z-modal) : des modales existent dans le shell client (compte/*), la bannière
+ * ne doit pas flotter par-dessus leur voile.
+ */
+const GA_ID = import.meta.env.PUBLIC_GA_ID;
+---
+{GA_ID && (
+  <div
+    id="bovo-consent"
+    class="consent-banner"
+    role="region"
+    aria-label="Consentement aux statistiques de visite"
+    hidden
+  >
+    <p class="consent-text">
+      Bovo utilise Google Analytics pour mesurer l'audience du site et
+      l'améliorer. Ces statistiques ne sont activées qu'avec votre accord.
+      <a href="https://policies.google.com/privacy" target="_blank" rel="noopener noreferrer">En savoir plus</a>
+    </p>
+    <div class="consent-actions">
+      <button type="button" class="btn btn-ghost btn-sm" data-consent="refuse">Refuser</button>
+      <button type="button" class="btn btn-primary btn-sm" data-consent="accept">Accepter</button>
+    </div>
+  </div>
+)}
+
+{GA_ID && (
+  <script define:vars={{ GA_ID }}>
+    (function () {
+      if (window.__bovoGa) return;
+      window.__bovoGa = true;
+
+      // Pas de GA dans l'app native Capacitor (cf. enregistrement du service worker).
+      var isNative = !!(
+        window.Capacitor &&
+        window.Capacitor.isNativePlatform &&
+        window.Capacitor.isNativePlatform()
+      );
+      if (isNative) {
+        // GA désactivé en natif : masquer le lien de gestion (sinon href="#" mort).
+        var hideGaUi = function () {
+          var links = document.querySelectorAll('a[data-consent="open"]');
+          for (var i = 0; i < links.length; i++) links[i].style.display = 'none';
+        };
+        hideGaUi();
+        document.addEventListener('astro:page-load', hideGaUi);
+        return;
+      }
+
+      var KEY = 'bovo:consent:analytics';
+      function readChoice() {
+        try { return localStorage.getItem(KEY); } catch (e) { return null; }
+      }
+      function saveChoice(v) {
+        try { localStorage.setItem(KEY, v); } catch (e) {}
+      }
+
+      // Supprime les cookies GA (_ga, _gid, _ga_*) sur le domaine et son parent
+      // (GA les pose par défaut sur le domaine enregistrable, ex. .bovo.bj).
+      function clearGaCookies() {
+        var host = location.hostname;
+        var domains = ['', host, '.' + host];
+        var parts = host.split('.');
+        if (parts.length > 2) domains.push('.' + parts.slice(-2).join('.'));
+        var cookies = document.cookie ? document.cookie.split(';') : [];
+        for (var i = 0; i < cookies.length; i++) {
+          var name = cookies[i].split('=')[0].trim();
+          if (name === '_ga' || name === '_gid' || name.indexOf('_ga_') === 0) {
+            for (var d = 0; d < domains.length; d++) {
+              document.cookie = name + '=; Max-Age=0; path=/' +
+                (domains[d] ? '; domain=' + domains[d] : '');
+            }
+          }
+        }
+      }
+
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { window.dataLayer.push(arguments); }
+      window.gtag = gtag;
+
+      // Consent Mode v2 — tout refusé par défaut (opt-in).
+      gtag('consent', 'default', {
+        ad_storage: 'denied',
+        ad_user_data: 'denied',
+        ad_personalization: 'denied',
+        analytics_storage: 'denied',
+        wait_for_update: 500,
+      });
+
+      var gaLoaded = false;
+      var lastPath = null;
+
+      // page_view émis manuellement (send_page_view: false) pour couvrir aussi les
+      // navigations View Transitions ; dédup par chemin pour éviter le doublon quand
+      // astro:page-load se déclenche sur le même chemin que le chargement initial.
+      function sendPageView() {
+        if (!gaLoaded) return;
+        var path = location.pathname + location.search;
+        if (path === lastPath) return;
+        var prev = lastPath;
+        lastPath = path;
+        gtag('event', 'page_view', {
+          page_location: location.href,
+          page_title: document.title,
+          // referrer interne sur les navs SPA (document.referrer reste figé sur
+          // le référent externe d'entrée après un pushState View Transitions).
+          page_referrer: prev ? location.origin + prev : document.referrer,
+        });
+      }
+
+      function loadGa() {
+        if (gaLoaded) return;
+        gaLoaded = true;
+        var s = document.createElement('script');
+        s.async = true;
+        s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_ID);
+        document.head.appendChild(s);
+        gtag('js', new Date());
+        gtag('config', GA_ID, { send_page_view: false });
+        sendPageView();
+      }
+
+      function grant() {
+        gtag('consent', 'update', { analytics_storage: 'granted' });
+        loadGa();
+      }
+
+      function banner() { return document.getElementById('bovo-consent'); }
+
+      // Remonte le CTA fixe des tunnels au-dessus de la bannière quand elle est
+      // visible (--bovo-consent-h consommé par global.css, mobile uniquement).
+      function syncCtaOffset() {
+        var b = banner();
+        if (b && !b.hidden) {
+          document.documentElement.style.setProperty('--bovo-consent-h', b.offsetHeight + 'px');
+          document.body.classList.add('bovo-consent-open');
+        } else {
+          document.documentElement.style.removeProperty('--bovo-consent-h');
+          document.body.classList.remove('bovo-consent-open');
+        }
+      }
+      // Re-mesure la hauteur quand la bannière change (police web appliquée après
+      // coup, re-wrap, rotation) : un seul écouteur 'resize' ne le couvre pas.
+      var ro = window.ResizeObserver ? new ResizeObserver(syncCtaOffset) : null;
+      function observeBanner() {
+        if (!ro) return;
+        ro.disconnect();
+        var b = banner();
+        if (b) ro.observe(b);
+      }
+      function showBanner() { var b = banner(); if (b) { b.hidden = false; syncCtaOffset(); } }
+      function hideBanner() { var b = banner(); if (b) b.hidden = true; syncCtaOffset(); }
+      function refreshBanner() { if (readChoice()) hideBanner(); else showBanner(); }
+
+      // Consentement déjà accordé lors d'une visite précédente → mesure immédiate.
+      if (readChoice() === 'granted') grant();
+
+      // Délégation sur document : survit au remplacement du <body> (View Transitions).
+      document.addEventListener('click', function (e) {
+        var t = e.target && e.target.closest ? e.target.closest('[data-consent]') : null;
+        if (!t) return;
+        var action = t.getAttribute('data-consent');
+        if (action === 'accept') {
+          saveChoice('granted');
+          grant();
+          hideBanner();
+        } else if (action === 'refuse') {
+          var wasGranted = readChoice() === 'granted';
+          saveChoice('denied');
+          hideBanner();
+          if (wasGranted) {
+            // Retrait d'un consentement déjà donné : on coupe la mesure, on purge
+            // les cookies _ga déjà posés, puis on recharge pour décharger gtag.js.
+            gtag('consent', 'update', { analytics_storage: 'denied' });
+            clearGaCookies();
+            location.reload();
+          }
+        } else if (action === 'open') {
+          // Point de retrait / gestion (lien footer) : rouvre la bannière.
+          if (t.getAttribute('href') === '#') e.preventDefault();
+          showBanner();
+        }
+      });
+
+      // Visibilité + comptage : au premier rendu, puis à chaque navigation client.
+      refreshBanner();
+      observeBanner();
+      sendPageView();
+      document.addEventListener('astro:page-load', function () {
+        refreshBanner();
+        observeBanner();
+        sendPageView();
+      });
+      window.addEventListener('resize', syncCtaOffset);
+    })();
+  </script>
+)}

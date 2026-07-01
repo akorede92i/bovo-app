@@ -204,6 +204,9 @@ const plombierPriceFrom = Math.min(...PLOMBIER_TYPES.map((t) => t.priceXof));
         <div class="home-footer-h">Légal</div>
         <a href="https://bovo.bj/mentions-legales.html">Mentions légales</a>
         <a href="https://bovo.bj/confidentialite.html">Confidentialité</a>
+        {import.meta.env.PUBLIC_GA_ID && (
+          <a href="#" data-consent="open">Gérer les statistiques</a>
+        )}
         <a href="https://bovo.bj">bovo.bj</a>
       </div>
     </div>
