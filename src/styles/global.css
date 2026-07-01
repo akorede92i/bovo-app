@@ -636,7 +636,9 @@ body[data-shell='dashboard'] {
   left: 50%;
   transform: translateX(-50%);
   bottom: calc(12px + var(--safe-bottom));
-  z-index: var(--z-toast);
+  /* Sous la couche modale (--z-modal=100) : des modales existent dans le shell
+     client (compte/*), la bannière ne doit pas flotter par-dessus leur voile. */
+  z-index: calc(var(--z-modal) - 1);
   width: min(560px, calc(100vw - 24px));
   display: flex;
   flex-wrap: wrap;

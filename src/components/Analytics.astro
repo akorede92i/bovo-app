@@ -21,8 +21,9 @@
  *   L'IIFE est idempotente (garde `window.__bovoGa`).
  *
  * Styles : classes `.consent-banner*` dans global.css (convention du repo, cf.
- * CtaFooter qui n'a pas de <style> propre). z-index = --z-toast : la bannière
- * doit rester visible ; aucune modale n'existe dans le shell client aujourd'hui.
+ * CtaFooter qui n'a pas de <style> propre). z-index SOUS la couche modale
+ * (--z-modal) : des modales existent dans le shell client (compte/*), la bannière
+ * ne doit pas flotter par-dessus leur voile.
  */
 const GA_ID = import.meta.env.PUBLIC_GA_ID;
 ---
@@ -58,7 +59,16 @@ const GA_ID = import.meta.env.PUBLIC_GA_ID;
         window.Capacitor.isNativePlatform &&
         window.Capacitor.isNativePlatform()
       );
-      if (isNative) return;
+      if (isNative) {
+        // GA désactivé en natif : masquer le lien de gestion (sinon href="#" mort).
+        var hideGaUi = function () {
+          var links = document.querySelectorAll('a[data-consent="open"]');
+          for (var i = 0; i < links.length; i++) links[i].style.display = 'none';
+        };
+        hideGaUi();
+        document.addEventListener('astro:page-load', hideGaUi);
+        return;
+      }
 
       var KEY = 'bovo:consent:analytics';
       function readChoice() {
@@ -66,6 +76,25 @@ const GA_ID = import.meta.env.PUBLIC_GA_ID;
       }
       function saveChoice(v) {
         try { localStorage.setItem(KEY, v); } catch (e) {}
+      }
+
+      // Supprime les cookies GA (_ga, _gid, _ga_*) sur le domaine et son parent
+      // (GA les pose par défaut sur le domaine enregistrable, ex. .bovo.bj).
+      function clearGaCookies() {
+        var host = location.hostname;
+        var domains = ['', host, '.' + host];
+        var parts = host.split('.');
+        if (parts.length > 2) domains.push('.' + parts.slice(-2).join('.'));
+        var cookies = document.cookie ? document.cookie.split(';') : [];
+        for (var i = 0; i < cookies.length; i++) {
+          var name = cookies[i].split('=')[0].trim();
+          if (name === '_ga' || name === '_gid' || name.indexOf('_ga_') === 0) {
+            for (var d = 0; d < domains.length; d++) {
+              document.cookie = name + '=; Max-Age=0; path=/' +
+                (domains[d] ? '; domain=' + domains[d] : '');
+            }
+          }
+        }
       }
 
       window.dataLayer = window.dataLayer || [];
@@ -91,10 +120,14 @@ const GA_ID = import.meta.env.PUBLIC_GA_ID;
         if (!gaLoaded) return;
         var path = location.pathname + location.search;
         if (path === lastPath) return;
+        var prev = lastPath;
         lastPath = path;
         gtag('event', 'page_view', {
           page_location: location.href,
           page_title: document.title,
+          // referrer interne sur les navs SPA (document.referrer reste figé sur
+          // le référent externe d'entrée après un pushState View Transitions).
+          page_referrer: prev ? location.origin + prev : document.referrer,
         });
       }
 
@@ -125,8 +158,18 @@ const GA_ID = import.meta.env.PUBLIC_GA_ID;
           document.documentElement.style.setProperty('--bovo-consent-h', b.offsetHeight + 'px');
           document.body.classList.add('bovo-consent-open');
         } else {
+          document.documentElement.style.removeProperty('--bovo-consent-h');
           document.body.classList.remove('bovo-consent-open');
         }
+      }
+      // Re-mesure la hauteur quand la bannière change (police web appliquée après
+      // coup, re-wrap, rotation) : un seul écouteur 'resize' ne le couvre pas.
+      var ro = window.ResizeObserver ? new ResizeObserver(syncCtaOffset) : null;
+      function observeBanner() {
+        if (!ro) return;
+        ro.disconnect();
+        var b = banner();
+        if (b) ro.observe(b);
       }
       function showBanner() { var b = banner(); if (b) { b.hidden = false; syncCtaOffset(); } }
       function hideBanner() { var b = banner(); if (b) b.hidden = true; syncCtaOffset(); }
@@ -149,9 +192,10 @@ const GA_ID = import.meta.env.PUBLIC_GA_ID;
           saveChoice('denied');
           hideBanner();
           if (wasGranted) {
-            // Retrait d'un consentement déjà donné : on coupe la mesure et on
-            // recharge pour purger gtag.js et les cookies _ga déjà posés.
+            // Retrait d'un consentement déjà donné : on coupe la mesure, on purge
+            // les cookies _ga déjà posés, puis on recharge pour décharger gtag.js.
             gtag('consent', 'update', { analytics_storage: 'denied' });
+            clearGaCookies();
             location.reload();
           }
         } else if (action === 'open') {
@@ -163,9 +207,11 @@ const GA_ID = import.meta.env.PUBLIC_GA_ID;
 
       // Visibilité + comptage : au premier rendu, puis à chaque navigation client.
       refreshBanner();
+      observeBanner();
       sendPageView();
       document.addEventListener('astro:page-load', function () {
         refreshBanner();
+        observeBanner();
         sendPageView();
       });
       window.addEventListener('resize', syncCtaOffset);
